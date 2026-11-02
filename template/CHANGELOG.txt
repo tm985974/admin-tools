@@ -2,6 +2,19 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.20 (2026-11-02)  TEMPLATE_FILES.txt: correct AppHost.cs hash
+  Fixed   : TEMPLATE_FILES.txt in v1.0.19 listed an out-of-date hash for
+            AppHost.cs (taken before its last edit). The template's own
+            developer build showed "template 1.0.19, 1 changed", and Update
+            Template refused the v1.0.19 zip ("does not match its own
+            TEMPLATE_FILES.txt"). The hash now matches the shipped AppHost.cs;
+            every listed file was re-verified. No code changes.
+  Note    : Release check: before packaging a template version, recompute
+            every TEMPLATE_FILES.txt hash from the files being shipped (same
+            rule: UTF-8, LF, no BOM) - this is the second stale AppHost.cs hash
+            (see v1.0.17).
+  Note    : Engine-only: projects on 1.0.17+ take it with Update Template.
+
 v1.0.19 (2026-11-02)  Tidier developer buttons; machine facts + requirement checks
   Fixed   : "Update Template" showed as "Update": the button was too narrow, the
             text wrapped and its second line was cut off. Developer buttons now

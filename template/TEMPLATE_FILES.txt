@@ -1,4 +1,4 @@
-# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.0.19
+# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.0.20
 #
 # Every project carries these files UNCHANGED (same bytes as the template).
 # AppHost.cs has no project-specific lines: the project's names are in the
@@ -17,7 +17,7 @@
 # run while any listed file differs.
 # Hash: SHA-256 of the UTF-8 text with LF line endings and no BOM.
 #
-5cd241fef4ce01e330543bb14a5f9aeee3d02481360bb939423bdd29fd511e17  AppHost.cs
+1cbed13adb5404b35ac9388f008d98b82baa573c98cf20a4cfe7d9f773e3b2c8  AppHost.cs
 8f1adb4f172aeb5300eefa37a998917c87c412e564161bbaf083772d23d82fbd  Build-App.ps1
 716629172f5ef833c6ee550303a4c979fbe14ce2da18c5654156920a5b914d36  Build-App.cs
 b9ccd3a5f1a58fe6e767bd70663d022358533c1d0420ad66ca318289326b4214  Build-App.cmd
