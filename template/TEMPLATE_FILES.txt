@@ -1,4 +1,4 @@
-# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.0.18
+# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.0.19
 #
 # Every project carries these files UNCHANGED (same bytes as the template).
 # AppHost.cs has no project-specific lines: the project's names are in the
@@ -17,7 +17,7 @@
 # run while any listed file differs.
 # Hash: SHA-256 of the UTF-8 text with LF line endings and no BOM.
 #
-1015fd06ca4c323cc6aa73c640668fa49a64118611bcb1f407d54ceb0fc1eb84  AppHost.cs
+5cd241fef4ce01e330543bb14a5f9aeee3d02481360bb939423bdd29fd511e17  AppHost.cs
 8f1adb4f172aeb5300eefa37a998917c87c412e564161bbaf083772d23d82fbd  Build-App.ps1
 716629172f5ef833c6ee550303a4c979fbe14ce2da18c5654156920a5b914d36  Build-App.cs
 b9ccd3a5f1a58fe6e767bd70663d022358533c1d0420ad66ca318289326b4214  Build-App.cmd
@@ -27,6 +27,7 @@ b9ccd3a5f1a58fe6e767bd70663d022358533c1d0420ad66ca318289326b4214  Build-App.cmd
 a66daa25ca2fbfa73df43077d0c09629bbab07b7a87e95bdb0e49e3f52c80ae6  Modules/Base/Services_EnvironmentStore.psm1
 e660b8a8a4817bb68e6aee75febf3f211360a53f587fe6f1545bb73533dc1b10  Modules/Base/Services_Filter.psm1
 027feda44dd81184f98e4e3c43e4f2d15221cfe398e8b360e427a5e8d3495e41  Modules/Base/Services_Logging.psm1
+e3f6e39423f1951f7b544ae4481dd3d7d6e70a38fb7c716954318d3d8f87a850  Modules/Base/Services_Requirements.psm1
 343d4bf2af8a02062a8483dcfe6c1a9b1560949c7bfa6644bbf341bdeafbfdf3  Modules/Base/Services_Settings.psm1
 eb1654f73a9f356f0393adfb87e1b45b718d39ffee1bd92a3a29c8cdf6be677f  Modules/Base/Services_Theme.psm1
 ef9888ea769e0a2929f086822e2303c8460f5e3a07aeaabd03ab158b1b91c011  Modules/Base/UI_EmbeddedTabPage.psm1

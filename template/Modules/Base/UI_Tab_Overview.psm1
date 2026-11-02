@@ -67,9 +67,13 @@ function New-OverviewTab {
     Add-Bullet 'Use Register-ListFilter + Select-FilterMatch (Base\Services_Filter.psm1); Tab 2 shows the pattern.'
     Add-Bullet 'Filter as I type (Environment > General) filters after a short pause; off = filter on Enter. Esc clears.'
 
+    Add-Section 'Requirements'
+    Add-Bullet 'A tab names what it needs (Register-AppRequirement -Module / -Command). Checked once at start and logged; when missing, the tab says so instead of failing.'
+
     Add-Section 'Logging'
     Add-Bullet 'Per-environment Logs\<ENV>.log plus a shared Session.log.'
     Add-Bullet 'Machine/UTC stamped and size-capped (FIFO).'
+    Add-Bullet 'Every start logs the machine: Windows, PowerShell and .NET versions, 32/64-bit. Session.log is the one file to ask for.'
     Add-Bullet 'Written to the resolved data root; never packed back into the EXE.'
 
     Add-Section 'Build and update (developer build)'
@@ -79,7 +83,8 @@ function New-OverviewTab {
     Add-Bullet 'Update Template - pick the template''s source zip: the engine files move to the newer template (checked and previewed first), project files stay.'
     Add-Bullet 'Build Sealed - mint the distributable with user/admin passwords.'
     Add-Bullet 'Build Lite - rebuild <ExeName>Lite.exe now (test passwords: admin a, user u).'
-    Add-Bullet 'Extract - write the whole project out (with FunctionMap.txt and Environment.txt) for hand-off.'
+    Add-Bullet 'Extract - write the whole project out now (with FunctionMap.txt and Environment.txt) for hand-off.'
+    Add-Bullet 'Open - the app folder (Archive, Update, Lite EXE), the Logs in use, or AppData (Settings, Extract).'
 
     Add-Section 'Make it your own'
     Add-Bullet 'New project: set AppName, ExeName and AppDataFolder in AppIdentity.json; AppHost.cs and the builder read it.'

@@ -10,6 +10,12 @@ function New-Tab1 {
         [Parameter(Mandatory)] $App
     )
 
+    # What this tab needs on the machine (Base\Services_Requirements.psm1). Checked
+    # once at start-up and logged; when missing, the tab shows a message instead.
+    # A real tab names its real dependency, e.g.
+    #   -Module 'ActiveDirectory' -Hint 'Install RSAT: Active Directory module for Windows PowerShell.'
+    if (-not (Register-AppRequirement -App $App -Page $Page -For 'Tab 1' -Module 'Microsoft.PowerShell.Management')) { return }
+
     $hdr = New-Object System.Windows.Forms.Label
     $hdr.Text = 'Tab 1 - wired example'; $hdr.Location = New-Object System.Drawing.Point(4, 4); $hdr.AutoSize = $true
     if (Get-Command Set-HeaderStyle -ErrorAction SilentlyContinue) { Set-HeaderStyle -App $App -Label $hdr } else { $hdr.ForeColor = $App.Theme.Title }

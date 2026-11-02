@@ -412,6 +412,86 @@ namespace AppTemplate
     }
 
     // =====================================================================
+    //  System facts -- cheap, logged on the Session.log start line of every
+    //  build (sealed included), so Session.log alone describes the machine.
+    //  Each read is guarded: a value that cannot be read says "unknown".
+    // =====================================================================
+    static class SystemFacts
+    {
+        static string _line;
+
+        // "os='Windows Server 2019 Standard 1809 build 17763.6414' ps=5.1.17763.6414 net=4.8 x64/x64"
+        public static string Line()
+        {
+            if (_line == null)
+                _line = "os='" + Windows() + "' ps=" + PowerShell() + " net=" + DotNet() + " " + Bitness();
+            return _line;
+        }
+
+        // Product name + release + build from the registry (Environment.OSVersion
+        // reports 6.2 on every Windows since 8 for an EXE without a manifest).
+        public static string Windows()
+        {
+            try
+            {
+                using (var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
+                {
+                    if (k == null) return Environment.OSVersion.ToString();
+                    string name = Convert.ToString(k.GetValue("ProductName") ?? "Windows");
+                    string rel  = Convert.ToString(k.GetValue("DisplayVersion") ?? k.GetValue("ReleaseId") ?? "");
+                    string build = Convert.ToString(k.GetValue("CurrentBuild") ?? k.GetValue("CurrentBuildNumber") ?? "");
+                    object ubr = k.GetValue("UBR");
+                    return (name + (rel == "" ? "" : " " + rel) + (build == "" ? "" : " build " + build + (ubr == null ? "" : "." + ubr))).Trim();
+                }
+            }
+            catch { return "unknown"; }
+        }
+
+        // $PSVersionTable.PSVersion, read from System.Management.Automation without
+        // starting a runspace.
+        public static string PowerShell()
+        {
+            try
+            {
+                var t = typeof(System.Management.Automation.PowerShell).Assembly.GetType("System.Management.Automation.PSVersionInfo");
+                if (t != null)
+                {
+                    var p = t.GetProperty("PSVersion", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    object v = p != null ? p.GetValue(null, null) : null;
+                    if (v != null) return v.ToString();
+                }
+            }
+            catch { }
+            return "unknown";
+        }
+
+        // The installed .NET Framework 4.x release (Environment.Version says
+        // 4.0.30319 for every 4.x).
+        public static string DotNet()
+        {
+            try
+            {
+                using (var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"))
+                {
+                    object o = k == null ? null : k.GetValue("Release");
+                    if (o == null) return "4.x (" + Environment.Version + ")";
+                    int r = Convert.ToInt32(o);
+                    string v = r >= 533320 ? "4.8.1" : r >= 528040 ? "4.8" : r >= 461808 ? "4.7.2" : r >= 461308 ? "4.7.1" :
+                               r >= 460798 ? "4.7" : r >= 394802 ? "4.6.2" : r >= 394254 ? "4.6.1" : r >= 393295 ? "4.6" : "4.5.x";
+                    return v;
+                }
+            }
+            catch { return "unknown"; }
+        }
+
+        // "process/OS", e.g. x64/x64; x86/x64 = a 32-bit process on 64-bit Windows.
+        public static string Bitness()
+        {
+            return (Environment.Is64BitProcess ? "x64" : "x86") + "/" + (Environment.Is64BitOperatingSystem ? "x64" : "x86");
+        }
+    }
+
+    // =====================================================================
     //  Main form
     // =====================================================================
     class MainForm : Form
@@ -517,18 +597,20 @@ namespace AppTemplate
             };
 #if !SEALED
             // Developer tooling -- present only in the developer build.
+            // Function Map and Environment are in every Extract and Archive\Zip zip
+            // (Config\FunctionMap.txt, Config\Environment.txt); the machine facts are
+            // also on the Session.log start line.
             _devRow.Controls.Add(StyledButton("Update",          delegate { StartUpdate(); }));
             _devRow.Controls.Add(StyledButton("Update Template", delegate { StartTemplateUpdate(); }));
-            _devRow.Controls.Add(StyledButton("Extract",         delegate { ExtractEmbedded(); }));
             _devRow.Controls.Add(StyledButton("Build Sealed",    delegate { BuildSealed(); }));
             _devRow.Controls.Add(StyledButton("Build Lite",      delegate { BuildLiteNow(); }));
+            _devRow.Controls.Add(StyledButton("Extract",         delegate { ExtractEmbedded(); }));
             _devRow.Controls.Add(StyledButton("Version History", delegate { ShowVersionHistory(); }));
-            _devRow.Controls.Add(StyledButton("Function Map",    delegate { GenerateFunctionMap(); }));
-            _devRow.Controls.Add(StyledButton("Environment",     delegate { CaptureEnvironment(); }));
-            _devRow.Controls.Add(StyledButton("Open AppData",    delegate {
-                Process.Start("explorer.exe", "\"" + GetLocalAppDataRoot() + "\""); }));
+            Button open = null;
+            open = StyledButton("Open \u25BE", delegate { ShowOpenMenu(open); });
+            _devRow.Controls.Add(open);
 #else
-            // Sealed (runtime) build: no developer tooling, no Open AppData.
+            // Sealed (runtime) build: no developer tooling.
             _devRow.Visible = false;
             _devRow.Height = 0;
 #endif
@@ -575,7 +657,10 @@ namespace AppTemplate
         Button StyledButton(string text, EventHandler onClick)
         {
             var b = _theme.MakeButton(text);
-            b.AutoSize = false; b.Size = new Size(118, 28);
+            // Grows to fit its text on one line (a fixed width wrapped "Update
+            // Template" and clipped its second line); never narrower than 118.
+            b.AutoSize = true; b.AutoSizeMode = AutoSizeMode.GrowOnly;
+            b.MinimumSize = new Size(118, 28); b.MaximumSize = new Size(0, 28);
             if (onClick != null) b.Click += onClick;
             return b;
         }
@@ -606,6 +691,7 @@ namespace AppTemplate
             FillContext(env);
             _ctx.Log("INFO", "Startup", "Launched tier=" + _tier + " v" + _version + " template=" + (_templateVersion == "" ? "unknown" : _templateVersion) +
                                         " env='" + _activeName + "' root=" + _dataRootStatus);
+            _ctx.Log("INFO", "Startup", "System: " + SystemFacts.Line());
             if (!ProjectIdentity.Ok)
                 _ctx.Log("WARN", "Identity", ProjectIdentity.FileName + " " + ProjectIdentity.Source +
                          " - running as '" + AppName + "' (AppData folder " + AppDataFolder + "). Add " + ProjectIdentity.FileName + " to the project root and rebuild.");
@@ -1323,6 +1409,31 @@ namespace AppTemplate
                 ShowStatusMessage("Archived v" + _version + "; " + ExeName + "Lite.exe ready (admin '" + DevLiteAdminPassword + "', user '" + DevLiteUserPassword + "').", "ok");
         }
 
+        // ---- Open \u25BE : the folders a developer needs ----
+        void ShowOpenMenu(Control anchor)
+        {
+            var menu = new ContextMenuStrip { Font = Font };
+            AddOpenItem(menu, "App folder  (Archive, Update, Lite EXE)", ExeDir());
+            AddOpenItem(menu, "Logs  (" + (_dataRootStatus == "Network" ? "shared" : "local") + ")", Path.Combine(_dataRoot ?? GetLocalAppDataRoot(), "Logs"));
+            AddOpenItem(menu, "AppData  (Settings, Extract, Build Sealed output)", GetLocalAppDataRoot());
+            menu.Closed += delegate { BeginInvoke((MethodInvoker)delegate { menu.Dispose(); }); };
+            if (anchor != null) menu.Show(anchor, new Point(0, anchor.Height));
+            else menu.Show(Cursor.Position);
+        }
+
+        void AddOpenItem(ContextMenuStrip menu, string text, string folder)
+        {
+            menu.Items.Add(text, null, delegate
+            {
+                try
+                {
+                    Directory.CreateDirectory(folder);
+                    Process.Start("explorer.exe", "\"" + folder + "\"");
+                }
+                catch (Exception ex) { Err("Open", ex); }
+            });
+        }
+
         static string ExeDir() { return Path.GetDirectoryName(Application.ExecutablePath); }
         static string LitePath() { return Path.Combine(ExeDir(), ExeName + "Lite.exe"); }
 
@@ -1495,24 +1606,6 @@ namespace AppTemplate
             return sb.ToString();
         }
 
-        void GenerateFunctionMap()
-        {
-            try
-            {
-                var files = LoadPackage();
-                string text = BuildFunctionMapText(files);
-                int count = text.Split('\n').Count(l => l.Contains("-->"));
-                string outDir = Path.Combine(GetLocalAppDataRoot(), "Extract"); Directory.CreateDirectory(outDir);
-                string outPath = Path.Combine(outDir, "FunctionMap.txt");
-                File.WriteAllText(outPath, text, new UTF8Encoding(false));
-                _ctx.Log("INFO", "FunctionMap", "Wrote " + count + " functions to " + outPath);
-                MessageBox.Show(this, "Function map (" + count + " functions):\n" + outPath, "Function Map", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex) { Err("Function Map", ex); }
-        }
-
-        string BuildEnvironmentText() { return BuildEnvironmentText(true); }
-
         // includeModules = false skips "Get-Module -ListAvailable" (slow on servers
         // with many modules) - used by the background archive.
         string BuildEnvironmentText(bool includeModules)
@@ -1522,9 +1615,10 @@ namespace AppTemplate
             sb.AppendLine("Generated         : " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             sb.AppendLine("Machine           : " + Environment.MachineName);
             sb.AppendLine("User              : " + Environment.UserName);
-            sb.AppendLine("OS                : " + Environment.OSVersion);
-            sb.AppendLine("64-bit OS         : " + Environment.Is64BitOperatingSystem);
-            sb.AppendLine("CLR               : " + Environment.Version);
+            sb.AppendLine("Windows           : " + SystemFacts.Windows());
+            sb.AppendLine("PowerShell        : " + SystemFacts.PowerShell());
+            sb.AppendLine(".NET Framework    : " + SystemFacts.DotNet());
+            sb.AppendLine("Process / OS      : " + SystemFacts.Bitness());
             sb.AppendLine("App version       : v" + _version);
             sb.AppendLine("Template version  : " + (_templateVersion == "" ? "unknown" : "v" + _templateVersion) +
                           (_templateDrift.Count > 0 ? "  (changed: " + string.Join(", ", _templateDrift.ToArray()) + ")" : ""));
@@ -1543,19 +1637,6 @@ namespace AppTemplate
             }
             catch (Exception ex) { sb.AppendLine("Get-Module: " + ex.Message); }
             return sb.ToString();
-        }
-
-        void CaptureEnvironment()
-        {
-            try
-            {
-                string outDir = Path.Combine(GetLocalAppDataRoot(), "Extract"); Directory.CreateDirectory(outDir);
-                string outPath = Path.Combine(outDir, "Environment.txt");
-                File.WriteAllText(outPath, BuildEnvironmentText(), new UTF8Encoding(false));
-                _ctx.Log("INFO", "Environment", "Wrote " + outPath);
-                MessageBox.Show(this, "Environment captured:\n" + outPath, "Environment", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex) { Err("Environment", ex); }
         }
 
         // A parsed CHANGELOG entry.

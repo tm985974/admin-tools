@@ -2,6 +2,31 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.19 (2026-11-02)  Tidier developer buttons; machine facts + requirement checks
+  Fixed   : "Update Template" showed as "Update": the button was too narrow, the
+            text wrapped and its second line was cut off. Developer buttons now
+            size to their text (118 px minimum).
+  Removed : Function Map and Environment buttons. Both files are in every
+            Extract and Archive\Zip zip (Config\FunctionMap.txt,
+            Config\Environment.txt), and the machine facts are now on the
+            Session.log start line.
+  Changed : "Open AppData" is now "Open" with a menu: App folder (Archive,
+            Update, Lite EXE), Logs (the data root in use, shared or local),
+            AppData (Settings, Extract, Build Sealed output).
+            Button order: Update, Update Template, Build Sealed, Build Lite,
+            Extract, Version History, Open.
+  Added   : Every start (every build, sealed included) logs a second line,
+            "[Startup] System: os='...' ps=5.1... net=4.8 x64/x64": Windows name,
+            release and build (from the registry), PowerShell version, .NET
+            Framework release, process/OS bitness. Environment.txt uses the same.
+  Added   : Base\Services_Requirements.psm1 - Register-AppRequirement: a tab
+            names the module (-Module, -MinimumVersion) or command/program
+            (-Command) it needs. Checked once per run, logged as OK or MISSING
+            (with -Hint), and with -Page a missing one puts a message band on
+            the tab; it returns $false so the tab stops building. Tab 1 shows
+            the pattern. Get-AppRequirementStatus lists every check.
+  Note    : Engine-only: projects on 1.0.17+ take it with Update Template.
+
 v1.0.18 (2026-11-01)  Build-App.exe (no PowerShell needed); Build Lite; Update folder
   Added   : Build-App.cs, the builder as C# (template-owned). It compiles to
             Build-App.exe, so a project builds where PowerShell scripts are

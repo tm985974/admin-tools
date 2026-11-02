@@ -16,8 +16,8 @@ renamed when you start a real project.
 | Embedded C# source (`core.dat`) | yes | **no — omitted** |
 | Module package | plaintext, all tiers | **two AES-256 bundles, per-tier** |
 | Password to run | none | **yes — at launch** |
-| Dev tooling (Update/Update Template/Extract/Build Sealed/Build Lite/Function Map/Environment/History) | yes | no |
-| Open AppData button | yes | no |
+| Dev tooling (Update / Update Template / Build Sealed / Build Lite / Extract / Version History / Open ▾) | yes | no |
+| Requirement checks + machine facts in Session.log | yes | yes |
 | Tabs (Overview, Tab 1-4, Environment) | yes | yes |
 | Create / edit environments (Environment tab) | yes | admin password only (user password: pick only) |
 | Admin-tier tabs/modules | yes (all tiers loaded) | only with the admin password |
@@ -129,8 +129,9 @@ The registrar builds a tab only if its function is present, so admin tabs simply
 don't appear in a user-tier session.
 
 One function per module keeps the **Function Map** (function → module)
-meaningful; the dev build's Function Map button regenerates it, and **Extract
-now includes `FunctionMap.txt` and `Environment.txt`** so a hand-off carries both.
+meaningful. It is `Config\FunctionMap.txt` in every Extract and `Archive\Zip`
+zip, beside `Config\Environment.txt` (the machine facts; Extract adds the
+installed-module list).
 
 ---
 
@@ -152,6 +153,7 @@ now includes `FunctionMap.txt` and `Environment.txt`** so a hand-off carries bot
 | Host code that needs a `[TabPage]`, without a tab strip | `New-EmbeddedTabPage -Parent ... -Width ... -Height ...` |
 | React to the user switching environment | `Register-EnvironmentChangedHandler -Handler { param($App) ... }` |
 | Port a tool whose files share one `$script:` scope | `Config\SharedScope.json` (`Modules`, `Order`), plus an optional `Initialize-SharedScope -App` |
+| Say what a tab needs on the machine (module / command) | `if (-not (Register-AppRequirement -App $App -Page $Page -For 'User Lookup' -Module ActiveDirectory -Hint '...')) { return }` at the top of `New-<Tab>` (`Services_Requirements.psm1`; Tab 1 shows it). `-Command` for programs/cmdlets, `-MinimumVersion`; `Get-AppRequirementStatus` lists all |
 | Filter a list, grid or tree (wildcards anywhere) | `Register-ListFilter -App $App -TextBox $box -OnFilter { param($Regex,$Text) ... }` + `Select-FilterMatch -Items $all -Regex $Regex -Property ...` (`Services_Filter.psm1`; Tab 2 is the example) |
 
 ### Lists and filters (template rule)
@@ -185,7 +187,10 @@ when two modules define the same function, or two module files share a name.
 
 The developer EXE keeps an `Update` folder beside itself (made on every start
 and every compile): drop update zips there; the Update and Update Template
-pickers open in it. **Build Lite** rebuilds `<ExeName>Lite.exe` on demand.
+pickers open in it. **Build Lite** rebuilds `<ExeName>Lite.exe` on demand (e.g.
+after saving environments in the developer EXE). **Open ▾** opens the app
+folder (Archive, Update, Lite EXE), the Logs folder in use, or AppData
+(Settings, Extract, Build Sealed output).
 
 1. Change files in the source folder (an unzipped Extract).
 2. Zip **only the changed files**, with paths from the project root
@@ -316,6 +321,20 @@ is running it cannot be replaced; that is logged and retried on the next start.
 Each step is saved as it finishes, so closing the app mid-way (it asks first)
 resumes on the next start; Session.log lines are tagged `[Archive]`.
 
+## Troubleshooting a user's machine
+
+Ask for `Session.log` (`<data root>\Logs`, usually
+`%LOCALAPPDATA%\<AppDataFolder>\Logs`). Every start writes two lines:
+
+```
+[Startup] Launched tier=User v1.2.3 template=1.0.19 env='Default' root=Network
+[Startup] System: os='Windows Server 2019 Standard 1809 build 17763.6414' ps=5.1.17763.6414 net=4.8 x64/x64
+```
+
+then one `[Requirements]` line per declared dependency (`OK ActiveDirectory
+1.0.1.0 (User Lookup)` or `MISSING ...` with the reason and the fix), and any
+errors with their full detail.
+
 ## Where things live at runtime
 
 ```
@@ -324,7 +343,7 @@ resumes on the next start; Session.log lines are tagged `[Archive]`.
   Logs\            Session.log + <ENV>.log   (or on the shared path if reachable)
   Settings\        Environments.json (the saved environments, per machine) and
                    settings modules save at runtime (Get-AppSettingsDir); persistent
-  Extract\         Extract / Function Map / Environment / sealed-build outputs
+  Extract\         Extract and Build Sealed outputs
   active.env       the environment you last picked on this machine (just a name)
 ```
 
