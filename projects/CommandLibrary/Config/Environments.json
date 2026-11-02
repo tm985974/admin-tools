@@ -1,0 +1,17 @@
+{
+    "ActiveDefault": "Default",
+    "Environments": [
+        {
+            "Name": "Default",
+            "Label": "Default",
+            "SharedPath": "",
+            "IsDefault": true,
+            "Domain": "",
+            "Server": "",
+            "SearchBase": "",
+            "FilterAsYouType": true,
+            "LogMaxKB": 5120,
+            "Notes": "Starting environment. Set Domain / Domain controller / Search base and the Run prompt fills any parameter with the same name. Set a Log & data path (UNC) to keep the library and logs on a share."
+        }
+    ]
+}

@@ -1,0 +1,9 @@
+{
+    "Fields": [
+        { "Key": "Label",      "Caption": "Environment name" },
+        { "Key": "SharedPath", "Caption": "Log & data path (UNC, optional - shares the library)" },
+        { "Key": "Domain",     "Caption": "Domain (fills -Domain)" },
+        { "Key": "Server",     "Caption": "Domain controller (fills -Server)" },
+        { "Key": "SearchBase", "Caption": "Search base OU (fills -SearchBase)" }
+    ]
+}
