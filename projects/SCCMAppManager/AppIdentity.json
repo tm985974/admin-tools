@@ -1,0 +1,5 @@
+{
+    "AppName": "SCCM App Manager",
+    "ExeName": "SCCMAppManager",
+    "AppDataFolder": "SCCMAppManager"
+}

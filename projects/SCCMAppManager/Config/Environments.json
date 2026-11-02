@@ -1,0 +1,43 @@
+{
+    "ActiveDefault": "A30",
+    "Environments": [
+        {
+            "Name": "A30",
+            "Label": "A30",
+            "SharedPath": "",
+            "IsDefault": true,
+            "FilterAsYouType": true,
+            "LogMaxKB": 5120,
+            "SiteCode": "A30",
+            "SiteServer": "",
+            "LocalRoot": "",
+            "IncomingPath": "\\\\software\\software$\\Vulnerability Packages",
+            "RepositoryPath": "\\\\ibkfile02\\software$\\Applications",
+            "IconsPath": "\\\\ibkfile02\\software$\\Applications\\Icons",
+            "TestCollection": "Testing - Thad",
+            "DPGroup": "A30_ALL_DPG",
+            "RobocopyThreads": 8,
+            "PruneOldLocalVersions": true,
+            "Notes": "Site A30. Blank SMS Provider = detected from the ConfigMgr console (or taken from the v8 settings file). Blank Local Root = the folder the EXE is in."
+        },
+        {
+            "Name": "CA1",
+            "Label": "CA1",
+            "SharedPath": "",
+            "IsDefault": false,
+            "FilterAsYouType": true,
+            "LogMaxKB": 5120,
+            "SiteCode": "CA1",
+            "SiteServer": "",
+            "LocalRoot": "",
+            "IncomingPath": "\\\\software\\software$\\Vulnerability Packages",
+            "RepositoryPath": "",
+            "IconsPath": "",
+            "TestCollection": "",
+            "DPGroup": "",
+            "RobocopyThreads": 8,
+            "PruneOldLocalVersions": true,
+            "Notes": "Site CA1. Fill in the SMS Provider server, repository, icons, test collection and DP group on Environment > SCCM Site."
+        }
+    ]
+}
