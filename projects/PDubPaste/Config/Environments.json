@@ -1,0 +1,18 @@
+{
+    "ActiveDefault": "Default",
+    "Environments": [
+        {
+            "Name": "Default",
+            "Label": "Default",
+            "SharedPath": "",
+            "IsDefault": true,
+            "Variable1": "",
+            "Variable2": "",
+            "Variable3": "",
+            "Variable4": "",
+            "FilterAsYouType": true,
+            "LogMaxKB": 5120,
+            "Notes": "Starting environment. Rename it, set a Log & data path (UNC) to keep logs/data on a share, and use Variable 1-4 until the project needs real fields (add them to Config\\EnvironmentFields.json, or give them their own page with Register-EnvironmentSection)."
+        }
+    ]
+}

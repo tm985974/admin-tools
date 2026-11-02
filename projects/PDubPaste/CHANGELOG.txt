@@ -1,0 +1,97 @@
+# CHANGELOG.txt -- project version history (newest first)
+# Each update package carries this file with its new section on top, plus the
+# bumped VERSION.txt, so Version History and the archived EXEs line up.
+
+v1.2.0 (2026-11-02)  Renamed to PDubPaste; engine synced to AppTemplate v1.0.20
+  Changed : The app is now PDubPaste: window / tray / dialog titles, the EXE
+            (PDubPaste.exe, PDubPasteLite.exe), archive and Extract zips, and
+            the data folder (<LocalAppData>\PDubPasteData). Services_PasswordPaste
+            .psm1 is now Services_PDubPaste.psm1 (same functions). The
+            single-instance lock is now "PDubPaste.<user>".
+  Added   : First start copies PasswordSlots.json from
+            <LocalAppData>\PasswordPasterData\Settings when PDubPaste has none
+            yet (copy, not move; DPAPI CurrentUser still decrypts it). Logged
+            in Session.log. Environments and logs are not carried over.
+  Changed : Leftover-copy detection also matches processes still named
+            PasswordPaster*, so an old copy holding the hotkeys is offered for
+            closing.
+  Changed : Manual engine sync 1.0.16 -> 1.0.20 (contract change at 1.0.17):
+            project identity moved from AppHost.cs to AppIdentity.json;
+            AppHost.cs, Build-App.ps1 and every other template-owned file
+            replaced; added Build-App.cs, Build-App.cmd,
+            Base\Services_Filter.psm1, Base\Services_Requirements.psm1.
+            Brings Update Template, Build Lite, the Update folder, the Open
+            menu, Build-App.exe and the startup system line. Project modules
+            unchanged apart from the rename.
+  Note    : From here, 1.0.x template releases go through Update Template.
+  Note    : Build Sealed passwords unchanged: user "password", admin "a".
+
+v1.1.5 (2026-10-28)  Environment tab for admins only
+  Changed : The Environment tab is shown only with the admin password (and in
+            the developer build); user-password sessions see Overview and
+            Password Config.
+  Note    : Sealed distributable passwords for this project: user "password",
+            admin "a" (entered in Build Sealed; README has the table).
+
+v1.1.4 (2026-10-28)  Fix: re-launch handed over but the window never showed
+  Fixed   : The running copy received the "show yourself" request (logged) and
+            then did nothing: its handler was created inside another event
+            handler, and a PowerShell closure made there does not capture the
+            outer closure's variables, so the restore step was empty. The handler
+            is now built at function level like the others.
+
+v1.1.3 (2026-10-28)  Re-launching shows the running copy in front
+  Fixed   : Starting the EXE again while it ran minimized / in the tray seemed to
+            do nothing: the running copy's window and sign-in prompt opened behind
+            other windows (Windows blocks background apps from taking focus). The
+            new launch now grants the running copy the right to come to the front
+            before it exits, and the window / prompt is forced to the front.
+  Added   : Session.log lines for the hand-off ("asked that copy to show itself",
+            "Another launch asked this copy to show itself"); a message box if the
+            running copy doesn't answer.
+
+v1.1.2 (2026-10-28)  Show reveals saved passwords; leftover copies; layout
+  Changed : Show now reveals the saved password (the window is behind the
+            Windows sign-in). Unticking, Revert, Save or the window locking hides
+            and clears it again. A revealed password that isn't edited is kept as
+            is on Save.
+  Added   : When hotkeys are taken by another Password Paster process in this
+            session (e.g. a pre-1.1 copy that never exited), the status says so
+            and, after unlock or Save, the app offers to close it and retries.
+  Fixed   : Password Config columns clipped under display scaling ("Sho",
+            Forget button covering the Hotkey box). Columns now size to fit.
+
+v1.1.1 (2026-10-28)  Fix: lock screen failed to build
+  Fixed   : "window setup failed: Cannot convert value 128274 to System.Char" -
+            the lock-screen title used an emoji outside [char]'s range. The
+            window stayed hidden (fail-closed) and hotkeys never started.
+
+v1.1.0 (2026-10-28)  Windows sign-in lock; hotkeys end with the window
+  Added   : Lock screen over the window. It asks for Windows Hello (PIN /
+            fingerprint / face) or, when Hello is unavailable or cancelled, the
+            Windows password of the account running the app (checked by Windows,
+            must be the same account). Asked at start-up - hotkeys only start
+            after this first unlock - and whenever the window is brought back from
+            the tray or taskbar. Minimizing, hiding to the tray, or N idle minutes
+            (Password Config, default 5, 0 = off) lock the window again; hotkeys
+            keep working while only the window is locked. Resume from the tray
+            requires an unlocked window. 3 wrong passwords close the prompt.
+  Fixed   : Hotkeys kept working after the window was closed (the process stayed
+            alive), and a new launch then reported its hotkeys as "in use by
+            another app". Hotkeys are now released by the C# side when the window
+            closes, the process is made to exit within 3 s, and only one copy
+            runs per Windows session - a second launch shows the running copy.
+
+v1.0.0 (2026-10-27)  Password Paster - created from AppTemplate v1.0.16
+  Added   : 5 password slots (name, password, hotkey, on/off, method, Enter after)
+            on the Password Config tab. Secrets are DPAPI-encrypted (CurrentUser)
+            in <LocalAppData>\PasswordPasterData\Settings\PasswordSlots.json,
+            never loaded back into the form and never logged.
+  Added   : System-wide hotkeys (RegisterHotKey). On a hotkey the password is
+            sent to the focused window once the hotkey's keys are released:
+            Type (Unicode keystrokes, no clipboard) or Clipboard (Ctrl+V, kept
+            out of Win+V history, previous clipboard text restored).
+  Added   : Overview tab with live slot status and Pause / Resume; tray icon
+            (Open / Pause / Exit) and optional minimize-to-tray.
+  Changed : Compact window; Tab 1-4 placeholders removed. Engine files unchanged.
+
