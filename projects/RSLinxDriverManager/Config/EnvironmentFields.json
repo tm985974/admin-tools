@@ -1,0 +1,20 @@
+{
+    "Fields": [
+        {
+            "Key": "Label",
+            "Caption": "Environment name"
+        },
+        {
+            "Key": "SharedPath",
+            "Caption": "Log & data path (UNC, optional)"
+        },
+        {
+            "Key": "BackupPath",
+            "Caption": "Driver backup folder (UNC)"
+        },
+        {
+            "Key": "ManufacturerMatch",
+            "Caption": "Manufacturer to include"
+        }
+    ]
+}

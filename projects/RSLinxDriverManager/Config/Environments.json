@@ -1,0 +1,16 @@
+{
+    "ActiveDefault": "Default",
+    "Environments": [
+        {
+            "Name": "Default",
+            "Label": "Default",
+            "SharedPath": "",
+            "IsDefault": true,
+            "BackupPath": "\\\\iblfile01\\ipcs\\localdata\\RSLinxBackups",
+            "ManufacturerMatch": "Allen-Bradley",
+            "FilterAsYouType": true,
+            "LogMaxKB": 5120,
+            "Notes": "Driver backup folder: where Save Current Config writes (local Backups folder when unreachable). Manufacturer to include: only device-registry rows whose Manufacturer matches this (spaces, dashes and case ignored). Set a Log & data path (UNC) to share logs and the VLAN lookup table between machines."
+        }
+    ]
+}

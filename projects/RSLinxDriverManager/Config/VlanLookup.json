@@ -1,0 +1,1006 @@
+{
+    "_note": "Default VLAN lookup table (from RSLinx.xlsx VlanLookup). Driver name = Site(Vlan)Description. Edited on the VLAN Lookup tab and saved to <data root>\\Settings\\VlanLookup.json.",
+    "Entries": [
+        {
+            "Site": "BK",
+            "IpBase": "192.168.0",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "BK",
+            "IpBase": "192.168.1",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "BK",
+            "IpBase": "10.128.33",
+            "Cidr": 24,
+            "Vlan": 33,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "BK",
+            "IpBase": "10.128.32",
+            "Cidr": 24,
+            "Vlan": 332,
+            "Description": "MAIN"
+        },
+        {
+            "Site": "BK",
+            "IpBase": "10.128.34",
+            "Cidr": 24,
+            "Vlan": 334,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "192.168.0",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "192.168.1",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "137.206.25",
+            "Cidr": 24,
+            "Vlan": 25,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "137.206.26",
+            "Cidr": 24,
+            "Vlan": 26,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "137.206.27",
+            "Cidr": 24,
+            "Vlan": 27,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "137.206.24",
+            "Cidr": 21,
+            "Vlan": 28,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "137.206.28",
+            "Cidr": 24,
+            "Vlan": 28,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "137.206.29",
+            "Cidr": 24,
+            "Vlan": 29,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "137.206.30",
+            "Cidr": 24,
+            "Vlan": 30,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "137.206.31",
+            "Cidr": 24,
+            "Vlan": 31,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.144.32",
+            "Cidr": 24,
+            "Vlan": 332,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.144.33",
+            "Cidr": 24,
+            "Vlan": 333,
+            "Description": "IOCC"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.144.34",
+            "Cidr": 24,
+            "Vlan": 334,
+            "Description": "FAS"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.144.35",
+            "Cidr": 24,
+            "Vlan": 335,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.144.37",
+            "Cidr": 24,
+            "Vlan": 337,
+            "Description": "WRLS"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.144.45",
+            "Cidr": 24,
+            "Vlan": 345,
+            "Description": "IMAGING"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.144.50",
+            "Cidr": 24,
+            "Vlan": 350,
+            "Description": "XSPOC"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.144.63",
+            "Cidr": 24,
+            "Vlan": 363,
+            "Description": "DEV"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.145.32",
+            "Cidr": 24,
+            "Vlan": 432,
+            "Description": "MGMT"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.145.34",
+            "Cidr": 24,
+            "Vlan": 434,
+            "Description": "WATER"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.145.36",
+            "Cidr": 24,
+            "Vlan": 436,
+            "Description": "DWI"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.32",
+            "Cidr": 24,
+            "Vlan": 532,
+            "Description": "MGMT"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.34",
+            "Cidr": 24,
+            "Vlan": 534,
+            "Description": "CLAMDIAT"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.38",
+            "Cidr": 24,
+            "Vlan": 538,
+            "Description": "CLAMMEAS"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.40",
+            "Cidr": 24,
+            "Vlan": 540,
+            "Description": "CLAMTUL"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.44",
+            "Cidr": 24,
+            "Vlan": 544,
+            "Description": "DTRCLAM"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.46",
+            "Cidr": 24,
+            "Vlan": 546,
+            "Description": "DTRCYCL"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.48",
+            "Cidr": 24,
+            "Vlan": 548,
+            "Description": "DTRGEN"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.50",
+            "Cidr": 24,
+            "Vlan": 550,
+            "Description": "DTRINJ"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.52",
+            "Cidr": 24,
+            "Vlan": 552,
+            "Description": "TULINJ"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.54",
+            "Cidr": 24,
+            "Vlan": 554,
+            "Description": "TULGEN"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.56",
+            "Cidr": 24,
+            "Vlan": 556,
+            "Description": "COMP"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.58",
+            "Cidr": 24,
+            "Vlan": 558,
+            "Description": "ULTWTR"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.60",
+            "Cidr": 24,
+            "Vlan": 560,
+            "Description": "TULSOX"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.146.64",
+            "Cidr": 24,
+            "Vlan": 564,
+            "Description": "MOXA"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.147.32",
+            "Cidr": 24,
+            "Vlan": 632,
+            "Description": "TREAT"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.147.34",
+            "Cidr": 24,
+            "Vlan": 634,
+            "Description": "TREATDOW"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.147.40",
+            "Cidr": 24,
+            "Vlan": 640,
+            "Description": "TREATTOW"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.148.32",
+            "Cidr": 24,
+            "Vlan": 732,
+            "Description": "MGMT"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.148.34",
+            "Cidr": 24,
+            "Vlan": 734,
+            "Description": "ENGSEC32"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.148.38",
+            "Cidr": 24,
+            "Vlan": 738,
+            "Description": "ENGESD"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.148.40",
+            "Cidr": 24,
+            "Vlan": 740,
+            "Description": "ENGTFLOW"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.148.42",
+            "Cidr": 24,
+            "Vlan": 742,
+            "Description": "ENGPWMON"
+        },
+        {
+            "Site": "BL",
+            "IpBase": "10.148.44",
+            "Cidr": 24,
+            "Vlan": 744,
+            "Description": "ENGCOG13"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "137.206.168",
+            "Cidr": 24,
+            "Vlan": 168,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "192.168.0",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "192.168.1",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.2",
+            "Cidr": 24,
+            "Vlan": 2,
+            "Description": "MGMT"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.235",
+            "Cidr": 24,
+            "Vlan": 235,
+            "Description": "DMZ"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.32",
+            "Cidr": 24,
+            "Vlan": 332,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.33",
+            "Cidr": 24,
+            "Vlan": 333,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.38",
+            "Cidr": 24,
+            "Vlan": 338,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.40",
+            "Cidr": 24,
+            "Vlan": 340,
+            "Description": "FAS"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.45",
+            "Cidr": 24,
+            "Vlan": 345,
+            "Description": "IMAGING"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.46",
+            "Cidr": 24,
+            "Vlan": 346,
+            "Description": "STEAM"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.50",
+            "Cidr": 24,
+            "Vlan": 350,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.52",
+            "Cidr": 24,
+            "Vlan": 352,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.54",
+            "Cidr": 24,
+            "Vlan": 354,
+            "Description": "CVR"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.160.56",
+            "Cidr": 24,
+            "Vlan": 356,
+            "Description": "TFLOW"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.63",
+            "Cidr": 24,
+            "Vlan": 363,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "CG",
+            "IpBase": "10.224.64",
+            "Cidr": 22,
+            "Vlan": 64,
+            "Description": "COMM"
+        },
+        {
+            "Site": "LH",
+            "IpBase": "192.168.0",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "LH",
+            "IpBase": "192.168.1",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "192.168.0",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "192.168.1",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.235",
+            "Cidr": 24,
+            "Vlan": 235,
+            "Description": "DMZ"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "137.206.32",
+            "Cidr": 24,
+            "Vlan": 32,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.32",
+            "Cidr": 24,
+            "Vlan": 332,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.33",
+            "Cidr": 24,
+            "Vlan": 333,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.40",
+            "Cidr": 24,
+            "Vlan": 340,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.45",
+            "Cidr": 24,
+            "Vlan": 345,
+            "Description": "IMAGING"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.46",
+            "Cidr": 24,
+            "Vlan": 346,
+            "Description": "SOX"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.48",
+            "Cidr": 24,
+            "Vlan": 348,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.50",
+            "Cidr": 24,
+            "Vlan": 350,
+            "Description": "CLAM"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.54",
+            "Cidr": 24,
+            "Vlan": 354,
+            "Description": "CVR"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.56",
+            "Cidr": 24,
+            "Vlan": 356,
+            "Description": "TFLOW"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.58",
+            "Cidr": 24,
+            "Vlan": 358,
+            "Description": "PWR"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.63",
+            "Cidr": 24,
+            "Vlan": 363,
+            "Description": "DEV"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "137.206.40",
+            "Cidr": 21,
+            "Vlan": 40,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "137.206.41",
+            "Cidr": 24,
+            "Vlan": 41,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "137.206.43",
+            "Cidr": 24,
+            "Vlan": 43,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "NM",
+            "IpBase": "10.160.64",
+            "Cidr": 24,
+            "Vlan": 64,
+            "Description": "COMM"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.235",
+            "Cidr": 24,
+            "Vlan": 1235,
+            "Description": "DMZ"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "192.168.0",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "192.168.1",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.2",
+            "Cidr": 24,
+            "Vlan": 2,
+            "Description": "MGMT"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "137.206.234",
+            "Cidr": 23,
+            "Vlan": 235,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "137.206.235",
+            "Cidr": 24,
+            "Vlan": 235,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "137.206.236",
+            "Cidr": 24,
+            "Vlan": 236,
+            "Description": "COMM"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.32",
+            "Cidr": 24,
+            "Vlan": 332,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.33",
+            "Cidr": 24,
+            "Vlan": 333,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.40",
+            "Cidr": 24,
+            "Vlan": 340,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.45",
+            "Cidr": 24,
+            "Vlan": 345,
+            "Description": "IMAGING"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.46",
+            "Cidr": 24,
+            "Vlan": 346,
+            "Description": "CLAM"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.52",
+            "Cidr": 24,
+            "Vlan": 352,
+            "Description": "XPOC"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.54",
+            "Cidr": 24,
+            "Vlan": 354,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.55",
+            "Cidr": 24,
+            "Vlan": 355,
+            "Description": "SHIPPING"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.56",
+            "Cidr": 24,
+            "Vlan": 356,
+            "Description": "IPCS"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.63",
+            "Cidr": 24,
+            "Vlan": 363,
+            "Description": "DEV"
+        },
+        {
+            "Site": "SA",
+            "IpBase": "10.208.64",
+            "Cidr": 24,
+            "Vlan": 64,
+            "Description": "COMM"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "192.168.0",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "192.168.1",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.2",
+            "Cidr": 24,
+            "Vlan": 2,
+            "Description": "MGMT"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.235",
+            "Cidr": 24,
+            "Vlan": 235,
+            "Description": "DMZ"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "137.206.33",
+            "Cidr": 24,
+            "Vlan": 33,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.32",
+            "Cidr": 24,
+            "Vlan": 332,
+            "Description": "MGMT"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.33",
+            "Cidr": 24,
+            "Vlan": 333,
+            "Description": "FAS"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.34",
+            "Cidr": 24,
+            "Vlan": 334,
+            "Description": "METSON"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.40",
+            "Cidr": 24,
+            "Vlan": 340,
+            "Description": "PLANT"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.45",
+            "Cidr": 24,
+            "Vlan": 345,
+            "Description": "IMAGING"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.46",
+            "Cidr": 24,
+            "Vlan": 346,
+            "Description": "STEAM"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.50",
+            "Cidr": 24,
+            "Vlan": 350,
+            "Description": "CLAM"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.54",
+            "Cidr": 24,
+            "Vlan": 354,
+            "Description": "DRIPPOT"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.56",
+            "Cidr": 24,
+            "Vlan": 356,
+            "Description": "TFLOW"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.58",
+            "Cidr": 24,
+            "Vlan": 358,
+            "Description": "ETD"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.63",
+            "Cidr": 24,
+            "Vlan": 363,
+            "Description": "DEV"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "137.206.44",
+            "Cidr": 21,
+            "Vlan": 44,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "137.206.45",
+            "Cidr": 24,
+            "Vlan": 45,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "SM",
+            "IpBase": "10.176.64",
+            "Cidr": 22,
+            "Vlan": 64,
+            "Description": "COMM"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "192.168.0",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "192.168.1",
+            "Cidr": 24,
+            "Vlan": 192,
+            "Description": "PRIVATE"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.2",
+            "Cidr": 24,
+            "Vlan": 2,
+            "Description": "MGMT"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.235",
+            "Cidr": 24,
+            "Vlan": 235,
+            "Description": "DMZ"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.32",
+            "Cidr": 24,
+            "Vlan": 332,
+            "Description": "INFR"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.33",
+            "Cidr": 24,
+            "Vlan": 333,
+            "Description": "FAS"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.40",
+            "Cidr": 24,
+            "Vlan": 340,
+            "Description": "EAST"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.41",
+            "Cidr": 24,
+            "Vlan": 341,
+            "Description": "CENT"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.42",
+            "Cidr": 24,
+            "Vlan": 342,
+            "Description": "CENT"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.45",
+            "Cidr": 24,
+            "Vlan": 345,
+            "Description": "IMAGING"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.46",
+            "Cidr": 24,
+            "Vlan": 346,
+            "Description": "GP"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.50",
+            "Cidr": 24,
+            "Vlan": 350,
+            "Description": "CLAM"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.51",
+            "Cidr": 24,
+            "Vlan": 351,
+            "Description": "CLAM"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.56",
+            "Cidr": 24,
+            "Vlan": 356,
+            "Description": "TFLOW"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.58",
+            "Cidr": 24,
+            "Vlan": 358,
+            "Description": "PWR"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.64",
+            "Cidr": 24,
+            "Vlan": 363,
+            "Description": "DEV"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "10.192.64",
+            "Cidr": 22,
+            "Vlan": 64,
+            "Description": "COMM"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "137.206.70",
+            "Cidr": 23,
+            "Vlan": 70,
+            "Description": "SCADA"
+        },
+        {
+            "Site": "VN",
+            "IpBase": "137.206.71",
+            "Cidr": 24,
+            "Vlan": 71,
+            "Description": "SCADA"
+        }
+    ]
+}
