@@ -6,7 +6,7 @@ registry. Rewrite of the old `RSLinx Utility.ps1` on AppTemplate v1.0.20.
 - **Drivers** tab: paste the device-registry CSV rows (or load the file) ->
   **Build preview** -> pick sites / edit -> **Add to this PC** or **Overwrite
   this PC**. Allen-Bradley devices only; Primary and Secondary IPs; one driver
-  per site (Lease) + VLAN, named `SITE(VLAN)DESCRIPTION` (max 15 characters),
+  per site (Lease name -> 2-letter code, **Site Codes** tab) + VLAN, named `SITE(VLAN)DESCRIPTION` (max 15 characters),
   e.g. `BL(25)SCADA`. Subnets missing from the lookup get `SITE(3rd octet)SCADA`.
   Backups before every change; old `RSLinx.csv` / backups (Name,Node) load too.
 - **VLAN Lookup** tab: the naming table (from `RSLinx.xlsx`, VlanLookup sheet),
@@ -19,15 +19,18 @@ registry. Rewrite of the old `RSLinx Utility.ps1` on AppTemplate v1.0.20.
 | Project file | What it holds |
 |---|---|
 | `Modules\Lite\UI_Tab_Drivers.psm1` | Drivers tab |
+| `Modules\Lite\UI_Tab_SiteCodes.psm1` | Site Codes tab |
 | `Modules\Lite\UI_Tab_VlanLookup.psm1` | VLAN Lookup tab |
 | `Modules\Lite\UI_Tab_RSLinx.psm1` | RSLinx tab |
 | `Modules\Lite\UI_RSLinxCommon.psm1` | shared grid / header / filter-bar builders |
 | `Modules\Lite\Services_DeviceImport.psm1` | CSV / paste parsing -> driver rows |
+| `Modules\Lite\Services_SiteCodes.psm1` | Lease name -> site code table |
 | `Modules\Lite\Services_VlanLookup.psm1` | lookup table, naming, IP helpers |
 | `Modules\Lite\Services_RSLinxRegistry.psm1` | read / plan / write AB_ETH drivers |
 | `Modules\Lite\Services_RSLinxBackup.psm1` | backup folder, save / list / read |
 | `Modules\Lite\Services_SystemInfo.psm1` | installed software, PC facts |
 | `Config\VlanLookup.json` | default VLAN lookup table |
+| `Config\SiteCodes.json` | default site codes |
 
 The rest of this file is the AppTemplate guide (building, sealing, updating).
 

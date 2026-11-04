@@ -2,6 +2,18 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.2 (2026-11-04)  Site Codes: Lease name -> 2-letter site code
+  Added   : Site Codes tab and Config\SiteCodes.json. The device registry's
+            Lease column holds the site name (Belridge, South Midway ...); the
+            table maps it to the code used in driver names (BL, SM ...), so
+            names stay within 15 characters. Shipped with Bakersfield BK,
+            Belridge BL, Coalinga CG, North Midway NM, San Ardo SA,
+            South Midway SM, Ventura VN. Matching ignores case and extra
+            spaces; a Lease that is (or starts with) a code still works.
+            Saved to Settings\SiteCodes.json; editable with the admin password.
+  Changed : Activity log: rows skipped for "no site code" list the Lease names
+            to add on the Site Codes tab.
+
 v1.0.1 (2026-11-04)  Lease values with more than the site code
   Fixed   : Build preview skipped every device when the Lease column held more
             than the bare code ("BL - Belridge", "BL-01" ...): the site code is

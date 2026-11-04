@@ -1,0 +1,12 @@
+{
+    "_note": "Default site codes: device registry Lease name -> 2-letter site code used in driver names. Edited on the Site Codes tab and saved to <data root>\\Settings\\SiteCodes.json.",
+    "Entries": [
+        { "Lease": "Bakersfield",  "Code": "BK" },
+        { "Lease": "Belridge",     "Code": "BL" },
+        { "Lease": "Coalinga",     "Code": "CG" },
+        { "Lease": "North Midway", "Code": "NM" },
+        { "Lease": "San Ardo",     "Code": "SA" },
+        { "Lease": "South Midway", "Code": "SM" },
+        { "Lease": "Ventura",      "Code": "VN" }
+    ]
+}

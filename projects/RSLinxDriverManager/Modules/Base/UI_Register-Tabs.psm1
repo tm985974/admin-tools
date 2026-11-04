@@ -5,6 +5,7 @@
 # Map (function -> module) meaningful:
 #   Overview    -> New-OverviewTab    (Base/UI_Tab_Overview.psm1)   -- how to use the tool
 #   Drivers     -> New-DriversTab     (Lite/UI_Tab_Drivers.psm1)    -- device data -> preview -> drivers on this PC, backups
+#   Site Codes  -> New-SiteCodesTab   (Lite/UI_Tab_SiteCodes.psm1)  -- Lease name -> 2-letter site code
 #   VLAN Lookup -> New-VlanLookupTab  (Lite/UI_Tab_VlanLookup.psm1) -- the table that names the drivers
 #   RSLinx      -> New-RSLinxTab      (Lite/UI_Tab_RSLinx.psm1)     -- embedded RSLinx Classic control panel + PC facts
 #   Environment -> New-EnvironmentTab (Base/UI_Tab_Environment.psm1) -- environment picker + fields + registered sections
@@ -26,6 +27,7 @@ function Register-AppTabs {
     $defs = @(
         @{ Title = 'Overview'; Fn = 'New-OverviewTab' }
         @{ Title = 'Drivers';     Fn = 'New-DriversTab' }
+        @{ Title = 'Site Codes';  Fn = 'New-SiteCodesTab' }
         @{ Title = 'VLAN Lookup'; Fn = 'New-VlanLookupTab' }
         @{ Title = 'RSLinx';      Fn = 'New-RSLinxTab' }
         @{ Title = 'Environment'; Fn = 'New-EnvironmentTab' }

@@ -38,7 +38,7 @@ function New-OverviewTab {
 
     Add-Section 'What it does'
     Add-Bullet 'Builds the RSLinx Classic Ethernet (AB_ETH) drivers on this PC from the device registry: one driver per site and VLAN, holding every Allen-Bradley device IP on that VLAN.'
-    Add-Bullet 'Driver names come from the VLAN lookup table: SITE(VLAN)DESCRIPTION, e.g. BL(25)SCADA (at most 15 characters). The site is the registry''s Lease column.'
+    Add-Bullet 'Driver names come from the VLAN lookup table: SITE(VLAN)DESCRIPTION, e.g. BL(25)SCADA (at most 15 characters). The site is the registry''s Lease name turned into a 2-letter code by the Site Codes table (Belridge -> BL).'
     Add-Bullet 'Every change to the drivers on this PC saves a backup of the current drivers first.'
 
     Add-Section 'Drivers tab - step by step'
@@ -49,6 +49,9 @@ function New-OverviewTab {
     Add-Bullet 'Restart RSLinx (or the PC) afterwards if it was running, so it loads the new drivers.'
     Add-Bullet 'Drivers on this PC: remove selected IPs (a driver left empty is deleted), or copy them to the preview. Backups: save the current drivers, restore one to the preview, delete. Old RSLinx.csv files and the previous tool''s backups (Name,Node) load the same way.'
     Add-Bullet 'Adding or removing drivers needs Run as administrator - the tab offers to restart elevated.'
+
+    Add-Section 'Site Codes tab'
+    Add-Bullet 'Maps each Lease name in the device registry to its 2-letter site code (Belridge -> BL, South Midway -> SM ...). Rows skipped with "no site code" in the Activity log list the Lease names to add here. Editing needs the admin password (or the developer build).'
 
     Add-Section 'VLAN Lookup tab'
     Add-Bullet 'One row per site + subnet (first three octets): CIDR, VLAN number and description. A row with CIDR below 24 also covers the rest of its block (e.g. 137.206.24 /21 covers 137.206.24-31) when no exact row exists.'

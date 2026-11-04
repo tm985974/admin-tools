@@ -7,7 +7,7 @@
 #   Process Team, Primary IP, Secondary IP, Manufacturer, Model, Description,
 #   Critical, Last Update, ASET_MFGR_ID, ASET_MODL_ID, ASET_STAT_ID, ASET_TYPE_ID,
 #   ASET_ID, LCTN_ID, STAT_SUB_STAT_TYPE_ID, PriIpId, SecIpId
-# Used: Lease (2-letter site), Primary IP, Secondary IP, Manufacturer, Active,
+# Used: Lease (site name -> 2-letter code via the Site Codes table), Primary IP, Secondary IP, Manufacturer, Active,
 # plus Asset / Model / Description / Location for display.
 #
 # Also accepted: a driver list with Name,Node columns (the old RSLinx.csv and
@@ -18,11 +18,11 @@
 #   $p = ConvertFrom-DeviceRegistryText -Text $text
 #        -> @{ Kind = 'Registry' | 'DriverList' | 'Empty'; Rows = @(...); HeaderFound = $bool;
 #              Columns = header names; Missing = needed columns not found }
-#   $r = ConvertTo-RSLinxDriverRows -Devices $p.Rows -Resolver (New-VlanResolver ...) `
+#   $r = ConvertTo-RSLinxDriverRows -Devices $p.Rows -Resolver (New-VlanResolver ...) [-SiteMap (New-SiteCodeMap ...)] `
 #            [-ManufacturerMatch 'Allen-Bradley'] [-IncludeInactive] [-PrimaryOnly]
 #        -> @{ Rows = @(driver rows); Stats = [ordered]@{...}; Unmatched = @('BL 10.1.2', ...);
 #              BadSites = @("'value' (count)", ...) - Lease values that gave no site code }
-#   Get-RSLinxSiteCode -Lease 'BL - Belridge'    -> 'BL'  ('' when there is no 2-letter code)
+#   Get-RSLinxSiteCode -Lease 'Belridge' -SiteMap $m   -> 'BL'  ('' when no code is found)
 #   ConvertFrom-RSLinxDriverList -Rows $p.Rows   -> driver rows from Name,Node data
 #   Test-RSLinxDriverRow -Row $row               -> '' when the row can be applied, else why not
 #
@@ -96,12 +96,17 @@ function ConvertFrom-DeviceRegistryText {
               Columns = $columns; Missing = $(if ($isDriverList) { @() } else { $missing }) }
 }
 
-# The 2-letter site code from a Lease value: 'BL' -> BL; 'BL - Belridge', 'BL Belridge',
-# 'bl-01', 'BL(North)' -> BL. Anything else -> '' (the row is skipped and the value logged).
+# The 2-letter site code for a Lease value:
+#   1. the Site Codes table (-SiteMap from New-SiteCodeMap): 'Belridge' -> BL
+#   2. already a code: 'BL' -> BL
+#   3. starts with a code: 'BL - Belridge', 'BL Belridge', 'bl-01', 'BL(North)' -> BL
+# Anything else -> '' (the row is skipped and the value logged).
 function Get-RSLinxSiteCode {
     [CmdletBinding()]
-    param([AllowNull()] [AllowEmptyString()] [string]$Lease)
-    $v = ([string]$Lease).Trim().ToUpperInvariant()
+    param([AllowNull()] [AllowEmptyString()] [string]$Lease, [hashtable]$SiteMap = @{})
+    $key = Get-SiteCodeKey -Lease $Lease
+    if ($SiteMap.ContainsKey($key)) { return $SiteMap[$key] }
+    $v = $key
     if ($v -match '^[A-Z]{2}$') { return $v }
     if ($v -match '^([A-Z]{2})[\s\-_:/\(\.,0-9]') { return $Matches[1] }
     return ''
@@ -146,6 +151,7 @@ function ConvertTo-RSLinxDriverRows {
     param(
         [AllowEmptyCollection()] [object[]]$Devices = @(),
         [Parameter(Mandatory)] [hashtable]$Resolver,
+        [hashtable]$SiteMap = @{},
         [string]$ManufacturerMatch = 'Allen-Bradley',
         [switch]$IncludeInactive,
         [switch]$PrimaryOnly
@@ -164,7 +170,7 @@ function ConvertTo-RSLinxDriverRows {
         if (-not (Test-ManufacturerMatch $d['manufacturer'] $ManufacturerMatch)) { $stats.NotManufacturer++; continue }
         if (-not $IncludeInactive -and (Test-InactiveValue $d['active'])) { $stats.Inactive++; continue }
 
-        $site = Get-RSLinxSiteCode -Lease $d['lease']
+        $site = Get-RSLinxSiteCode -Lease $d['lease'] -SiteMap $SiteMap
         if ($site -eq '') {
             $stats.BadSite++
             $bv = ([string]$d['lease']).Trim(); if ($bv -eq '') { $bv = '(blank)' }
