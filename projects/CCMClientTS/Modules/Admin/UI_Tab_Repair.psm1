@@ -220,6 +220,8 @@ function New-CcmRepairTab {
         }.GetNewClosure())
 
         $btnRun.Add_Click({
+            # local copies: a closure made inside this handler ($done) only captures THIS scope's variables
+            $ui = $ui; $out = $out; $btnRun = $btnRun; $App = $App
             $s = & $selStep
             if (-not $s) { $App.SetStatus('Select a step first.', 'warn'); return }
             if ($ui.Busy -or (Get-CcmActiveJob)) { $App.SetStatus("A step is running ($($ui.Running)) - wait for it to finish.", 'warn'); return }

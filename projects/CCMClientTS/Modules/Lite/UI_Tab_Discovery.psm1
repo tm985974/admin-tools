@@ -120,6 +120,7 @@ function New-CcmDiscoveryTab {
                 $lblState.Text = 'Running discovery...'; $lblDetail.Text = ''; $lblNext.Text = ''; $lblInstall.Text = ''
                 $banner.BackColor = $Th.Header; $lblState.ForeColor = $Th.Title
                 [System.Windows.Forms.Application]::DoEvents()
+                $lblDetail = $lblDetail   # local copy so the nested closure below captures it
                 $prog = { param($t) $lblDetail.Text = "Checking $t ..."; $lblDetail.Refresh() }.GetNewClosure()
                 [void](Invoke-CcmDiscovery -App $App -Deep:($chkDeep.Checked) -Progress $prog)   # ScanHandlers refresh the banner + grid
             }

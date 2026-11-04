@@ -2,6 +2,14 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.2 (2026-11-04)
+  Fixed   : Repair Steps: "The property 'Busy' cannot be found on this object"
+            when a step finished. The step-finished handler is a closure made
+            inside the Run button's handler and did not capture the tab state,
+            so the result was never shown or saved and the Run button stayed
+            disabled. The handler now gets local copies.
+  Fixed   : Discovery: the "Checking ..." progress text never updated (same cause).
+
 v1.0.1 (2026-11-04)
   Fixed   : Discovery "Services" section listed ~60 bogus rows ("Service 'K' does
             not exist", "'True' does not exist") and the Logs tab list showed
