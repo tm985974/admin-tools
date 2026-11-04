@@ -2,6 +2,15 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.1 (2026-11-04)  Lease values with more than the site code
+  Fixed   : Build preview skipped every device when the Lease column held more
+            than the bare code ("BL - Belridge", "BL-01" ...): the site code is
+            now the first two letters when they are followed by a space, dash,
+            bracket, digit or similar. A Lease column exported under a longer
+            name ("Lease Name", "Lease Code" ...) is found too.
+  Added   : Activity log lists the Lease values that gave no site code (with
+            counts) and any needed column the pasted data does not have.
+
 v1.0.0 (2026-11-04)  Created from AppTemplate v1.0.20 - rewrite of RSLinx Utility.ps1
   Added   : Drivers tab. Paste device-registry CSV rows (or load the file);
             Allen-Bradley devices only; Primary and Secondary IPs; drivers

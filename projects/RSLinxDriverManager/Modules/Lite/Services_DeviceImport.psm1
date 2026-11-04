@@ -16,10 +16,13 @@
 # Comma, tab (pasted from Excel) or semicolon separated; quoted fields are fine.
 #
 #   $p = ConvertFrom-DeviceRegistryText -Text $text
-#        -> @{ Kind = 'Registry' | 'DriverList' | 'Empty'; Rows = @(...); HeaderFound = $bool }
+#        -> @{ Kind = 'Registry' | 'DriverList' | 'Empty'; Rows = @(...); HeaderFound = $bool;
+#              Columns = header names; Missing = needed columns not found }
 #   $r = ConvertTo-RSLinxDriverRows -Devices $p.Rows -Resolver (New-VlanResolver ...) `
 #            [-ManufacturerMatch 'Allen-Bradley'] [-IncludeInactive] [-PrimaryOnly]
-#        -> @{ Rows = @(driver rows); Stats = [ordered]@{...}; Unmatched = @('BL 10.1.2', ...) }
+#        -> @{ Rows = @(driver rows); Stats = [ordered]@{...}; Unmatched = @('BL 10.1.2', ...);
+#              BadSites = @("'value' (count)", ...) - Lease values that gave no site code }
+#   Get-RSLinxSiteCode -Lease 'BL - Belridge'    -> 'BL'  ('' when there is no 2-letter code)
 #   ConvertFrom-RSLinxDriverList -Rows $p.Rows   -> driver rows from Name,Node data
 #   Test-RSLinxDriverRow -Row $row               -> '' when the row can be applied, else why not
 #
@@ -47,7 +50,7 @@ function ConvertFrom-DeviceRegistryText {
 
     $t = ([string]$Text).TrimStart([char]0xFEFF)
     $lines = @($t -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
-    if ($lines.Count -eq 0) { return @{ Kind = 'Empty'; Rows = @(); HeaderFound = $false } }
+    if ($lines.Count -eq 0) { return @{ Kind = 'Empty'; Rows = @(); HeaderFound = $false; Columns = @(); Missing = @() } }
 
     $first = $lines[0]
     $tabs = ([regex]::Matches($first, "`t")).Count
@@ -71,17 +74,37 @@ function ConvertFrom-DeviceRegistryText {
     $map = New-Object System.Collections.ArrayList          # (original column name, normalised name)
     if ($raw.Count -gt 0) {
         $done = @{}
-        foreach ($p in $raw[0].PSObject.Properties) {
-            $k = Get-NormalizedColumnName $p.Name
-            if ($script:UsedColumns -contains $k -and -not $done.ContainsKey($k)) { $done[$k] = $true; [void]$map.Add(@($p.Name, $k)) }
+        $names = @($raw[0].PSObject.Properties | ForEach-Object { $_.Name })
+        foreach ($n in $names) {
+            $k = Get-NormalizedColumnName $n
+            if ($script:UsedColumns -contains $k -and -not $done.ContainsKey($k)) { $done[$k] = $true; [void]$map.Add(@($n, $k)) }
+        }
+        # Lease exported under a longer name ('Lease Code', 'Lease Name' ...): use the first one.
+        if (-not $done.ContainsKey('lease')) {
+            foreach ($n in $names) { if ((Get-NormalizedColumnName $n) -like 'lease*') { $done['lease'] = $true; [void]$map.Add(@($n, 'lease')); break } }
         }
     }
+    $columns = @(); if ($raw.Count -gt 0) { $columns = @($raw[0].PSObject.Properties | ForEach-Object { $_.Name }) }
+    $found = @($map | ForEach-Object { $_[1] })
+    $missing = @(@('lease', 'primaryip', 'secondaryip', 'manufacturer') | Where-Object { $found -notcontains $_ })
     foreach ($r in $raw) {
         $h = @{}
         foreach ($m in $map) { $h[$m[1]] = ([string]$r.($m[0])).Trim() }
         [void]$rows.Add($h)
     }
-    return @{ Kind = $(if ($isDriverList) { 'DriverList' } else { 'Registry' }); Rows = $rows.ToArray(); HeaderFound = $hasHeader }
+    return @{ Kind = $(if ($isDriverList) { 'DriverList' } else { 'Registry' }); Rows = $rows.ToArray(); HeaderFound = $hasHeader
+              Columns = $columns; Missing = $(if ($isDriverList) { @() } else { $missing }) }
+}
+
+# The 2-letter site code from a Lease value: 'BL' -> BL; 'BL - Belridge', 'BL Belridge',
+# 'bl-01', 'BL(North)' -> BL. Anything else -> '' (the row is skipped and the value logged).
+function Get-RSLinxSiteCode {
+    [CmdletBinding()]
+    param([AllowNull()] [AllowEmptyString()] [string]$Lease)
+    $v = ([string]$Lease).Trim().ToUpperInvariant()
+    if ($v -match '^[A-Z]{2}$') { return $v }
+    if ($v -match '^([A-Z]{2})[\s\-_:/\(\.,0-9]') { return $Matches[1] }
+    return ''
 }
 
 function Test-ManufacturerMatch([string]$Value, [string]$Match) {
@@ -134,14 +157,20 @@ function ConvertTo-RSLinxDriverRows {
     $out = New-Object System.Collections.ArrayList
     $seen = @{}            # 'DRIVER|ip' -> row (duplicates add the asset to its note)
     $unmatched = @{}       # 'BL 10.1.2' -> count of IPs that got the default name
+    $badSites = @{}        # Lease value that gave no site code -> count
 
     foreach ($d in $Devices) {
         $stats.DeviceRows++
         if (-not (Test-ManufacturerMatch $d['manufacturer'] $ManufacturerMatch)) { $stats.NotManufacturer++; continue }
         if (-not $IncludeInactive -and (Test-InactiveValue $d['active'])) { $stats.Inactive++; continue }
 
-        $site = ([string]$d['lease']).Trim().ToUpperInvariant()
-        if ($site -notmatch '^[A-Z]{2}$') { $stats.BadSite++; continue }
+        $site = Get-RSLinxSiteCode -Lease $d['lease']
+        if ($site -eq '') {
+            $stats.BadSite++
+            $bv = ([string]$d['lease']).Trim(); if ($bv -eq '') { $bv = '(blank)' }
+            if ($badSites.ContainsKey($bv)) { $badSites[$bv]++ } else { $badSites[$bv] = 1 }
+            continue
+        }
 
         $ips = @()
         if ($d['primaryip']) { $ips += ,@('Primary', $d['primaryip']) }
@@ -178,7 +207,9 @@ function ConvertTo-RSLinxDriverRows {
     $stats.IPs = $sorted.Count
     $stats.Drivers = @($sorted | Select-Object -ExpandProperty Driver -Unique).Count
     $um = @($unmatched.Keys | Sort-Object | ForEach-Object { '{0}  ({1} IP{2})' -f $_, $unmatched[$_], $(if ($unmatched[$_] -eq 1) { '' } else { 's' }) })
-    return @{ Rows = $sorted; Stats = $stats; Unmatched = $um }
+    $bs = @($badSites.GetEnumerator() | Sort-Object -Property @{ Expression = 'Value'; Descending = $true }, @{ Expression = 'Key' } |
+            ForEach-Object { "'{0}' ({1})" -f $_.Key, $_.Value })
+    return @{ Rows = $sorted; Stats = $stats; Unmatched = $um; BadSites = $bs }
 }
 
 function ConvertFrom-RSLinxDriverList {

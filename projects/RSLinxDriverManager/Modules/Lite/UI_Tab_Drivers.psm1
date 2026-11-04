@@ -393,8 +393,15 @@ function Invoke-DrvBuildPreview {
             $rows = @($res.Rows)
             $s = $res.Stats
             if (-not $p.HeaderFound) { Write-DrvLog 'No header row found - assumed the standard device registry column order.' }
+            if (@($p.Missing).Count -gt 0) {
+                Write-DrvLog ("Column(s) not found: {0}. Columns in the data: {1}" -f (@($p.Missing) -join ', '), ((@($p.Columns) | Select-Object -First 40) -join ' | ')) 'WARN'
+            }
             Write-DrvLog ("Device rows: {0:N0}.  Used: {1:N0} IP(s) in {2:N0} driver(s).  Skipped: {3:N0} not {4}, {5:N0} inactive, {6:N0} no 2-letter Lease, {7:N0} no IP, {8:N0} bad IP, {9:N0} duplicate." -f `
                 $s.DeviceRows, $s.IPs, $s.Drivers, $s.NotManufacturer, $mfr, $s.Inactive, $s.BadSite, $s.NoIP, $s.BadIP, $s.Duplicates)
+            if (@($res.BadSites).Count -gt 0) {
+                Write-DrvLog ("{0:N0} row(s) skipped because Lease has no 2-letter site code. Lease values seen: {1}" -f `
+                    $s.BadSite, ((@($res.BadSites) | Select-Object -First 25) -join ', ')) 'WARN'
+            }
             if ($s.DeviceRows -gt 0 -and $s.NotManufacturer -eq $s.DeviceRows) {
                 Write-DrvLog "No row has Manufacturer '$mfr' - check the pasted columns (Environment tab: Manufacturer to include)." 'WARN'
             }
