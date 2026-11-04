@@ -1,0 +1,10 @@
+{
+    "Fields": [
+        { "Key": "Label",           "Caption": "Environment name" },
+        { "Key": "SharedPath",      "Caption": "Log & data path (UNC, optional)" },
+        { "Key": "SiteCode",        "Caption": "Site code (e.g. A30)" },
+        { "Key": "ManagementPoint", "Caption": "Management point FQDN" },
+        { "Key": "ClientSource",    "Caption": "Local client source folder (ccmsetup.exe + x64\\client.msi)" },
+        { "Key": "RepairSource",    "Caption": "DISM repair source (\\\\HEALTHY-PC\\C$\\Windows or wim:E:\\install.wim:1)" }
+    ]
+}

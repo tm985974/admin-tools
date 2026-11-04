@@ -1,0 +1,18 @@
+{
+    "ActiveDefault": "AERAIPCS",
+    "Environments": [
+        {
+            "Name": "AERAIPCS",
+            "Label": "AERAIPCS (site A30)",
+            "SharedPath": "",
+            "IsDefault": true,
+            "SiteCode": "A30",
+            "ManagementPoint": "IBKSCCM01.AERAIPCS.COM",
+            "ClientSource": "C:\\ccmclient",
+            "RepairSource": "",
+            "FilterAsYouType": true,
+            "LogMaxKB": 5120,
+            "Notes": "Air-gapped site A30. RepairSource: a healthy PC on the same build (\\\\PC\\C$\\Windows) - DISM RestoreHealth with /LimitAccess. ClientSource: full copy of \\\\IBKSCCM01\\SMS_A30\\Client."
+        }
+    ]
+}
