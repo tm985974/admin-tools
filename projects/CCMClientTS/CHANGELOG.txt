@@ -2,6 +2,13 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.1 (2026-11-04)
+  Fixed   : Discovery "Services" section listed ~60 bogus rows ("Service 'K' does
+            not exist", "'True' does not exist") and the Logs tab list showed
+            single letters: the service and log tables were flattened into one
+            list (array rows without separating commas). Each row is now kept
+            as its own array.
+
 v1.0.0 (2026-11-04)  CCM Client Troubleshooter - created from AppTemplate v1.0.20
   Added   : Discovery tab (Lite): read-only scan of the Configuration Manager
             client and the Windows pieces it depends on - elevation, identity
