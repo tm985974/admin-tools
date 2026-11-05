@@ -2,6 +2,17 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.14 (2026-11-05)  Computers tab menu: several selected = Ping Selected only
+  Changed : Computers tab right-click menu follows the selection:
+              one computer   - every action as before; no "Ping Selected...".
+              several        - only "Ping Selected..." (opens the Ping
+                               Computers window) and a greyed note "Select one
+                               computer for the other options". RDP, Restart,
+                               Delete and every other action cannot be run on a
+                               multi-selection from this menu.
+            Decided each time the menu opens. Other computer menus (Users tab
+            tree, Audit lists, the ping window's rows) are unchanged.
+
 v1.2.13 (2026-11-05)  Ping fix: every pasted / selected name gets its own row; Ping Selected on the Computers tab only
   Fixed   : Ping List and Ping Selected showed ONE row named "System.String[]"
             ("No such host is known", "1 computer(s)") instead of one row per

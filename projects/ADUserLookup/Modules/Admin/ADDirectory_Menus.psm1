@@ -976,7 +976,7 @@ function New-ComputerContextMenu {
         }
         & $showPingGroupFn -ComputerNames $names -Context $capturedCompContext -App $menuApp -NoConfirm
     }).GetNewClosure())
-    if ($withPing) { [void]$menu.Items.Add($miPingGroup) }
+    if ($withPing) { [void]$menu.Items.Add($miPingGroup) }     # moved to the top at the end (shown only for several computers)
 
     $miPing      = New-Object System.Windows.Forms.ToolStripMenuItem
     $miPing.Text = 'Ping (continuous, command window)'
@@ -1140,6 +1140,33 @@ function New-ComputerContextMenu {
         }
     }).GetNewClosure())
     [void]$menu.Items.Add($miCopy)
+
+    # -- Computers tab (-ShowPing): selection-driven menu (v1.2.14) ------------
+    # One computer selected : every action, no "Ping Selected...".
+    # Several selected      : ONLY "Ping Selected..." (opens the Ping Computers
+    #                         window) plus a note to select one computer for the
+    #                         other actions - nothing else can be run on a
+    #                         multi-selection from this menu.
+    # Decided each time the menu opens (Opening), from the live selection.
+    if ($withPing) {
+        $miOneOnly         = New-Object System.Windows.Forms.ToolStripMenuItem
+        $miOneOnly.Text    = 'Select one computer for the other options'
+        $miOneOnly.Enabled = $false
+        $menu.Items.Remove($miPingGroup)
+        [void]$menu.Items.Insert(0, $miOneOnly)
+        [void]$menu.Items.Insert(0, $miPingGroup)
+
+        $menu.Add_Opening(({
+            param($s, $e)
+            $count = @(@(& $TargetProvider) | Where-Object { $_ -and $_.Name }).Count
+            if ($count -eq 0) { $e.Cancel = $true; return }
+            $multi = ($count -gt 1)
+            foreach ($it in @($menu.Items)) {
+                if ([object]::ReferenceEquals($it, $miPingGroup) -or [object]::ReferenceEquals($it, $miOneOnly)) { $it.Visible = $multi }
+                else { $it.Visible = (-not $multi) }
+            }
+        }).GetNewClosure())
+    }
 
     return $menu
 }
