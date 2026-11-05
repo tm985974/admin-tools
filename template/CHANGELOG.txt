@@ -2,6 +2,43 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.21 (2026-11-05)  Hover help on everything clickable; "show the exact command" engine
+  Added   : Base\Services_ToolTips.psm1 - tooltips for every button, check box,
+            radio button, link label, menu item (right-click menus too) and
+            tab, from ONE catalog: engine entries (developer buttons,
+            Environment tab, OK / Cancel / Close / Export CSV ...) plus the
+            project's Config\ToolTips.json (project-owned; wins). Keys are the
+            control text, optionally with where it is ("Tools > Ping List >
+            Ping", "<dialog title> > Copy"); the most specific match wins.
+            Started once by _AppLauncher.ps1 (Start-AppToolTips); dialogs, lazy
+            tabs and menus swapped at run time are picked up automatically -
+            modules call nothing. Set-AppToolTip sets one in code.
+  Added   : Developer build: every clickable control without an entry is
+            listed, ready to paste, in <data root>\Logs\ToolTips_missing.txt
+            and counted in Session.log ([ToolTips]).
+  Added   : Base\Services_Commands.psm1 - anything that runs a script builds the
+            PowerShell as text with the real values (Format-AppCommandValue)
+            and goes through Invoke-AppCommand (confirm + log + run that same
+            text) or Confirm-AppCommand (confirm + log). The command window
+            (Show-AppCommandDialog) shows title, summary and the code
+            (read-only, selectable) with Copy and Run / Cancel; for a change it
+            is the confirmation itself and Enter never runs it.
+            Register-AppCommand gives a button right-click "Show command... /
+            Copy command" (nothing runs) and adds that hint to its tooltip.
+            Every confirmed command is logged ([Command] Run : <title>, the code
+            as DIAG).
+  Added   : Environment > General > Commands (all environments,
+            Settings\Commands.json): show the command before running Always /
+            Changes (default: actions passed -Kind Change) / Never. Shift+click
+            shows it first whatever the setting.
+  Changed : _AppLauncher.ps1 starts the tooltips after the tabs are built.
+            Tab 1's "Open data root" is the command-engine example; Config\
+            ToolTips.json (project-owned) carries Tab 1-4 entries as the example.
+  Note    : Engine-only and additive (no contract change): projects on 1.0.17+
+            take it with Update Template. Add Config\ToolTips.json to the
+            project for its own controls; until then the developer build's
+            ToolTips_missing.txt lists them.
+
 v1.0.20 (2026-11-02)  TEMPLATE_FILES.txt: correct AppHost.cs hash
   Fixed   : TEMPLATE_FILES.txt in v1.0.19 listed an out-of-date hash for
             AppHost.cs (taken before its last edit). The template's own

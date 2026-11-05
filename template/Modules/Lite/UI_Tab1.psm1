@@ -2,6 +2,9 @@
 #
 # Wired reference tab. Copy this pattern for real tabs:
 #   read the active environment -> do work -> write to the log -> update the UI.
+# Hover help for its buttons is in Config\ToolTips.json ("Tab 1 > ..."); the
+# "Open data root" button shows how an action that runs a command uses
+# Invoke-AppCommand / Register-AppCommand (exact command, copyable).
 
 function New-Tab1 {
     [CmdletBinding()]
@@ -40,8 +43,18 @@ function New-Tab1 {
         $status.Text = "Wrote Session.log + $($App.ActiveName).log under: $($App.DataRoot)\Logs"
     }.GetNewClosure())
 
+    # Anything that runs a command goes through the engine (Base\Services_Commands.psm1):
+    # build the PowerShell as text with the real values, then Invoke-AppCommand
+    # shows it first when the setting (or Shift+click) asks for it, logs it, and
+    # runs exactly that text. Register-AppCommand adds right-click
+    # "Show command... / Copy command" to the button.
+    $fmt = ${function:Format-AppCommandValue}     # captured: closures do not see module functions reliably
+    $run = ${function:Invoke-AppCommand}
+    $openCode = { 'Start-Process -FilePath ''explorer.exe'' -ArgumentList ' + (& $fmt ('"{0}"' -f $App.DataRoot)) }.GetNewClosure()
+    Register-AppCommand -App $App -Control $btnOpen -Title 'Open data root' -Code $openCode
     $btnOpen.Add_Click({
-        try { Start-Process explorer.exe ('"{0}"' -f $App.DataRoot) } catch {}
+        $r = & $run -App $App -Title 'Open data root' -Kind Read -Code (& $openCode)
+        if ($r.Errors.Count -gt 0) { $status.Text = "Could not open it: $($r.Errors[0])" }
     }.GetNewClosure())
 
     $Page.Controls.Add($hdr); $Page.Controls.Add($info)

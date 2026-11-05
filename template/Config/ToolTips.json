@@ -1,0 +1,11 @@
+{
+    "_note": "Hover help for this project's buttons, menu items and tabs (project-owned). Key = the control's text, optionally preceded by where it is: tab / sub-tab / group box titles (outermost first) or a dialog's title, joined with ' > '. The most specific match wins; '&', a trailing '...' and case are ignored. An empty text = no tooltip on purpose. Engine controls (developer buttons, Environment tab, OK / Cancel / Close ...) already have entries in Base\\Services_ToolTips.psm1; an entry here overrides them. The developer build lists every control still missing one in <data root>\\Logs\\ToolTips_missing.txt.",
+    "ToolTips": {
+        "Tab 1": "Wired example: reads the active environment, writes a log line, opens a folder through the command engine.",
+        "Tab 2": "Filterable grid: the reference for every list with a filter box (wildcards anywhere).",
+        "Tab 3": "Empty placeholder tab.",
+        "Tab 4": "Empty placeholder tab.",
+        "Tab 1 > Write test log line": "Write one line to Session.log and one to this environment's action log, to check that logging works.",
+        "Tab 1 > Open data root": "Open the data root folder (logs, settings) in Explorer."
+    }
+}
