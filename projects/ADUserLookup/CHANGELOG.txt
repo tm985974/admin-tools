@@ -2,6 +2,41 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.15 (2026-11-05)  New Ignition tab (low-noise discovery); Set DNS on Tools
+  Added   : Ignition tab (admin tier, after Computers) - discovers Ignition
+            gateways across the domain. For each server it makes ONE HTTP
+            request to that server's gateway info endpoint (/system/gwinfo on
+            port 8088, then 8043 https) - the same endpoint the Inductive
+            Automation launchers use - and lists what responds: host, DNS, IP,
+            version, edition, gateway name, node role, redundancy and scheme.
+            Wildcard filter, scope (servers only / all), thread count (1-16,
+            default 8), progress bar, Export CSV. Right-click a gateway: Open
+            Gateway Web Page, RDP, Ping. Discovery runs on the Discover button;
+            the last results are cached (Settings\ignition-gateways.json) and
+            reloaded on first view.
+  Note    : Deliberately low-noise, by request. Unlike the old standalone
+            scanner (ControlSystemsConnect.ps1) this does NOT open TCP 445 or
+            walk C$/D$/E$/F$ admin shares to read project folders - sweeping
+            admin shares across the estate is a lateral-movement signature that
+            trips EDR/SOC alerts. The trade-off: it inventories the GATEWAY
+            (version/role/edition/up-down), not the per-project folder list,
+            which the old tool only got by reading the disk over SMB. The
+            Vision / Perspective / Designer per-project launchers from the old
+            tool are not ported for the same reason (they depended on that SMB
+            enumeration); gateway-level launching can be added later if wanted.
+  Added   : Tools > Set DNS sub-tab (last position) - paste computer names, set
+            primary / secondary DNS and the dynamic-registration flag on every
+            physical adapter that is Up, on each computer. Replaces the old
+            standalone RemoteDNSChange.ps1. Uses Invoke-Command (WinRM) running
+            Set-DnsClientServerAddress rather than remote WMI/DCOM (also quieter
+            to an EDR; requires WinRM on the target). Confirms through the
+            command engine (the exact Invoke-Command text is shown first), and
+            writes one OK/FAIL line per computer to the Activity Log.
+  Engine  : No engine change - template stays 1.0.21. All new code is project
+            modules (Modules\Admin\ADIgnition_*, ADTools_SetDns_*, UI_Ignition)
+            plus project-owned config (SharedScope.json, ToolTips.json,
+            UI_Register-Tabs.psm1). No Update Template needed.
+
 v1.2.14 (2026-11-05)  Computers tab menu: several selected = Ping Selected only
   Changed : Computers tab right-click menu follows the selection:
               one computer   - every action as before; no "Ping Selected...".

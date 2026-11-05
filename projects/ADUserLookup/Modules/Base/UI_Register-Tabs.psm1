@@ -31,6 +31,7 @@ function Register-AppTabs {
         @{ Title = 'Groups';             Fn = 'New-GroupsTab' }
         @{ Title = 'Account Management'; Fn = 'New-UserActionsTab' }
         @{ Title = 'Computers';          Fn = 'New-ComputersTab' }
+        @{ Title = 'Ignition';           Fn = 'New-IgnitionTab' }
         @{ Title = 'Bulk Operations';    Fn = 'New-BulkOpsTab' }
         @{ Title = 'Infrastructure';     Fn = 'New-InfrastructureTab' }
         @{ Title = 'Tools';              Fn = 'New-ToolsTab' }

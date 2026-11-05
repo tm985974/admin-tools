@@ -69,6 +69,12 @@
 #             of computer names and ping them all once or continuously
 #             (Build-PingListTab / ADTools.PingList.Tab, on the same group-ping
 #             panel as the computer menu's "Ping Selected..." dialog).
+#             ADDED 'Set DNS' sub-tab (last position, v1.2.15) - paste a list of
+#             computer names and set their DNS servers (and dynamic-registration
+#             flag) over WinRM (Build-SetDnsTab / ADTools.SetDns.Tab, backed by
+#             Invoke-SetRemoteDns / ADTools.SetDns.Engine). Replaces the old
+#             standalone RemoteDNSChange.ps1; uses Invoke-Command rather than
+#             remote WMI/DCOM. Every OK/FAIL goes to the Activity Log.
 #endregion
 
 #region -- Register-ToolsTab --------------------------------------------------
@@ -117,6 +123,7 @@ function Register-ToolsTab {
         @{ Key='env';   Text='  Environment Report  ' }
         @{ Key='abortreboot'; Text='  Abort Remote Reboot  ' }
         @{ Key='pinglist';    Text='  Ping List  ' }
+        @{ Key='setdns';      Text='  Set DNS  ' }
     )
     foreach ($p in $pages) {
         $tp           = New-Object System.Windows.Forms.TabPage
@@ -134,6 +141,7 @@ function Register-ToolsTab {
     Build-EnvTab   -Tab $script:ToolsPages['env']
     Build-AbortRebootTab -Tab $script:ToolsPages['abortreboot']
     Build-PingListTab    -Tab $script:ToolsPages['pinglist']
+    Build-SetDnsTab      -Tab $script:ToolsPages['setdns']
 }
 #endregion
 

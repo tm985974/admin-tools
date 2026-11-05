@@ -8,6 +8,7 @@
         "Groups": "Find groups, see and edit their members.",
         "Account Management": "Create a new user (one at a time or from a pasted list).",
         "Computers": "Find computers and check connectivity (ping and the RDP / SMB / Radmin / WinRM ports).",
+        "Ignition": "Discover Ignition gateways on the network with a single HTTP request to each server (no SMB / admin-share access), and open or RDP to them.",
         "Bulk Operations": "Actions on many objects at once: delete, add users, add groups, add users to groups, offboard.",
         "Infrastructure": "Reports on the domain and forest: functional levels, trusts, DC health, privileged accounts, GPO scope.",
         "Tools": "Password generator, naming convention audit, DNS / DHCP lookups, operation log, environment report, abort reboot, ping list.",
@@ -32,6 +33,7 @@
         "Tools > Environment Report": "Scan this machine and the domain connection and report what is installed and reachable.",
         "Tools > Abort Remote Reboot": "Paste computer names and cancel a pending restart on each.",
         "Tools > Ping List": "Paste computer names and ping them all - once or continuously - with up / down, response time and loss.",
+        "Tools > Set DNS": "Paste computer names and set their DNS servers on every adapter that is up, over WinRM. Replaces the old Remote DNS Change tool.",
         "Environment > Domain": "Domain (DNS name) and domain controller for this environment, with a connection test.",
         "Environment > Accounts": "Naming patterns, UPN suffix, home drive and default OUs used when accounts are created or offboarded.",
         "Environment > Mail": "SMTP server, port and sender address for notification mail.",
@@ -189,6 +191,16 @@
         "Copy selected": "Copy the name, phone and email of the selected people to the clipboard.",
         "Export visible": "Save every row currently shown to a CSV file.",
         "Export selected": "Save the selected rows to a CSV file.",
-        "Refresh from AD": "Read the directory again."
+        "Refresh from AD": "Read the directory again.",
+
+        "_ Ignition tab": "",
+        "Ignition > Discover Gateways": "Probe every server once over HTTP for an Ignition gateway and list what responds. No SMB or admin-share access.",
+        "Ignition > Reload Cached": "Show the gateways from the last discovery without re-probing anything.",
+        "Ignition > Export CSV": "Save the discovered gateways to a CSV file.",
+        "Ignition > Open Gateway Web Page": "Open the gateway home page in your browser.",
+        "Ignition > RDP": "Open Remote Desktop to the selected server(s).",
+
+        "_ Set DNS": "",
+        "Tools > Set DNS > Apply DNS Settings": "Set the DNS servers on every adapter that is up, on each pasted computer, over WinRM. Shows the exact command first."
     }
 }
