@@ -2,6 +2,24 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.23 (2026-11-05)  Update Template works: AppHost.cs hash check fixed
+  Fixed   : Update Template refused every template zip ("does not match its own
+            TEMPLATE_FILES.txt: AppHost.cs"), and every developer build showed
+            "template 1.0.x, 1 changed" for AppHost.cs. Not a stale hash (as
+            v1.0.17 and v1.0.20 assumed): the hash routine still cut the old
+            PROJECT IDENTITY block out of AppHost.cs before hashing, and since
+            the block was removed in v1.0.17 the only text it found was its own
+            two search strings - so it cut part of its own code and the result
+            never matched the manifest. AppHost.cs is now hashed whole like
+            every other file, and no longer contains those strings, so the
+            1.0.18-1.0.22 engines hash this AppHost.cs correctly too.
+            Found applying v1.0.22 to CCMClientTS (template 1.0.20).
+  Note    : One-time step for projects on 1.0.17-1.0.22: their running engine
+            has the bug, so Update Template still refuses (step 3 checks the
+            project's own AppHost.cs with the old routine). Apply the engine
+            bridge zip once with Update > Zip file; Update Template works from
+            then on. Engine-only, no contract change.
+
 v1.0.22 (2026-11-05)  Command window shown before every action by default
   Changed : Environment > General > Commands now defaults to Always: the
             command window (exact PowerShell, Copy, Run / Cancel) opens before
