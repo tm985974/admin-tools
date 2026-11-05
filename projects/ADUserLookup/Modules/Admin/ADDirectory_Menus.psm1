@@ -69,6 +69,8 @@ function New-UserContextMenu {
     # class fixed for Show-GroupMembersDialog in New-GroupContextMenu), so they
     # are captured here once and invoked via & in every closure that needs them.
     $confirmActionFn      = ${function:Confirm-Action}
+    $newAdCmdFn           = ${function:New-ADCommandText}
+    $adLiteralFn          = ${function:ConvertTo-ADCodeLiteral}
     $writeOpLogFn         = ${function:Write-OperationLog}
     $updateTreeLeaves     = ${function:Update-TreeLeavesForSelection}
     $updateCachedUserFn   = ${function:Update-CachedUser}
@@ -321,7 +323,8 @@ function New-UserContextMenu {
 
         $sams = @($actionable | ForEach-Object { $_.Sam })
         $msg  = if ($sams.Count -eq 1) { "Unlock account for $($sams[0])?" } else { "Unlock $($sams.Count) selected accounts?" }
-        if (-not (& $confirmActionFn -Title 'Unlock Account' -Message $msg -ActionLabel 'Unlock')) { return }
+        $code = & $newAdCmdFn -Cmdlet 'Unlock-ADAccount' -Identity $sams -Context $capturedDirContext -Tail '-ErrorAction Stop'
+        if (-not (& $confirmActionFn -Title 'Unlock Account' -Message $msg -ActionLabel 'Unlock' -Code $code)) { return }
 
         $ok = 0; $fail = 0
         $unlockedOk = [System.Collections.Generic.List[string]]::new()
@@ -441,8 +444,13 @@ function New-UserContextMenu {
 
         $sams = @($actionable | ForEach-Object { $_.Sam })
         $msg  = if ($sams.Count -eq 1) { "Enable account for $($sams[0])?" } else { "Enable $($sams.Count) selected accounts?" }
-        if (-not (& $confirmActionFn -Title 'Enable Account' -Message $msg -ActionLabel 'Enable')) { return }
         $stamp = "Enabled on $(Get-Date -Format 'M/d/yy')."
+        $codeLines = @()
+        foreach ($cs in $sams) {
+            $codeLines += (& $newAdCmdFn -Cmdlet 'Enable-ADAccount' -Identity @($cs) -Context $capturedDirContext -Tail '-ErrorAction Stop')
+            $codeLines += (& $newAdCmdFn -Cmdlet 'Set-ADUser' -Identity @($cs) -Context $capturedDirContext -Tail ('-Description ' + (& $adLiteralFn $stamp) + ' -ErrorAction Stop'))
+        }
+        if (-not (& $confirmActionFn -Title 'Enable Account' -Message $msg -ActionLabel 'Enable' -Code ($codeLines -join "`r`n"))) { return }
 
         $ok = 0; $fail = 0; $failMsg = ''
         $enabledOk = [System.Collections.Generic.List[string]]::new()
@@ -663,6 +671,8 @@ function New-GroupContextMenu {
         $miRemoveUser     = New-Object System.Windows.Forms.ToolStripMenuItem
         $miRemoveUser.Text = 'Remove User from Group(s)'
         $confirmActionFn2 = ${function:Confirm-Action}
+        $newAdCmdFn2      = ${function:New-ADCommandText}
+        $adLiteralFn2     = ${function:ConvertTo-ADCodeLiteral}
         $writeOpLogFn2    = ${function:Write-OperationLog}
         $readSelUserGrpFn = ${function:Read-SelectedUserGroups}
         $showMailDlgFn2g  = ${function:Show-NotificationMailDialog}
@@ -681,7 +691,11 @@ function New-GroupContextMenu {
             $samDesc = if ($sams.Count -eq 1) { "'$($sams[0])'" } else { "$($sams.Count) users" }
             $msg = if ($names.Count -eq 1) { "Remove $samDesc from '$($names[0])'?" } `
                    else { "Remove $samDesc from $($names.Count) group(s)?`n`n$($names -join ', ')" }
-            if (-not (& $confirmActionFn2 -Title 'Remove from Group' -Message $msg -ActionLabel 'Remove')) { return }
+            $codeLines = @()
+            foreach ($cg in $names) { foreach ($cs in $sams) {
+                $codeLines += (& $newAdCmdFn2 -Cmdlet 'Remove-ADGroupMember' -Identity @($cg) -Context $capturedDirContext -Tail ('-Members ' + (& $adLiteralFn2 $cs) + ' -Confirm:$false -ErrorAction Stop'))
+            } }
+            if (-not (& $confirmActionFn2 -Title 'Remove from Group' -Message $msg -ActionLabel 'Remove' -Code ($codeLines -join "`r`n"))) { return }
             $srvParam = if ($capturedDirContext.TargetDC) { @{ Server = $capturedDirContext.TargetDC } } else { @{} }
             $ok = 0; $fail = 0; $failMsg = ''
             foreach ($groupName in $names) {
@@ -860,6 +874,24 @@ function New-ComputerContextMenu {
     $confirmActionCompFn = ${function:Confirm-Action}
     $showMailDlgFnComp   = ${function:Show-NotificationMailDialog}
     $invDeleteCompFn  = ${function:Invoke-DeleteComputers}
+    # v1.2.12: command engine (Base\Services_Commands) + group ping.
+    $invokeCmdFn      = ${function:Invoke-AppCommand}
+    $confirmCmdFn     = ${function:Confirm-AppCommand}
+    $fmtCmdFn         = ${function:Format-AppCommandValue}
+    $pingCmdTextFn    = ${function:Get-PingGroupCommandText}
+    $showPingGroupFn  = ${function:Show-PingGroupDialog}
+    $restartCmdTextFn = ${function:Get-RemoteRestartCommandText}
+    $menuApp          = $script:ADApp
+    # Runs one "Start-Process ..." line per target through Invoke-AppCommand:
+    # shown first when Environment > Commands (or Shift) asks, logged, then
+    # exactly that text runs. -Lines is one line per computer.
+    $runLaunchCmd = {
+        param([string]$Title, [string[]]$Lines, [string]$Summary)
+        if (@($Lines).Count -eq 0) { return }
+        if (-not $invokeCmdFn) { & $invSetStatusComp 'Command engine not loaded (Base\Services_Commands).' 'err'; return }
+        $r = & $invokeCmdFn -App $menuApp -Title $Title -Kind Read -Code (@($Lines) -join "`r`n") -Summary $Summary
+        if ($r.Errors.Count -gt 0) { & $invSetStatusComp "${Title}: $($r.Errors[0])" 'err' }
+    }.GetNewClosure()
     # Context threaded in from the caller (see param) - same fix as New-
     # UserContextMenu/New-GroupContextMenu above. Previously this function
     # took no Context at all, and the Delete Computer(s) handler fell back
@@ -876,7 +908,7 @@ function New-ComputerContextMenu {
     $miTest.Add_Click(({
         $targets = @(& $TargetProvider)
         if ($targets.Count -ne 1) {
-            [System.Windows.Forms.MessageBox]::Show('Select exactly one computer.','Test Connectivity','OK','Information'); return
+            [System.Windows.Forms.MessageBox]::Show("Select exactly one computer.`n`nTo check several at once, use Ping Selected...",'Test Connectivity','OK','Information'); return
         }
         $name = $targets[0].Name
         if ($setSelectedComp) {
@@ -892,9 +924,9 @@ function New-ComputerContextMenu {
     $miRDP      = New-Object System.Windows.Forms.ToolStripMenuItem
     $miRDP.Text = 'RDP'
     $miRDP.Add_Click(({
-        foreach ($t in @(& $TargetProvider)) {
-            try { Start-Process mstsc.exe "/v:$($t.Name)" } catch { & $invSetStatusComp "RDP failed for $($t.Name)." 'err' }
-        }
+        $names = @(@(& $TargetProvider) | ForEach-Object { $_.Name } | Where-Object { $_ })
+        $lines = @($names | ForEach-Object { 'Start-Process -FilePath ''mstsc.exe'' -ArgumentList ' + (& $fmtCmdFn "/v:$_") })
+        & $runLaunchCmd 'RDP' $lines "Open Remote Desktop to $($names.Count) computer(s)."
     }).GetNewClosure())
     [void]$menu.Items.Add($miRDP)
 
@@ -909,31 +941,52 @@ function New-ComputerContextMenu {
         )
         $exe = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
         if (-not $exe) { & $invSetStatusComp 'Radmin Viewer not found at standard paths.' 'warn'; return }
-        foreach ($t in @(& $TargetProvider)) {
-            # Radmin's /connect: switch takes ONE combined HOST:PORT token -
-            # there is no separate /port: switch. The prior "/connect:HOST
-            # /port:4899" form was invalid syntax and silently failed to
-            # connect.
-            try { Start-Process $exe "/connect:$($t.Name):$RADMIN_PORT" } catch { & $invSetStatusComp "Radmin failed for $($t.Name)." 'err' }
-        }
+        # Radmin's /connect: switch takes ONE combined HOST:PORT token -
+        # there is no separate /port: switch. The prior "/connect:HOST
+        # /port:4899" form was invalid syntax and silently failed to
+        # connect.
+        $names = @(@(& $TargetProvider) | ForEach-Object { $_.Name } | Where-Object { $_ })
+        $lines = @($names | ForEach-Object { 'Start-Process -FilePath ' + (& $fmtCmdFn $exe) + ' -ArgumentList ' + (& $fmtCmdFn "/connect:${_}:$RADMIN_PORT") })
+        & $runLaunchCmd 'Radmin' $lines "Open Radmin Viewer to $($names.Count) computer(s)."
     }).GetNewClosure())
     [void]$menu.Items.Add($miRadmin)
 
-    $miPing      = New-Object System.Windows.Forms.ToolStripMenuItem
-    $miPing.Text = 'Ping (continuous)'
-    $miPing.Add_Click(({
-        foreach ($t in @(& $TargetProvider)) {
-            try { Start-Process cmd.exe "/k ping -t $($t.Name)" } catch { }
+    # Ping Selected... (v1.2.12): every selected computer in one "Ping
+    # Computers" window - live up/down, response time, loss, continuous
+    # until Stop (ADComputers.Ping.Dialog). Works for one or many.
+    $miPingGroup      = New-Object System.Windows.Forms.ToolStripMenuItem
+    $miPingGroup.Text = 'Ping Selected...'
+    $miPingGroup.Add_Click(({
+        $names = @(@(& $TargetProvider) | ForEach-Object { $_.Name } | Where-Object { $_ })
+        if ($names.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show('Select at least one computer.','Ping Selected','OK','Information'); return
         }
+        if (-not $showPingGroupFn) { & $invSetStatusComp 'Ping dialog module not loaded.' 'warn'; return }
+        if ($confirmCmdFn -and $pingCmdTextFn) {
+            $ok = & $confirmCmdFn -App $menuApp -Title 'Ping Selected' -Kind Read -RunLabel 'Ping' `
+                -Summary "Ping $($names.Count) computer(s) every 2 s in a Ping Computers window (Stop / Ping once there)." `
+                -Code (& $pingCmdTextFn -Names $names -TimeoutMs 1000 -IntervalSeconds 2)
+            if (-not $ok) { return }
+        }
+        & $showPingGroupFn -ComputerNames $names -Context $capturedCompContext -App $menuApp -NoConfirm
+    }).GetNewClosure())
+    [void]$menu.Items.Add($miPingGroup)
+
+    $miPing      = New-Object System.Windows.Forms.ToolStripMenuItem
+    $miPing.Text = 'Ping (continuous, command window)'
+    $miPing.Add_Click(({
+        $names = @(@(& $TargetProvider) | ForEach-Object { $_.Name } | Where-Object { $_ })
+        $lines = @($names | ForEach-Object { 'Start-Process -FilePath ''cmd.exe'' -ArgumentList ' + (& $fmtCmdFn "/k ping -t $_") })
+        & $runLaunchCmd 'Ping (command window)' $lines "Open a command window running ping -t for each of $($names.Count) computer(s)."
     }).GetNewClosure())
     [void]$menu.Items.Add($miPing)
 
     $miMMC      = New-Object System.Windows.Forms.ToolStripMenuItem
     $miMMC.Text = 'Computer Management (MMC)'
     $miMMC.Add_Click(({
-        foreach ($t in @(& $TargetProvider)) {
-            try { Start-Process compmgmt.msc "/computer:$($t.Name)" } catch { & $invSetStatusComp "MMC failed for $($t.Name)." 'err' }
-        }
+        $names = @(@(& $TargetProvider) | ForEach-Object { $_.Name } | Where-Object { $_ })
+        $lines = @($names | ForEach-Object { 'Start-Process -FilePath ''compmgmt.msc'' -ArgumentList ' + (& $fmtCmdFn "/computer:$_") })
+        & $runLaunchCmd 'Computer Management' $lines "Open Computer Management for $($names.Count) computer(s)."
     }).GetNewClosure())
     [void]$menu.Items.Add($miMMC)
     [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
@@ -989,7 +1042,9 @@ function New-ComputerContextMenu {
         $preview = ($names | Select-Object -First 15) -join ', '
         if ($names.Count -gt 15) { $preview += ", ... ($($names.Count) total)" }
         $msg = "Immediately restart $($names.Count) computer(s)?`n`n$preview`n`nAny unsaved work on these computers will be lost."
-        if (-not (& $confirmActionCompFn -Title 'Restart Now' -Message $msg -ActionLabel 'Restart')) { return }
+        $code = ''
+        if ($restartCmdTextFn) { $code = & $restartCmdTextFn -Mode Now -Names $names }
+        if (-not (& $confirmActionCompFn -Title 'Restart Now' -Message $msg -ActionLabel 'Restart' -Code $code)) { return }
         if (-not $invRestartNowFn) {
             & $invSetStatusComp 'Restart engine module not loaded.' 'warn'; return
         }
@@ -1045,9 +1100,9 @@ function New-ComputerContextMenu {
     $miOpenShare      = New-Object System.Windows.Forms.ToolStripMenuItem
     $miOpenShare.Text = 'Open C$ Admin Share'
     $miOpenShare.Add_Click(({
-        foreach ($t in @(& $TargetProvider)) {
-            try { Start-Process explorer.exe "\\$($t.Name)\c$" } catch { & $invSetStatusComp "Failed to open C$ share for $($t.Name)." 'err' }
-        }
+        $names = @(@(& $TargetProvider) | ForEach-Object { $_.Name } | Where-Object { $_ })
+        $lines = @($names | ForEach-Object { 'Start-Process -FilePath ''explorer.exe'' -ArgumentList ' + (& $fmtCmdFn ('\\' + $_ + '\c$')) })
+        & $runLaunchCmd 'Open C$ Admin Share' $lines "Open the C$ admin share of $($names.Count) computer(s) in Explorer."
     }).GetNewClosure())
     [void]$menu.Items.Add($miOpenShare)
     [void]$menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))

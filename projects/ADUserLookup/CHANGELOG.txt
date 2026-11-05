@@ -2,6 +2,50 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.12 (2026-11-05)  Ping several computers; hover help everywhere; see the exact command (+ engine v1.0.21)
+  Added   : Right-click any computer list > "Ping Selected..." - every
+            selected computer in one Ping Computers window: Up / Down, address,
+            response time, sent / received / loss %, last reply and since when
+            the state has held; continuous every 2 s until Stop (interval 1-30 s
+            and timeout selectable; Ping once; "ping -t selected" opens command
+            windows; Copy results pastes into Excel). Right-click a result row
+            for the usual computer menu. Several windows can be open at once.
+            The single-computer items still say "Select exactly one computer"
+            (Test Connectivity now points to Ping Selected for several).
+  Added   : Tools > Ping List - paste computer names (one per line, or
+            separated by commas / spaces; "\\" prefixes, trailing "$" and #
+            comment lines are ignored) and ping them once or continuously, with
+            the same results grid. The list can be edited between rounds.
+  Changed : "Ping (continuous)" is now "Ping (continuous, command window)" (same
+            behaviour: one ping -t window per computer).
+  Added   : (engine 1.0.21) Hover help on every tab, sub-tab, button, check
+            box, radio button and right-click menu item - Config\ToolTips.json
+            (new, project-owned). The developer build lists anything still
+            without one in Logs\ToolTips_missing.txt.
+  Added   : (engine 1.0.21) The exact command, with Copy, before it runs:
+            - every AD change confirmation now shows the PowerShell it is about
+              to run (Confirm-Action -Code): Unlock, Enable, Disable, Delete
+              User / Group / Computer, Remove User from Group, Edit Members
+              (add / remove), Edit Groups (add / remove), Set / Clear Expiry,
+              Restart Now, Timed Restart (incl. the msg.exe line), Force
+              Logoff (both session dialogs), Abort Pending Restart (new
+              confirmation).
+            - RDP, Radmin, Computer Management, Open C$ and the ping items run
+              through the command engine (Invoke-AppCommand): exactly the text
+              shown runs. They run straight away by default; Shift+click (or
+              Environment > General > Commands = Always) shows the command
+              first. "Ping once" also has right-click Show / Copy command.
+            Every command run or cancelled is logged to Session.log.
+  Changed : Restart Now / Timed Restart / Abort build their shutdown.exe
+            arguments in one place (Get-RestartArguments), so the command shown
+            is always the one run.
+  Note    : Not yet showing code: Create User, Bulk Add Users, Bulk Add Groups,
+            Add Users to Groups, Offboarding, Naming Convention fixes, Edit
+            Contacts, Reset Password (their confirmations are unchanged).
+  Note    : Applied with Update (the package carries the engine 1.0.21 files and
+            TEMPLATE_* as well, so it is one step). The same engine is in
+            AppTemplate v1.0.21 for future Update Template syncs.
+
 v1.2.11 (2026-11-02)  Engine v1.0.16 -> v1.0.20 (manual sync: AppIdentity.json)
   Changed : Project identity moved from the PROJECT IDENTITY block in AppHost.cs
             to AppIdentity.json (new, project-owned): AppName "AD User Lookup",

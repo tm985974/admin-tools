@@ -2,7 +2,7 @@
 #
 # Hosts the ported 'Tools' tab: Register-ToolsTab from AD Admin 1.6.1, unchanged.
 # Password Generator, Naming Convention, DNS Lookup, DHCP Leases, Operation
-# Log, Environment Report and Abort Remote Reboot.
+# Log, Environment Report, Abort Remote Reboot and Ping List.
 #
 # Built on first view (Set-LazyTabBuild). The original registrar is handed the
 # REAL main tab page, because it hooks $Tab.Parent (the main TabControl) and

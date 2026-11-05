@@ -96,6 +96,58 @@ function Invoke-ShutdownExe {
 }
 #endregion
 
+#region -- Get-RestartArguments / Get-RemoteRestartCommandText -------------------
+function Get-RestartArguments {
+    <#
+    .SYNOPSIS
+        The shutdown.exe argument string for one computer - the ONE place it
+        is built, so the command shown to the user (Get-RemoteRestartCommandText)
+        and the one run (Invoke-ShutdownExe) are always the same.
+    .PARAMETER Mode
+        Now (forced, immediate), Timed (/t delay + optional /c message) or Abort.
+    #>
+    param(
+        [ValidateSet('Now', 'Timed', 'Abort')] [string]$Mode,
+        [string]$Name,
+        [int]$DelaySeconds = 0,
+        [string]$Message = ''
+    )
+    switch ($Mode) {
+        'Now'   { return "/r /f /t 0 /m \\$Name /c ""Restart initiated by AD-Admin.""" }
+        'Abort' { return "/a /m \\$Name" }
+        default {
+            if ($DelaySeconds -lt 0) { $DelaySeconds = 0 }
+            $a = "/r /t $DelaySeconds /m \\$Name"
+            if ($Message) { $a += " /c ""$Message""" }
+            return $a
+        }
+    }
+}
+
+function Get-RemoteRestartCommandText {
+    <#
+    .SYNOPSIS
+        The exact commands a restart / abort runs for -Names, one line per
+        computer (plus the msg.exe pop-up line for a timed restart with a
+        message), for the command window (Confirm-Action -Code).
+    #>
+    param(
+        [ValidateSet('Now', 'Timed', 'Abort')] [string]$Mode,
+        [string[]]$Names,
+        [int]$DelaySeconds = 0,
+        [string]$Message = ''
+    )
+    $safe = $Message
+    if ($safe.Length -gt 127) { $safe = $safe.Substring(0, 127) }
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($n in @($Names | Where-Object { $_ } | Select-Object -Unique)) {
+        if ($Mode -eq 'Timed' -and $safe) { [void]$lines.Add("msg.exe * /server:$n /time:$DelaySeconds ""$safe""") }
+        [void]$lines.Add('shutdown.exe ' + (Get-RestartArguments -Mode $Mode -Name $n -DelaySeconds $DelaySeconds -Message $safe))
+    }
+    return ($lines -join "`r`n")
+}
+#endregion
+
 #region -- Invoke-RemoteRestart -------------------------------------------------
 function Invoke-RemoteRestart {
     <#
@@ -125,7 +177,7 @@ function Invoke-RemoteRestart {
     $itemResults = [System.Collections.Generic.List[PSCustomObject]]::new()
 
     foreach ($name in $names) {
-        $result = Invoke-ShutdownExe -Arguments "/r /f /t 0 /m \\$name /c ""Restart initiated by AD-Admin."""
+        $result = Invoke-ShutdownExe -Arguments (Get-RestartArguments -Mode Now -Name $name)
         if ($result.Success) {
             Write-OperationLog -Context $Context -Action 'RESTART-NOW' -Target $name -Result 'OK'
             [void]$itemResults.Add([PSCustomObject]@{ Name = $name; Success = $true; Message = 'Restart initiated' })
@@ -238,9 +290,7 @@ function Invoke-TimedRestart {
         # restart scheduling call fails.
         if ($safeMessage) { Invoke-RemoteMessage -ComputerName $name -Message $safeMessage -TimeoutSeconds $DelaySeconds }
 
-        $args = "/r /t $DelaySeconds /m \\$name"
-        if ($safeMessage) { $args += " /c ""$safeMessage""" }
-        $result = Invoke-ShutdownExe -Arguments $args
+        $result = Invoke-ShutdownExe -Arguments (Get-RestartArguments -Mode Timed -Name $name -DelaySeconds $DelaySeconds -Message $safeMessage)
         if ($result.Success) {
             Write-OperationLog -Context $Context -Action 'RESTART-TIMED' -Target $name -Result 'OK' -Detail "Delay: ${DelaySeconds}s. Message: $safeMessage"
             [void]$itemResults.Add([PSCustomObject]@{ Name = $name; Success = $true; Message = "Restart scheduled in ${DelaySeconds}s" })
@@ -291,7 +341,7 @@ function Invoke-AbortRemoteRestart {
     $itemResults = [System.Collections.Generic.List[PSCustomObject]]::new()
 
     foreach ($name in $names) {
-        $result = Invoke-ShutdownExe -Arguments "/a /m \\$name"
+        $result = Invoke-ShutdownExe -Arguments (Get-RestartArguments -Mode Abort -Name $name)
         if ($result.Success) {
             Write-OperationLog -Context $Context -Action 'RESTART-ABORT' -Target $name -Result 'OK'
             [void]$itemResults.Add([PSCustomObject]@{ Name = $name; Success = $true; Message = 'Pending restart aborted' })
@@ -308,6 +358,8 @@ function Invoke-AbortRemoteRestart {
 #endregion
 
 Export-ModuleMember -Function `
+    Get-RestartArguments, `
+    Get-RemoteRestartCommandText, `
     Invoke-RemoteRestart, `
     Invoke-TimedRestart, `
     Invoke-AbortRemoteRestart

@@ -134,6 +134,11 @@ function Build-AbortRebootTab {
     $invAbortFn      = ${function:Invoke-AbortRemoteRestart}
     $showMailDlgFn   = ${function:Show-NotificationMailDialog}
     $capturedContext = $script:ToolsCtx
+    # v1.2.12: confirm through the command engine (Kind Change: shown with the
+    # default setting) - the exact shutdown.exe /a lines, Copy, Run / Cancel.
+    $confirmCmdFn     = ${function:Confirm-AppCommand}
+    $restartCmdTextFn = ${function:Get-RemoteRestartCommandText}
+    $abortApp         = $script:ADApp
 
     $btnAbort.Add_Click({
         $names = @(
@@ -149,6 +154,13 @@ function Build-AbortRebootTab {
             $lStatus.ForeColor = [System.Drawing.Color]::FromArgb(156,0,6)
             $lStatus.Text      = 'Restart engine module not loaded.'
             return
+        }
+
+        if ($confirmCmdFn -and $restartCmdTextFn) {
+            $ok = & $confirmCmdFn -App $abortApp -Title 'Abort Pending Restart' -Kind Change -RunLabel 'Abort' `
+                -Summary "Abort a pending restart on $($names.Count) computer(s)." `
+                -Code (& $restartCmdTextFn -Mode Abort -Names $names)
+            if (-not $ok) { return }
         }
 
         $btnAbort.Enabled = $false

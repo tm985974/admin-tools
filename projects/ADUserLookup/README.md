@@ -177,7 +177,7 @@ installed-module list).
 
 ---
 
-## Engine helpers for module code (v1.0.17)
+## Engine helpers for module code (v1.0.21)
 
 | Need | Use |
 |---|---|
@@ -197,6 +197,8 @@ installed-module list).
 | Port a tool whose files share one `$script:` scope | `Config\SharedScope.json` (`Modules`, `Order`), plus an optional `Initialize-SharedScope -App` |
 | Say what a tab needs on the machine (module / command) | `if (-not (Register-AppRequirement -App $App -Page $Page -For 'User Lookup' -Module ActiveDirectory -Hint '...')) { return }` at the top of `New-<Tab>` (`Services_Requirements.psm1`; Tab 1 shows it). `-Command` for programs/cmdlets, `-MinimumVersion`; `Get-AppRequirementStatus` lists all |
 | Filter a list, grid or tree (wildcards anywhere) | `Register-ListFilter -App $App -TextBox $box -OnFilter { param($Regex,$Text) ... }` + `Select-FilterMatch -Items $all -Regex $Regex -Property ...` (`Services_Filter.psm1`; Tab 2 is the example) |
+| Hover help on a button / menu item / tab (v1.0.21) | an entry in `Config\ToolTips.json` - nothing to call (see *Hover help*). In code: `Set-AppToolTip -Control $c -Text '...'` |
+| Run a command and let the user see / copy its exact syntax first (v1.0.21) | build the code as text with `Format-AppCommandValue`, then `Invoke-AppCommand -App $App -Title ... -Kind Change -Code $code` (or `-Kind Read`) (confirm + log + run that text) or `Confirm-AppCommand` (confirm + log only). Right-click Show / Copy command on a button: `Register-AppCommand -App $App -Control $btn -Code { <code text> }` (`Services_Commands.psm1`; the computer right-click menu in `ADDirectory_Menus.psm1` is the example) |
 
 ### Lists and filters (template rule)
 
@@ -217,6 +219,68 @@ property may match). The environment's **Filter as I type** decides whether it
 filters after a short pause in typing or on Enter; Esc clears. Call
 `& $filter.Apply` after loading data. `Modules\Lite\UI_Tab2.psm1` is the
 reference.
+
+### Hover help (template rule, v1.0.21)
+
+Everything you can click - buttons, check boxes, radio buttons, link labels,
+menu items (right-click menus too) and tabs - should say what clicking it does.
+The texts are kept in one catalog, not in the modules:
+
+- engine entries in `Base\Services_ToolTips.psm1` (developer buttons,
+  Environment tab, common buttons such as OK / Cancel / Close / Export CSV);
+- `Config\ToolTips.json` (project-owned) for the project's own controls. An
+  entry there wins over an engine entry.
+
+```json
+{ "ToolTips": {
+    "Refresh":                  "any 'Refresh' button without a more specific entry",
+    "Computers > Refresh":      "the Refresh button on the Computers tab",
+    "Tools > Ping List > Ping": "a button on a sub-tab",
+    "Ping Computers > Copy":    "a button in the dialog titled 'Ping Computers'",
+    "Tools > Ping List":        "the sub-tab itself"
+} }
+```
+
+The key is the control's text, optionally preceded by where it is (tab / sub-tab
+/ group box titles, outermost first, or the dialog title). Case, `&` and a
+trailing `...` are ignored; the most specific key wins and any "where" part may
+be left out. Menu items take the place of the control the menu belongs to. The
+launcher starts it once (`Start-AppToolTips`); a light timer picks up dialogs,
+lazy tabs and menus as they appear - modules call nothing. `Set-AppToolTip` sets
+one in code. **Developer build:** every clickable control with no entry is
+listed, ready to paste, in `<data root>\Logs\ToolTips_missing.txt` (and counted
+in Session.log), so coverage can be completed as features are added.
+
+### Showing the exact command (template rule, v1.0.21)
+
+Anything that runs a script builds the PowerShell it will run **as text with
+the real values** and goes through `Services_Commands.psm1`:
+
+```powershell
+$code = 'Unlock-ADAccount -Identity {0} -Server {1}' -f (Format-AppCommandValue $sam), (Format-AppCommandValue $dc)
+$r = Invoke-AppCommand -App $App -Title 'Unlock Account' -Kind Change -Code $code -Summary "Unlock $sam?"
+if ($r.Ran -and $r.Errors.Count -eq 0) { ... }
+```
+
+`Invoke-AppCommand` shows the command window when it should, logs the command
+and runs **that same text**, so what was shown is what ran. The window has the
+title, the summary, the code (read-only, selectable), **Copy** and **Run /
+Cancel** - for a change it is the confirmation itself (replace a module's own
+confirm dialog with it rather than adding a second popup; Enter never runs a
+change). `Confirm-AppCommand` is the same without the run step, for code an
+engine function runs itself. When it shows (Environment > General > Commands,
+app-wide): **Always**, **Changes** (default - actions passed `-Kind Change`),
+or **Never**; **Shift+click** shows it first whatever the setting.
+`Register-AppCommand` gives a button a right-click **Show command... / Copy
+command** (nothing is run) and its tooltip says so. Every confirmed command is
+logged (`[Command] Run : <title>`; the code as DIAG with diagnostics on).
+
+In this project the catalog is `Config\ToolTips.json` (every tab, sub-tab,
+right-click menu item and button); commands are shown for every AD change
+confirmation (`Confirm-Action -Code`, e.g. Unlock, Enable, Disable, Delete,
+group membership, expiry, restarts, force logoff) and for the computer menu's
+launch actions (RDP, Radmin, MMC, C$, ping), which run through
+`Invoke-AppCommand`.
 
 Lazy tabs replay their first activation after building (main TabControl
 `Selected`/`SelectedIndexChanged`, then focus into the page so `Enter` fires), so

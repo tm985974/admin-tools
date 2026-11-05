@@ -67,7 +67,9 @@ function Invoke-DeleteComputers {
     $preview = ($names | Select-Object -First 15) -join ', '
     if ($names.Count -gt 15) { $preview += ", ... ($($names.Count) total)" }
     $msg = "Permanently delete $($names.Count) computer object(s)?`n`n$preview`n`nThis cannot be undone."
-    if (-not (Confirm-Action -Title 'Delete Computer(s)' -Message $msg -ActionLabel 'Delete')) { return $null }
+    $code = New-ADCommandText -Cmdlet 'Remove-ADComputer' -Identity $names -Context $Context -Tail '-Confirm:$false -ErrorAction Stop' `
+        -Comment 'Each computer is snapshotted first (OU, for the recovery details in the admin mail), then:'
+    if (-not (Confirm-Action -Title 'Delete Computer(s)' -Message $msg -ActionLabel 'Delete' -Code $code)) { return $null }
 
     $srvParam = if ($Context -and $Context.TargetDC) { @{ Server = $Context.TargetDC } } else { @{} }
     $ok = 0; $fail = 0

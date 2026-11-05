@@ -197,7 +197,12 @@ function Show-DisableAccountDialog {
         $desc       = & $buildDesc
         $countNames = ($Users | ForEach-Object { $_.Sam }) -join ', '
         $msg = "Disable $($Users.Count) account(s)?`n$countNames`n`nDescription:`n$desc"
-        if (-not (Confirm-Action -Title 'Disable Account' -Message $msg -ActionLabel 'Disable')) { return }
+        $codeLines = @('# Each account is snapshotted first (OU and groups, for the recovery details in the mail), then:')
+        foreach ($u in $Users) {
+            $codeLines += (New-ADCommandText -Cmdlet 'Disable-ADAccount' -Identity @($u.Sam) -Context $Context -Tail '-ErrorAction Stop')
+            $codeLines += (New-ADCommandText -Cmdlet 'Set-ADUser' -Identity @($u.Sam) -Context $Context -Tail ('-Description ' + (ConvertTo-ADCodeLiteral $desc) + ' -ErrorAction Stop'))
+        }
+        if (-not (Confirm-Action -Title 'Disable Account' -Message $msg -ActionLabel 'Disable' -Code ($codeLines -join "`r`n"))) { return }
         $srvParam = if ($Context.TargetDC) { @{ Server = $Context.TargetDC } } else { @{} }
         $ok = 0; $fail = 0; $failMsg = ''
         $disabledOk = [System.Collections.Generic.List[string]]::new()

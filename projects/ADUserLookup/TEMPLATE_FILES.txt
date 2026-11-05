@@ -1,4 +1,4 @@
-# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.0.20
+# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.0.21
 #
 # Every project carries these files UNCHANGED (same bytes as the template).
 # AppHost.cs has no project-specific lines: the project's names are in the
@@ -8,7 +8,8 @@
 # Project-owned (never listed here): AppIdentity.json, Modules/Lite/*,
 #   Modules/Admin/*, Modules/Base/UI_Register-Tabs.psm1,
 #   Modules/Base/UI_Tab_Overview.psm1, Config/Environments.json,
-#   Config/EnvironmentFields.json, Config/SharedScope.json, VERSION.txt,
+#   Config/EnvironmentFields.json, Config/SharedScope.json, Config/ToolTips.json,
+#   VERSION.txt,
 #   CHANGELOG.txt, README.md.
 #
 # The developer build checks every listed file on every start (AppHost.cs,
@@ -21,8 +22,9 @@
 8f1adb4f172aeb5300eefa37a998917c87c412e564161bbaf083772d23d82fbd  Build-App.ps1
 716629172f5ef833c6ee550303a4c979fbe14ce2da18c5654156920a5b914d36  Build-App.cs
 b9ccd3a5f1a58fe6e767bd70663d022358533c1d0420ad66ca318289326b4214  Build-App.cmd
-05319e41ee5732542b80adf8d526de2f635d2c9084db4488e1c38cb2f7284d3c  _AppLauncher.ps1
+216d37a12a0c7af9d6d77f3da6f9622112600f09a03c98d45594fbdbe2c7f904  _AppLauncher.ps1
 23bfed0ee452dec4864a6267346442c7e1a2186e5a3d6573f1c66bb4a7ab6fb8  Config/Logging.json
+d1e422e27c0370fc15ebaa5df6b57e796b8ffa82cec75aeea3c4ee525fa50e40  Modules/Base/Services_Commands.psm1
 010a207cc2cff05c6159324cf633f641d2c55f1d2244bfc42fcda48d16eefcbf  Modules/Base/Services_Environment.psm1
 a66daa25ca2fbfa73df43077d0c09629bbab07b7a87e95bdb0e49e3f52c80ae6  Modules/Base/Services_EnvironmentStore.psm1
 e660b8a8a4817bb68e6aee75febf3f211360a53f587fe6f1545bb73533dc1b10  Modules/Base/Services_Filter.psm1
@@ -30,7 +32,8 @@ e660b8a8a4817bb68e6aee75febf3f211360a53f587fe6f1545bb73533dc1b10  Modules/Base/S
 e3f6e39423f1951f7b544ae4481dd3d7d6e70a38fb7c716954318d3d8f87a850  Modules/Base/Services_Requirements.psm1
 343d4bf2af8a02062a8483dcfe6c1a9b1560949c7bfa6644bbf341bdeafbfdf3  Modules/Base/Services_Settings.psm1
 eb1654f73a9f356f0393adfb87e1b45b718d39ffee1bd92a3a29c8cdf6be677f  Modules/Base/Services_Theme.psm1
+050d8428a7981a4171dbeca0788f9f9f07df298e49e46fa74ead445b6ee06fc0  Modules/Base/Services_ToolTips.psm1
 ef9888ea769e0a2929f086822e2303c8460f5e3a07aeaabd03ab158b1b91c011  Modules/Base/UI_EmbeddedTabPage.psm1
 f550b376ca9512340cf3f09d4dd44f9d287b4a3f6a5d17e506a22467a253e36f  Modules/Base/UI_Layout.psm1
 1cbfe7737e4bed3e282fee8dd895d337fd5a5ac3916dba2b709aa2803404c380  Modules/Base/UI_LazyTab.psm1
-ef0bd87b189b70459d3c804762d01bada1eb1e58d73482f10c2c3f04276db2a5  Modules/Base/UI_Tab_Environment.psm1
+045c2f5db2db9a8f83174e6963032cbb7ad51af6becc21c2e5baf19038116841  Modules/Base/UI_Tab_Environment.psm1

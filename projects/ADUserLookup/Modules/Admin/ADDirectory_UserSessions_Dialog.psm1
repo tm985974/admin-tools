@@ -269,12 +269,21 @@ function Show-UserSessionsDialog {
 
         $confirmLines = foreach ($t in $targets) { "  $($t.Computer)  (session $($t.SessionId))" }
         $confirmMsg   = "Force logoff the following session(s)?`r`n`r`n$($confirmLines -join "`r`n")`r`n`r`nThis disconnects the user immediately and cannot be undone."
-        $confirm      = [System.Windows.Forms.MessageBox]::Show(
-            $confirmMsg, 'Confirm Force Logoff',
-            [System.Windows.Forms.MessageBoxButtons]::YesNo,
-            [System.Windows.Forms.MessageBoxIcon]::Warning,
-            [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
-        if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+        # v1.2.12: the confirmation shows the exact logoff.exe lines (command
+        # window, Confirm-Action -Code); the plain Yes/No box is the fallback
+        # if the command engine is not loaded.
+        $code = (@($targets | ForEach-Object { "logoff.exe $($_.SessionId) /server:$($_.Computer)" }) -join "`r`n")
+        if (Get-Command Confirm-AppCommand -ErrorAction SilentlyContinue) {
+            if (-not (Confirm-Action -Title 'Confirm Force Logoff' -Message $confirmMsg -ActionLabel 'Force Logoff' -Code $code)) { return }
+        }
+        else {
+            $confirm      = [System.Windows.Forms.MessageBox]::Show(
+                $confirmMsg, 'Confirm Force Logoff',
+                [System.Windows.Forms.MessageBoxButtons]::YesNo,
+                [System.Windows.Forms.MessageBoxIcon]::Warning,
+                [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
+            if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) { return }
+        }
 
         $okCount   = 0
         $failCount = 0

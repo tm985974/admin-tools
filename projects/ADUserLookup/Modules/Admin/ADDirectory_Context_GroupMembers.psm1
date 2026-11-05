@@ -190,6 +190,8 @@ function Show-GroupMembersDialog {
     # NotificationMailDialog are captured the same way for the new Remove
     # Selected Member(s) tracking mail.
     $confirmActionFn  = ${function:Confirm-Action}
+    $newAdCmdFnGM     = ${function:New-ADCommandText}
+    $adLiteralFnGM    = ${function:ConvertTo-ADCodeLiteral}
     $writeOpLogFn     = ${function:Write-OperationLog}
     $readSelUserGrpFn = ${function:Read-SelectedUserGroups}
     $getSnapshotFnM   = ${function:Get-ADRecoverySnapshot}
@@ -225,7 +227,11 @@ function Show-GroupMembersDialog {
         if ($toRemove.Count -eq 0) { return }
         $msg = if ($toRemove.Count -eq 1) { "Remove '$($toRemove[0].Identity)' from '$GroupName'?" } `
                else { "Remove $($toRemove.Count) member(s) from '$GroupName'?" }
-        if (-not (& $confirmActionFn -Title 'Remove Members' -Message $msg -ActionLabel 'Remove')) { return }
+        $codeLines = @('# Each member is snapshotted first (OU, for the recovery details in the mail), then:')
+        foreach ($ce in $toRemove) {
+            $codeLines += (& $newAdCmdFnGM -Cmdlet 'Remove-ADGroupMember' -Identity @($GroupName) -Context $Context -Tail ('-Members ' + (& $adLiteralFnGM $ce.Identity) + ' -Confirm:$false -ErrorAction Stop'))
+        }
+        if (-not (& $confirmActionFn -Title 'Remove Members' -Message $msg -ActionLabel 'Remove' -Code ($codeLines -join "`r`n"))) { return }
         $srvParam = if ($Context.TargetDC) { @{ Server = $Context.TargetDC } } else { @{} }
         $ok = 0; $fail = 0; $failMsg = ''
         $removedOk     = [System.Collections.Generic.List[string]]::new()
@@ -386,7 +392,8 @@ function Show-GroupMembersDialog {
             [System.Windows.Forms.MessageBox]::Show("'$id' is already a member of '$GroupName'.","Already Member",'OK','Information')
             return
         }
-        if (-not (& $confirmActionFn -Title 'Add Member' -Message "Add '$id' to '$GroupName'?" -ActionLabel 'Add')) { return }
+        $code = & $newAdCmdFnGM -Cmdlet 'Add-ADGroupMember' -Identity @($GroupName) -Context $Context -Tail ('-Members ' + (& $adLiteralFnGM $id) + ' -ErrorAction Stop')
+        if (-not (& $confirmActionFn -Title 'Add Member' -Message "Add '$id' to '$GroupName'?" -ActionLabel 'Add' -Code $code)) { return }
         $srvParam = if ($Context.TargetDC) { @{ Server = $Context.TargetDC } } else { @{} }
         try {
             Add-ADGroupMember -Identity $GroupName -Members $id @srvParam -ErrorAction Stop

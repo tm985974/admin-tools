@@ -106,9 +106,49 @@ function Show-ExportResult {
 }
 #endregion
 
+#region -- New-ADCommandText ----------------------------------------------------
+# The exact command text for an AD cmdlet run once per identity, as the action
+# runs it (the -Server the action uses, its -Confirm / -ErrorAction switches),
+# for Confirm-Action -Code. One line per identity; -Comment adds '#' lines on
+# top (e.g. the recovery snapshot each action takes first).
+function ConvertTo-ADCodeLiteral {
+    param([AllowNull()] $Value)
+    if (Get-Command Format-AppCommandValue -ErrorAction SilentlyContinue) { return (Format-AppCommandValue $Value) }
+    return "'" + ([string]$Value).Replace("'", "''") + "'"
+}
+
+function New-ADCommandText {
+    param(
+        [Parameter(Mandatory)] [string]$Cmdlet,
+        [string[]]$Identity,
+        [PSCustomObject]$Context,
+        [string]$Tail = '',
+        [string]$Comment = ''
+    )
+    $lines = New-Object System.Collections.Generic.List[string]
+    if ($Comment) { foreach ($c in ($Comment -split "`r?`n")) { [void]$lines.Add('# ' + $c) } }
+    $srv = ''
+    if ($Context -and $Context.TargetDC) { $srv = ' -Server ' + (ConvertTo-ADCodeLiteral ([string]$Context.TargetDC)) }
+    foreach ($i in @($Identity | Where-Object { $_ })) {
+        $l = $Cmdlet + ' -Identity ' + (ConvertTo-ADCodeLiteral ([string]$i)) + $srv
+        if ($Tail) { $l += ' ' + $Tail }
+        [void]$lines.Add($l)
+    }
+    return ($lines -join "`r`n")
+}
+#endregion
+
 #region -- Confirm-Action -----------------------------------------------------
+# -Code (v1.2.12): the exact PowerShell the action is about to run. When given,
+# the confirmation IS the engine's command window (Show-AppCommandDialog via
+# Confirm-AppCommand -Always): the message on top, the code below with Copy,
+# then the action button / Cancel - one popup, never two. The command is
+# logged ([Command] Run / Cancelled). Without -Code: the original dialog.
 function Confirm-Action {
-    param([string]$Title, [string]$Message, [string]$ActionLabel = 'Confirm')
+    param([string]$Title, [string]$Message, [string]$ActionLabel = 'Confirm', [string]$Code = '')
+    if ($Code -and (Get-Command Confirm-AppCommand -ErrorAction SilentlyContinue)) {
+        return [bool](Confirm-AppCommand -App $script:ADApp -Title $Title -Code $Code -Summary $Message -RunLabel $ActionLabel -Kind Change -Always)
+    }
     $F_UI   = New-Object System.Drawing.Font('Segoe UI', 9)
     $F_UI_B = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
     $F_13B  = New-Object System.Drawing.Font('Segoe UI', 13, [System.Drawing.FontStyle]::Bold)

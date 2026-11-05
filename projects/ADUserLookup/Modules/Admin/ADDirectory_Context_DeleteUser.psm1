@@ -82,7 +82,9 @@ function Invoke-DeleteUsers {
     $preview = ($sams | Select-Object -First 15) -join ', '
     if ($sams.Count -gt 15) { $preview += ", ... ($($sams.Count) total)" }
     $msg = "Permanently delete $($sams.Count) user account(s)?`n`n$preview`n`nThis cannot be undone."
-    if (-not (Confirm-Action -Title 'Delete User(s)' -Message $msg -ActionLabel 'Delete')) { return $null }
+    $code = New-ADCommandText -Cmdlet 'Remove-ADUser' -Identity $sams -Context $Context -Tail '-Confirm:$false -ErrorAction Stop' `
+        -Comment 'Each account is snapshotted first (OU and groups, for the recovery details in the admin mail), then:'
+    if (-not (Confirm-Action -Title 'Delete User(s)' -Message $msg -ActionLabel 'Delete' -Code $code)) { return $null }
 
     $srvParam = if ($Context -and $Context.TargetDC) { @{ Server = $Context.TargetDC } } else { @{} }
     $ok = 0; $fail = 0

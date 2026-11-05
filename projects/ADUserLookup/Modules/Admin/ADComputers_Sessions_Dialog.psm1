@@ -348,7 +348,8 @@ function Show-ComputerSessionsDialog {
 
         $confirmLines = foreach ($t in $targets) { "  $($t.User)  (session $($t.SessionId))" }
         $confirmMsg   = "Force logoff the following session(s) on ${ComputerName}?`r`n`r`n$($confirmLines -join "`r`n")`r`n`r`nThis disconnects the user immediately and cannot be undone."
-        $confirmed    = Confirm-Action -Title 'Confirm Force Logoff' -Message $confirmMsg -ActionLabel 'Force Logoff'
+        $code         = (@($targets | ForEach-Object { "logoff.exe $($_.SessionId) /server:$ComputerName" }) -join "`r`n")
+        $confirmed    = Confirm-Action -Title 'Confirm Force Logoff' -Message $confirmMsg -ActionLabel 'Force Logoff' -Code $code
         if (-not $confirmed) { return }
 
         $okCount   = 0

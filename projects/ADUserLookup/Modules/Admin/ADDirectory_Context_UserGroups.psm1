@@ -292,6 +292,8 @@ function Show-EditUserGroupsDialog {
     # from the enclosing function scope (defined above this block).
     # -------------------------------------------------------------------------
     $confirmActionFnR  = ${function:Confirm-Action}
+    $newAdCmdFnR       = ${function:New-ADCommandText}
+    $adLiteralFnR      = ${function:ConvertTo-ADCodeLiteral}
     $writeOpLogFnR     = ${function:Write-OperationLog}
     $readSelUserGrpFnR = ${function:Read-SelectedUserGroups}
     $showMailDlgFnR    = ${function:Show-NotificationMailDialog}
@@ -311,7 +313,11 @@ function Show-EditUserGroupsDialog {
         } else {
             "Remove '$Sam' from $($names.Count) group(s)?`n`n$($names -join ', ')"
         }
-        if (-not (& $confirmActionFnR -Title 'Remove from Group' -Message $msg -ActionLabel 'Remove')) { return }
+        $codeLines = @()
+        foreach ($cg in $names) {
+            $codeLines += (& $newAdCmdFnR -Cmdlet 'Remove-ADGroupMember' -Identity @($cg) -Context $Context -Tail ('-Members ' + (& $adLiteralFnR $Sam) + ' -Confirm:$false -ErrorAction Stop'))
+        }
+        if (-not (& $confirmActionFnR -Title 'Remove from Group' -Message $msg -ActionLabel 'Remove' -Code ($codeLines -join "`r`n"))) { return }
         $srvParam = if ($Context.TargetDC) { @{ Server = $Context.TargetDC } } else { @{} }
         $ok = 0; $fail = 0; $failMsg = ''
         $removedOk = [System.Collections.Generic.List[string]]::new()
@@ -447,6 +453,8 @@ function Show-EditUserGroupsDialog {
     # in that operation), only when at least one Add succeeded.
     # -------------------------------------------------------------------------
     $confirmActionFn3   = ${function:Confirm-Action}
+    $newAdCmdFn3        = ${function:New-ADCommandText}
+    $adLiteralFn3       = ${function:ConvertTo-ADCodeLiteral}
     $writeOpLogFn3      = ${function:Write-OperationLog}
     $readSelUserGrpFn2  = ${function:Read-SelectedUserGroups}
     $showMailDlgFn3     = ${function:Show-NotificationMailDialog}
@@ -496,7 +504,11 @@ function Show-EditUserGroupsDialog {
         $addList = @($actionable)
         $msg = if ($addList.Count -eq 1) { "Add '$Sam' to '$($addList[0])'?" } `
                else { "Add '$Sam' to $($addList.Count) group(s)?`n`n$($addList -join ', ')" }
-        if (-not (& $confirmActionFn3 -Title 'Add to Groups' -Message $msg -ActionLabel 'Add')) { return }
+        $codeLines = @()
+        foreach ($cg in $addList) {
+            $codeLines += (& $newAdCmdFn3 -Cmdlet 'Add-ADGroupMember' -Identity @($cg) -Context $Context -Tail ('-Members ' + (& $adLiteralFn3 $Sam) + ' -ErrorAction Stop'))
+        }
+        if (-not (& $confirmActionFn3 -Title 'Add to Groups' -Message $msg -ActionLabel 'Add' -Code ($codeLines -join "`r`n"))) { return }
         $srvParam = if ($Context.TargetDC) { @{ Server = $Context.TargetDC } } else { @{} }
         $ok = 0; $fail = 0; $failMsg = ''
         $addedGroups = [System.Collections.Generic.List[string]]::new()

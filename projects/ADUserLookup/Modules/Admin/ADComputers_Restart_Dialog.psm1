@@ -227,6 +227,7 @@ function Show-TimedRestartDialog {
     $invTimedRestartFn = ${function:Invoke-TimedRestart}
     $showMailDlgFn      = ${function:Show-NotificationMailDialog}
     $confirmActionFn    = ${function:Confirm-Action}
+    $restartCmdTextFn   = ${function:Get-RemoteRestartCommandText}
     $capturedContext    = $Context
     $capturedNames      = $names
 
@@ -243,7 +244,9 @@ function Show-TimedRestartDialog {
                       (($capturedNames | Select-Object -First 15) -join ', ') +
                       $(if ($capturedNames.Count -gt 15) { ", ... ($($capturedNames.Count) total)" } else { '' }) +
                       "`r`n`r`nMessage shown to remote user(s):`r`n$message"
-        if (-not (& $confirmActionFn -Title 'Timed Restart' -Message $confirmMsg -ActionLabel 'Schedule')) { return }
+        $code = ''
+        if ($restartCmdTextFn) { $code = & $restartCmdTextFn -Mode Timed -Names $capturedNames -DelaySeconds ($mins * 60) -Message $message }
+        if (-not (& $confirmActionFn -Title 'Timed Restart' -Message $confirmMsg -ActionLabel 'Schedule' -Code $code)) { return }
 
         if (-not $invTimedRestartFn) {
             $lStatus.ForeColor = [System.Drawing.Color]::FromArgb(156, 0, 6)

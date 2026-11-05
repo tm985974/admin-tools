@@ -132,9 +132,10 @@ function Show-SetExpiryDialog {
 
     $btnSet.Add_Click({
         $expiry = $dtp.Value
+        $code = New-ADCommandText -Cmdlet 'Set-ADAccountExpiration' -Identity @($sam) -Context $Context -Tail ('-DateTime ' + (ConvertTo-ADCodeLiteral $expiry) + ' -ErrorAction Stop')
         if (-not (Confirm-Action -Title 'Set Expiry' `
             -Message "Set expiration for $sam to $($expiry.ToString('yyyy-MM-dd'))?" `
-            -ActionLabel 'Set')) { return }
+            -ActionLabel 'Set' -Code $code)) { return }
         $result = Invoke-SetAccountExpiry -Sam $sam -ExpiryDate $expiry -Context $Context
         $lStatus.ForeColor = if ($result.Success) { [System.Drawing.Color]::FromArgb(0,97,0) } else { [System.Drawing.Color]::FromArgb(156,0,6) }
         $lStatus.Text = $result.Message
@@ -144,7 +145,8 @@ function Show-SetExpiryDialog {
         }
     })
     $btnClear.Add_Click({
-        if (-not (Confirm-Action -Title 'Clear Expiry' -Message "Remove expiration for $sam?" -ActionLabel 'Clear')) { return }
+        $code = New-ADCommandText -Cmdlet 'Clear-ADAccountExpiration' -Identity @($sam) -Context $Context -Tail '-ErrorAction Stop'
+        if (-not (Confirm-Action -Title 'Clear Expiry' -Message "Remove expiration for $sam?" -ActionLabel 'Clear' -Code $code)) { return }
         $result = Invoke-ClearAccountExpiry -Sam $sam -Context $Context
         $lStatus.ForeColor = if ($result.Success) { [System.Drawing.Color]::FromArgb(0,97,0) } else { [System.Drawing.Color]::FromArgb(156,0,6) }
         $lStatus.Text = $result.Message

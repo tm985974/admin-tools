@@ -19,7 +19,9 @@
 #            the text fields in Config\EnvironmentFields.json (default:
 #            Environment name, Log & data path, Variable 1-4);
 #            Lists & logs (this environment): Filter as I type, action-log size;
-#            Logging (all environments): Session.log size, diagnostics.
+#            Logging (all environments): Session.log size, diagnostics;
+#            Commands (all environments): when the command window is shown
+#            before running (Services_Commands.psm1).
 #   Project pages: one sub-tab per Register-EnvironmentSection (see
 #            Services_Environment.psm1 for the Load / Collect / Validate contract).
 #
@@ -138,6 +140,21 @@ function New-EnvironmentTab {
     $gen.Diag.Text = 'Diagnostic / troubleshooting logging'; $gen.Diag.Location = New-Object System.Drawing.Point(240, $y); $gen.Diag.AutoSize = $true
     $tpGen.Controls.Add($gen.Diag); $y += 24
     & $addHint $tpGen 'Session.log holds status and session messages for every environment; when full the oldest lines are removed. Diagnostic logging adds troubleshooting detail - leave it off unless investigating. Errors and warnings are always logged.' 240 $y 600 32
+    $y += 40
+
+    & $addHeader $tpGen 'Commands  (all environments)' $y; $y += 32
+    $labCmd = New-Object System.Windows.Forms.Label
+    $labCmd.Text = 'Show the command before running:'; $labCmd.Location = New-Object System.Drawing.Point(12, ($y + 3)); $labCmd.AutoSize = $true
+    $tpGen.Controls.Add($labCmd)
+    $gen.CmdModes = @('Always', 'Changes', 'Never')
+    $gen.Cmd = New-Object System.Windows.Forms.ComboBox
+    $gen.Cmd.DropDownStyle = 'DropDownList'; $gen.Cmd.Location = New-Object System.Drawing.Point(240, $y); $gen.Cmd.Width = 440
+    [void]$gen.Cmd.Items.Add('Always - before every action that runs a command')
+    [void]$gen.Cmd.Items.Add('Changes - only before actions that change something (default)')
+    [void]$gen.Cmd.Items.Add('Never - only when Shift is held')
+    $gen.Cmd.SelectedIndex = 1
+    $tpGen.Controls.Add($gen.Cmd); $y += 30
+    & $addHint $tpGen 'The command window shows the exact PowerShell about to run, with the real values, and has Copy and Run / Cancel. Shift+click a button or menu item to see it first whatever this is set to. Buttons that run a command also offer Show / Copy command on right-click.' 240 $y 600 46
 
     $genApi = @{
         Load = {
@@ -148,6 +165,11 @@ function New-EnvironmentTab {
             if (Get-Command Get-AppLoggingSettings -ErrorAction SilentlyContinue) {
                 $ls = Get-AppLoggingSettings -App $App
                 $gen.SessMax.Text = [string]$ls.SessionLogMaxKB; $gen.Diag.Checked = [bool]$ls.DiagnosticsEnabled
+            }
+            if (Get-Command Get-AppCommandSettings -ErrorAction SilentlyContinue) {
+                $ci = [array]::IndexOf([string[]]$gen.CmdModes, [string](Get-AppCommandSettings -App $App).PreviewMode)
+                if ($ci -lt 0) { $ci = 1 }
+                $gen.Cmd.SelectedIndex = $ci
             }
             $gen.Root.Text = switch ([string]$App.DataRootStatus) {
                 'Network'       { 'Logs and data are on the shared path.' }
@@ -163,6 +185,8 @@ function New-EnvironmentTab {
             $n = 0; if ([int]::TryParse($gen.LogMax.Text.Trim(), [ref]$n)) { $h['LogMaxKB'] = $n } else { $h['LogMaxKB'] = $gen.LogMax.Text.Trim() }
             $s = 0; [void][int]::TryParse($gen.SessMax.Text.Trim(), [ref]$s)
             $h['__SessionLogMaxKB'] = $s; $h['__Diagnostics'] = [bool]$gen.Diag.Checked     # app-wide, saved separately
+            $ci = [Math]::Max(0, $gen.Cmd.SelectedIndex)
+            $h['__CommandPreview'] = [string]$gen.CmdModes[$ci]                             # app-wide, saved separately
             return $h
         }.GetNewClosure()
         Validate = {
@@ -251,19 +275,21 @@ function New-EnvironmentTab {
         }
         $rec = ConvertTo-EnvRecord $st.Record
         $before = '{0}|{1}|{2}' -f $rec['SharedPath'], $rec['Domain'], $rec['Server']
-        $sess = 0; $diag = $false
+        $sess = 0; $diag = $false; $cmdMode = ''
         foreach ($pg in $st.Pages) {
             if (-not $pg.Api -or -not $pg.Api.Collect) { continue }
             $vals = & $pg.Api.Collect $st.Record
             foreach ($k in @($vals.Keys)) {
                 if ($k -eq '__SessionLogMaxKB') { $sess = [int]$vals[$k]; continue }
                 if ($k -eq '__Diagnostics')     { $diag = [bool]$vals[$k]; continue }
+                if ($k -eq '__CommandPreview')  { $cmdMode = [string]$vals[$k]; continue }
                 $rec[$k] = $vals[$k]
             }
         }
         try {
             $saved = Save-AppEnvironmentRecord -App $st.App -Record $rec
             if ($sess -ge 64 -and (Get-Command Set-AppLoggingSettings -ErrorAction SilentlyContinue)) { Set-AppLoggingSettings -App $st.App -DiagnosticsEnabled $diag -SessionLogMaxKB $sess }
+            if ($cmdMode -and (Get-Command Set-AppCommandSettings -ErrorAction SilentlyContinue)) { Set-AppCommandSettings -App $st.App -PreviewMode $cmdMode }
         }
         catch {
             $st.App.Log('ERROR', 'Environment', "save failed: $($_.Exception.ToString())")

@@ -65,6 +65,10 @@
 #             by Invoke-AbortRemoteRestart / ADComputers.Restart.Engine).
 #             Companion to the Computers grid's new Restart Now / Timed
 #             Restart right-click items (ADDirectory.Menus).
+#             ADDED 'Ping List' sub-tab (last position, v1.2.12) - paste a list
+#             of computer names and ping them all once or continuously
+#             (Build-PingListTab / ADTools.PingList.Tab, on the same group-ping
+#             panel as the computer menu's "Ping Selected..." dialog).
 #endregion
 
 #region -- Register-ToolsTab --------------------------------------------------
@@ -112,6 +116,7 @@ function Register-ToolsTab {
         @{ Key='oplog'; Text='  Operation Log  ' }
         @{ Key='env';   Text='  Environment Report  ' }
         @{ Key='abortreboot'; Text='  Abort Remote Reboot  ' }
+        @{ Key='pinglist';    Text='  Ping List  ' }
     )
     foreach ($p in $pages) {
         $tp           = New-Object System.Windows.Forms.TabPage
@@ -128,6 +133,7 @@ function Register-ToolsTab {
     Build-OpLogTab -Tab $script:ToolsPages['oplog']
     Build-EnvTab   -Tab $script:ToolsPages['env']
     Build-AbortRebootTab -Tab $script:ToolsPages['abortreboot']
+    Build-PingListTab    -Tab $script:ToolsPages['pinglist']
 }
 #endregion
 
