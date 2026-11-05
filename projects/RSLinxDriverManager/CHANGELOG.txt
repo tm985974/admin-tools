@@ -2,6 +2,12 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.3 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
+  Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
+  Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed
+  Note    : template v1.0.22  Command window shown before every action by default
+  Note    : template v1.0.21  Hover help on everything clickable; "show the exact command" engine
+
 v1.0.2 (2026-11-04)  Site Codes: Lease name -> 2-letter site code
   Added   : Site Codes tab and Config\SiteCodes.json. The device registry's
             Lease column holds the site name (Belridge, South Midway ...); the

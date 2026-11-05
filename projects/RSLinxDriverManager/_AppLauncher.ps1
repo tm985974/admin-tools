@@ -155,3 +155,13 @@ try {
 catch {
     if ($App) { $App.Log('ERROR', 'Launcher', "Register-AppTabs threw: $($_.Exception.Message)") }
 }
+
+# ---- hover help for every clickable control (Base\Services_ToolTips.psm1) ----
+# Texts come from the engine and the project's Config\ToolTips.json; controls
+# built later (lazy tabs, dialogs, menus) are picked up as they appear.
+try {
+    if ($App -and (Get-Command Start-AppToolTips -ErrorAction SilentlyContinue)) { Start-AppToolTips -App $App -Form $AppForm }
+}
+catch {
+    if ($App) { $App.Log('ERROR', 'Launcher', "Start-AppToolTips threw: $($_.Exception.Message)") }
+}
