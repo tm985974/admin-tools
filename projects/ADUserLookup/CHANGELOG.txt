@@ -2,6 +2,10 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.17 (2026-11-05)  Engine synced v1.0.22 -> v1.0.23
+  Changed : AppTemplate engine v1.0.22 -> v1.0.23 (Update Template): 1 file(s) replaced, 0 added, 0 removed.
+  Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed
+
 v1.2.16 (2026-11-05)  Command window before every action (engine 1.0.22)
   Changed : The command window - the exact PowerShell about to run, with Copy
             and Run / Cancel - now opens before EVERY wired action, not only
