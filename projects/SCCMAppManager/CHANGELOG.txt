@@ -2,6 +2,12 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.8 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
+  Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
+  Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed
+  Note    : template v1.0.22  Command window shown before every action by default
+  Note    : template v1.0.21  Hover help on everything clickable; "show the exact command" engine
+
 v1.0.7 (2026-11-02)  Engine synced v1.0.16 -> v1.0.20 (AppTemplate)
   Changed : Template-owned files replaced with AppTemplate v1.0.20 (manual sync: the
             v1.0.17 step is a contract change). TEMPLATE_FILES.txt and
