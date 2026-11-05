@@ -894,16 +894,13 @@ namespace AppTemplate
         // same way; any difference is a local change to an engine file - logged so
         // it is moved into the template (or reverted) before the next template sync.
         // AppHost.cs and Build-App.ps1 are not in the package: the developer build
-        // checks its embedded copies of them (EngineView). The identity-block strip
-        // below only matters for sources older than template 1.0.17.
+        // checks its embedded copies of them (EngineView). Every file, AppHost.cs
+        // included, is hashed whole: there is no identity block since 1.0.17 (the
+        // old strip matched its own search strings and broke every AppHost.cs
+        // check from 1.0.17 to 1.0.22). Pre-1.0.17 projects use a manual sync.
         internal static string NormalizedHash(string path, string text)
         {
             string t = (text ?? "").Replace("\uFEFF", "").Replace("\r\n", "\n");
-            if (path.Equals("AppHost.cs", StringComparison.OrdinalIgnoreCase))
-            {
-                int a = t.IndexOf("// >>> PROJECT IDENTITY"), b = t.IndexOf("// <<< PROJECT IDENTITY");
-                if (a >= 0 && b > a) t = t.Substring(0, a) + t.Substring(b);
-            }
             using (var sha = SHA256.Create())
             {
                 var h = sha.ComputeHash(new UTF8Encoding(false).GetBytes(t));
