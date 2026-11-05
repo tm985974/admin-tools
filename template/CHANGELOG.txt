@@ -2,6 +2,17 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.22 (2026-11-05)  Command window shown before every action by default
+  Changed : Environment > General > Commands now defaults to Always: the
+            command window (exact PowerShell, Copy, Run / Cancel) opens before
+            EVERY action that goes through the command engine, launch and
+            read-only actions included (RDP, ping, open folder ...). Before, the
+            default was Changes, so launch actions ran straight away and the
+            code only showed on Shift+click - easy to miss. Changes / Never are
+            still there for anyone who finds it too chatty. A saved choice
+            (Settings\Commands.json) is kept.
+  Note    : Engine-only; projects take it with Update Template.
+
 v1.0.21 (2026-11-05)  Hover help on everything clickable; "show the exact command" engine
   Added   : Base\Services_ToolTips.psm1 - tooltips for every button, check box,
             radio button, link label, menu item (right-click menus too) and

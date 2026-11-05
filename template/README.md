@@ -228,7 +228,7 @@ Cancel** - for a change it is the confirmation itself (replace a module's own
 confirm dialog with it rather than adding a second popup; Enter never runs a
 change). `Confirm-AppCommand` is the same without the run step, for code an
 engine function runs itself. When it shows (Environment > General > Commands,
-app-wide): **Always**, **Changes** (default - actions passed `-Kind Change`),
+app-wide): **Always** (default, v1.0.22), **Changes** (only actions passed `-Kind Change`),
 or **Never**; **Shift+click** shows it first whatever the setting.
 `Register-AppCommand` gives a button a right-click **Show command... / Copy
 command** (nothing is run) and its tooltip says so. Every confirmed command is

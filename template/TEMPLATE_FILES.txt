@@ -1,4 +1,4 @@
-# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.0.21
+# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.0.22
 #
 # Every project carries these files UNCHANGED (same bytes as the template).
 # AppHost.cs has no project-specific lines: the project's names are in the
@@ -24,7 +24,7 @@
 b9ccd3a5f1a58fe6e767bd70663d022358533c1d0420ad66ca318289326b4214  Build-App.cmd
 216d37a12a0c7af9d6d77f3da6f9622112600f09a03c98d45594fbdbe2c7f904  _AppLauncher.ps1
 23bfed0ee452dec4864a6267346442c7e1a2186e5a3d6573f1c66bb4a7ab6fb8  Config/Logging.json
-d1e422e27c0370fc15ebaa5df6b57e796b8ffa82cec75aeea3c4ee525fa50e40  Modules/Base/Services_Commands.psm1
+57fb965d0ae578cd764eaaa2e04e8bd3ba45fa9ae04085ed9195293c09d1ce53  Modules/Base/Services_Commands.psm1
 010a207cc2cff05c6159324cf633f641d2c55f1d2244bfc42fcda48d16eefcbf  Modules/Base/Services_Environment.psm1
 a66daa25ca2fbfa73df43077d0c09629bbab07b7a87e95bdb0e49e3f52c80ae6  Modules/Base/Services_EnvironmentStore.psm1
 e660b8a8a4817bb68e6aee75febf3f211360a53f587fe6f1545bb73533dc1b10  Modules/Base/Services_Filter.psm1
@@ -36,4 +36,4 @@ eb1654f73a9f356f0393adfb87e1b45b718d39ffee1bd92a3a29c8cdf6be677f  Modules/Base/S
 ef9888ea769e0a2929f086822e2303c8460f5e3a07aeaabd03ab158b1b91c011  Modules/Base/UI_EmbeddedTabPage.psm1
 f550b376ca9512340cf3f09d4dd44f9d287b4a3f6a5d17e506a22467a253e36f  Modules/Base/UI_Layout.psm1
 1cbfe7737e4bed3e282fee8dd895d337fd5a5ac3916dba2b709aa2803404c380  Modules/Base/UI_LazyTab.psm1
-045c2f5db2db9a8f83174e6963032cbb7ad51af6becc21c2e5baf19038116841  Modules/Base/UI_Tab_Environment.psm1
+d9f86a62e9b7c56debfd3d47c0b4d38d29d3fd26513978df44cb0fa665aaadc1  Modules/Base/UI_Tab_Environment.psm1
