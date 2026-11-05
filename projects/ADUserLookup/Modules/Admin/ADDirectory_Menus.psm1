@@ -860,8 +860,12 @@ function New-ComputerContextMenu {
         ${function:Confirm-Action} outside the closure (as
         $confirmActionCompFn), invoked with & inside it.
     #>
-    param([scriptblock]$TargetProvider, [PSCustomObject]$Context)
+    # -ShowPing (v1.2.13): add 'Ping Selected...' - only the Computers tab's
+    # grid passes it; the Users tree, Audit lists and the ping window's own
+    # rows do not.
+    param([scriptblock]$TargetProvider, [PSCustomObject]$Context, [switch]$ShowPing)
     $menu             = New-Object System.Windows.Forms.ContextMenuStrip
+    $withPing         = [bool]$ShowPing
     $menu.Font        = New-Object System.Drawing.Font('Segoe UI', 9)
     $invSetStatusComp = ${function:Invoke-SetStatus}
     $invComputerCheck = ${function:Invoke-ComputerCheck}
@@ -908,7 +912,9 @@ function New-ComputerContextMenu {
     $miTest.Add_Click(({
         $targets = @(& $TargetProvider)
         if ($targets.Count -ne 1) {
-            [System.Windows.Forms.MessageBox]::Show("Select exactly one computer.`n`nTo check several at once, use Ping Selected...",'Test Connectivity','OK','Information'); return
+            $oneMsg = 'Select exactly one computer.'
+            if ($withPing) { $oneMsg += "`n`nTo check several at once, use Ping Selected..." }
+            [System.Windows.Forms.MessageBox]::Show($oneMsg,'Test Connectivity','OK','Information'); return
         }
         $name = $targets[0].Name
         if ($setSelectedComp) {
@@ -970,7 +976,7 @@ function New-ComputerContextMenu {
         }
         & $showPingGroupFn -ComputerNames $names -Context $capturedCompContext -App $menuApp -NoConfirm
     }).GetNewClosure())
-    [void]$menu.Items.Add($miPingGroup)
+    if ($withPing) { [void]$menu.Items.Add($miPingGroup) }
 
     $miPing      = New-Object System.Windows.Forms.ToolStripMenuItem
     $miPing.Text = 'Ping (continuous, command window)'

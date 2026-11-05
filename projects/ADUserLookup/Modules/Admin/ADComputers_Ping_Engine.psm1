@@ -35,7 +35,7 @@ function ConvertTo-ComputerNameList {
     param([AllowEmptyString()] [string]$Text)
     $seen  = New-Object System.Collections.Generic.HashSet[string]([System.StringComparer]::OrdinalIgnoreCase)
     $names = New-Object System.Collections.Generic.List[string]
-    if (-not $Text) { return , $names.ToArray() }
+    if (-not $Text) { return }
     foreach ($line in ($Text -split "`r?`n")) {
         $l = $line.Trim()
         if (-not $l -or $l.StartsWith('#')) { continue }
@@ -45,7 +45,10 @@ function ConvertTo-ComputerNameList {
             if ($seen.Add($n)) { [void]$names.Add($n) }
         }
     }
-    return , $names.ToArray()
+    # Unrolled on purpose: callers wrap with @(...). Returning ', $array' made
+    # @(...) a one-element array holding the whole list (v1.2.12 bug: one row
+    # named 'System.String[]').
+    return $names.ToArray()
 }
 #endregion
 

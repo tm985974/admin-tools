@@ -66,10 +66,10 @@
         "Copy Group Name(s)": "Copy the selected group names to the clipboard, one per line.",
 
         "_ computer right-click menu": "",
-        "Test Connectivity": "Ping one computer and test its RDP, SMB, Radmin and WinRM ports (results on the Computers tab cards). For several, use Ping Selected.",
+        "Test Connectivity": "Ping one computer and test its RDP, SMB, Radmin and WinRM ports (results on the Computers tab cards). For several, use Ping Selected on the Computers tab.",
         "RDP": "Open a Remote Desktop connection to each selected computer. Shift+click to see the exact command first.",
         "Radmin": "Open Radmin Viewer to each selected computer (port 4899). Shift+click to see the exact command first.",
-        "Ping Selected": "Ping every selected computer in one window - live up / down, response time and loss, every 2 s until Stop.",
+        "Ping Selected": "(Computers tab) Ping every selected computer in one window - live up / down, response time and loss, every 2 s until Stop.",
         "Ping (continuous, command window)": "Open a separate command window running ping -t for each selected computer.",
         "Computer Management (MMC)": "Open Computer Management connected to each selected computer.",
         "BitLocker Recovery Key": "Show the BitLocker recovery key(s) stored in AD for this computer.",

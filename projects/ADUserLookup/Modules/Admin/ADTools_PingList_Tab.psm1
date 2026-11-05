@@ -74,7 +74,7 @@ function Build-PingListTab {
     $Tab.Controls.Add($host2)
 
     $parseFn  = ${function:ConvertTo-ComputerNameList}
-    $provider = { return , @(& $parseFn -Text $tbNames.Text) }.GetNewClosure()
+    $provider = { & $parseFn -Text $tbNames.Text }.GetNewClosure()     # unrolled; the panel wraps it with @()
     $capturedContext = $script:ToolsCtx
     $app = $script:ADApp
     $api = New-PingGroupPanel -Parent $host2 -NamesProvider $provider -App $app -Context $capturedContext -Title 'Ping List'

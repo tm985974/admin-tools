@@ -310,7 +310,7 @@ function New-PingGroupPanel {
     # Names of the selected rows (or every row when none is selected).
     $selectedNames = {
         $sel = @($grid.SelectedRows | ForEach-Object { [string]$_.Cells['Computer'].Value } | Where-Object { $_ })
-        return , $sel
+        return $sel
     }.GetNewClosure()
 
     $btnPingT.Add_Click({

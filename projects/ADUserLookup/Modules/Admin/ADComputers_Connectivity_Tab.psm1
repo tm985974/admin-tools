@@ -275,7 +275,7 @@ function Build-ConnectivityTab {
         $out
     }
     if (Get-Command New-ComputerContextMenu -ErrorAction SilentlyContinue) {
-        $script:ConnCompGrid.ContextMenuStrip = New-ComputerContextMenu -TargetProvider $connCompGridProvider -Context $Context
+        $script:ConnCompGrid.ContextMenuStrip = New-ComputerContextMenu -TargetProvider $connCompGridProvider -Context $Context -ShowPing
     }
 
     $script:ConnCompGrid.Add_MouseDown({

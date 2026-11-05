@@ -2,6 +2,19 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.13 (2026-11-05)  Ping fix: every pasted / selected name gets its own row; Ping Selected on the Computers tab only
+  Fixed   : Ping List and Ping Selected showed ONE row named "System.String[]"
+            ("No such host is known", "1 computer(s)") instead of one row per
+            computer: the name list was returned wrapped (return , $array) and
+            wrapped again by @(...), so the whole list became one item.
+            ConvertTo-ComputerNameList and the name providers now return the
+            names unrolled.
+  Changed : "Ping Selected..." appears only on the Computers tab's right-click
+            menu (New-ComputerContextMenu -ShowPing). The Users tab tree, Audit
+            lists and the ping window's own rows no longer show it; their
+            "Select exactly one computer" message no longer mentions it.
+            "Ping (continuous, command window)" is unchanged everywhere.
+
 v1.2.12 (2026-11-05)  Ping several computers; hover help everywhere; see the exact command (+ engine v1.0.21)
   Added   : Right-click any computer list > "Ping Selected..." - every
             selected computer in one Ping Computers window: Up / Down, address,

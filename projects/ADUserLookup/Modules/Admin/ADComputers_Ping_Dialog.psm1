@@ -42,7 +42,7 @@ function Show-PingGroupDialog {
     $dlg.ShowInTaskbar = $true
 
     $fixed = $names
-    $provider = { return , $fixed }.GetNewClosure()
+    $provider = { $fixed }.GetNewClosure()     # unrolled; the panel wraps it with @()
     $api = New-PingGroupPanel -Parent $dlg -NamesProvider $provider -App $App -Context $Context -Title 'Ping Computers'
 
     $owner = $null
