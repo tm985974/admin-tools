@@ -2,6 +2,19 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.16 (2026-11-05)  Command window before every action (engine 1.0.22)
+  Changed : The command window - the exact PowerShell about to run, with Copy
+            and Run / Cancel - now opens before EVERY wired action, not only
+            changes: RDP, Radmin, Computer Management, Open C$, both ping
+            items, Ping once / continuous, Abort, Set DNS, and every AD change
+            confirmation (Unlock, Enable, Disable, Deletes, group membership,
+            expiry, restarts, force logoff). Before, the default (Changes)
+            ran launch actions straight away and showed their code only on
+            Shift+click. Environment > General > Commands switches back to
+            Changes or Never.
+  Engine  : Synced to AppTemplate 1.0.22 (Services_Commands, UI_Tab_Environment,
+            TEMPLATE_*).
+
 v1.2.15 (2026-11-05)  New Ignition tab (low-noise discovery); Set DNS on Tools
   Added   : Ignition tab (admin tier, after Computers) - discovers Ignition
             gateways across the domain. For each server it makes ONE HTTP

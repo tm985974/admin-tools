@@ -149,10 +149,10 @@ function New-EnvironmentTab {
     $gen.CmdModes = @('Always', 'Changes', 'Never')
     $gen.Cmd = New-Object System.Windows.Forms.ComboBox
     $gen.Cmd.DropDownStyle = 'DropDownList'; $gen.Cmd.Location = New-Object System.Drawing.Point(240, $y); $gen.Cmd.Width = 440
-    [void]$gen.Cmd.Items.Add('Always - before every action that runs a command')
-    [void]$gen.Cmd.Items.Add('Changes - only before actions that change something (default)')
+    [void]$gen.Cmd.Items.Add('Always - before every action that runs a command (default)')
+    [void]$gen.Cmd.Items.Add('Changes - only before actions that change something')
     [void]$gen.Cmd.Items.Add('Never - only when Shift is held')
-    $gen.Cmd.SelectedIndex = 1
+    $gen.Cmd.SelectedIndex = 0
     $tpGen.Controls.Add($gen.Cmd); $y += 30
     & $addHint $tpGen 'The command window shows the exact PowerShell about to run, with the real values, and has Copy and Run / Cancel. Shift+click a button or menu item to see it first whatever this is set to. Buttons that run a command also offer Show / Copy command on right-click.' 240 $y 600 46
 
@@ -168,7 +168,7 @@ function New-EnvironmentTab {
             }
             if (Get-Command Get-AppCommandSettings -ErrorAction SilentlyContinue) {
                 $ci = [array]::IndexOf([string[]]$gen.CmdModes, [string](Get-AppCommandSettings -App $App).PreviewMode)
-                if ($ci -lt 0) { $ci = 1 }
+                if ($ci -lt 0) { $ci = 0 }
                 $gen.Cmd.SelectedIndex = $ci
             }
             $gen.Root.Text = switch ([string]$App.DataRootStatus) {

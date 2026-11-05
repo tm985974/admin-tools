@@ -33,8 +33,9 @@
 #
 # When is the window shown?  Environment > General > Commands (app-wide,
 # Settings\Commands.json):
-#   Always   - before every action that goes through the engine
-#   Changes  - (default) before actions that change something (-Kind Change);
+#   Always   - (default, v1.0.22) before every action that goes through the
+#              engine - read-only / launch actions included
+#   Changes  - only before actions that change something (-Kind Change);
 #              read-only / launch actions (-Kind Read) just run
 #   Never    - never, unless Shift is held
 # Shift+click on any button or menu item that goes through the engine shows it
@@ -46,7 +47,7 @@
 function Get-AppCommandSettings {
     [CmdletBinding()]
     param([Parameter(Mandatory)] $App)
-    $s = [pscustomobject]@{ PreviewMode = 'Changes' }
+    $s = [pscustomobject]@{ PreviewMode = 'Always' }
     try {
         $p = Join-Path (Get-AppSettingsDir -App $App) 'Commands.json'
         if (Test-Path -LiteralPath $p) {
@@ -62,7 +63,7 @@ function Set-AppCommandSettings {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] $App,
-        [ValidateSet('Always', 'Changes', 'Never')] [string]$PreviewMode = 'Changes'
+        [ValidateSet('Always', 'Changes', 'Never')] [string]$PreviewMode = 'Always'
     )
     $p = Join-Path (Get-AppSettingsDir -App $App) 'Commands.json'
     $o = [ordered]@{}
@@ -249,7 +250,7 @@ function Test-AppCommandPreview {
     param($App, [ValidateSet('Change', 'Read')] [string]$Kind = 'Change')
     $shift = (([System.Windows.Forms.Control]::ModifierKeys -band [System.Windows.Forms.Keys]::Shift) -eq [System.Windows.Forms.Keys]::Shift)
     if ($shift) { return $true }
-    $mode = 'Changes'
+    $mode = 'Always'
     if ($App) { try { $mode = [string](Get-AppCommandSettings -App $App).PreviewMode } catch { } }
     if ($mode -eq 'Always') { return $true }
     if ($mode -eq 'Changes' -and $Kind -eq 'Change') { return $true }
