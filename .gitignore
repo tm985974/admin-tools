@@ -1,0 +1,12 @@
+# Build outputs and the developer EXE's working folders. Git history and tags
+# replace Archive\Zip; sealed EXEs go on GitHub Releases.
+*.exe
+*.zip
+*.bak
+**/Archive/
+**/Update/
+# Generated on every build / Extract
+**/Config/FunctionMap.txt
+**/Config/Environment.txt
+# Output of tools/New-UpdateZip.ps1
+/out/
