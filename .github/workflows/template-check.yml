@@ -1,0 +1,17 @@
+# Checks the template manifest and every project for engine drift on every push.
+# Runs tools/Test-Template.ps1 (the same script you can run locally).
+name: Template check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test template and projects
+        shell: pwsh
+        run: ./tools/Test-Template.ps1

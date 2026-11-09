@@ -1,0 +1,32 @@
+# Compiles every project's developer EXE on Windows to prove the source builds.
+# Nothing is published: developer EXEs contain the source. Make sealed EXEs with
+# Build Sealed on your machine and attach them to a GitHub Release if you want.
+# Runs on code changes pushed to main, or by hand (Actions > Build > Run workflow).
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['**/*.cs', '**/*.ps1', '**/*.psm1', '**/*.cmd', '**/*.json']
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        folder:
+          - template
+          - projects\ADUserLookup
+          - projects\CCMClientTS
+          - projects\CommandLibrary
+          - projects\PDubPaste
+          - projects\RadminLicense
+          - projects\RSLinxDriverManager
+          - projects\SCCMAppManager
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build developer EXE (no Lite)
+        shell: cmd
+        run: call "${{ matrix.folder }}\Build-App.cmd" -NoLite -NoPause -Output "%RUNNER_TEMP%\App.exe"
