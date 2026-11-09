@@ -1,0 +1,23 @@
+{
+    "ActiveDefault": "Default",
+    "Environments": [
+        {
+            "Name": "Default",
+            "Label": "Default",
+            "SharedPath": "",
+            "IsDefault": true,
+            "FilterAsYouType": true,
+            "LogMaxKB": 5120,
+            "RadminLicenseKey": "",
+            "RadminTransferFolder": "",
+            "RadminDeviceFolder": "C:\\FAS",
+            "RadminRserverPath": "",
+            "RadminLicensedRegKey": "SOFTWARE\\WOW6432Node\\Radmin\\v3.0\\Shared\\Parameters\\XferParam\\2",
+            "RadminSaveRequestArgs": "/saverequest /key:{Key} /requestfile:\"{File}\"",
+            "RadminUseLicenseArgs": "/uselicense /licensefile:\"{File}\"",
+            "RadminCallTimeoutSec": 60,
+            "RadminParallelMachines": 16,
+            "Notes": "Set the Radmin license key and the transfer folder on Environment > Radmin. One environment per site / license key."
+        }
+    ]
+}

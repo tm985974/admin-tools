@@ -1,0 +1,12 @@
+{
+    "Fields": [
+        {
+            "Key": "Label",
+            "Caption": "Environment name"
+        },
+        {
+            "Key": "SharedPath",
+            "Caption": "Log & data path (UNC, optional)"
+        }
+    ]
+}

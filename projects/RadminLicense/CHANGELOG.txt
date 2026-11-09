@@ -1,0 +1,31 @@
+# CHANGELOG.txt -- project version history (newest first)
+# Each update package carries this file with its new section on top, plus the
+# bumped VERSION.txt, so Version History and the archived EXEs line up.
+
+v1.0.0  (2026-11-03)  Radmin License Manager - created from AppTemplate v1.0.20
+  Added   : Replaces RadminSaveRequest.ps1, RadminSaveLic.ps1 and
+            RadminLoadLicense.ps1 with one tool for the offline round trip
+            (request -> activate.famatech.com -> license).
+  Added   : This Machine tab - status of the PC the app runs on (Radmin found,
+            licensed, elevated), Save request, Apply license (auto-finds
+            <NAME>.license, or browse), Restart as administrator.
+  Added   : Fleet tab - machine list (add / paste / import txt or csv), Check
+            status, Collect requests (unlicensed only), Apply licenses (where a
+            .license is waiting). Remote machines over WinRM, in the background,
+            N at a time; this PC in-process. Optional credential. Wildcard filter.
+  Added   : Transfer folder layout: Requests\ (+ _requests.csv), Licenses\,
+            Done\, README-ACTIVATION.txt. Licensed machines move to Done\.
+            Per-PC override for USB drive letters.
+  Added   : Environment > Radmin page: license key, transfer folder, device
+            folder (C:\FAS), rserver3.exe path, licensed registry key,
+            save-request / use-license argument forms, timeout, parallelism.
+  Fixed   : (vs the old scripts) the license key is no longer hard-coded; the
+            two request scripts disagreed on /requestfile:"x" vs /requestfile"x"
+            - both forms are tried and the one that worked is reported;
+            success is verified (request file written / registry key present)
+            instead of assumed; $args (a PowerShell automatic variable) is no
+            longer overwritten; rserver3 calls time out instead of hanging.
+  Safety  : A license is only applied when its file name matches the target's
+            computer name; the key is only sent to a machine when it makes a
+            request; machines that are already licensed are skipped unless
+            "Also machines that are already licensed" is ticked.
