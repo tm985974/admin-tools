@@ -72,6 +72,8 @@ function Build-FleetTab {
     $btn.License.Font = New-AppFont -App $App -Style ([System.Drawing.FontStyle]::Bold)
     $btn.Stop.Enabled = $false
     $st.Btn = $btn
+    # Its text changes to "Credential: <user>", so its tooltip is set here, not in Config\ToolTips.json.
+    Set-AppToolTip -Control $btn.Cred -Text 'Pick an admin account for the remote machines (Cancel = use your own Windows login). Kept until the app closes; never saved.'
 
     $bar = New-Object System.Windows.Forms.Panel
     $bar.Dock = 'Top'; $bar.Height = 58; $bar.Padding = New-Object System.Windows.Forms.Padding(10, 0, 0, 0)
@@ -262,11 +264,19 @@ function Build-FleetTab {
             }
         }
 
-        if ($Action -ne 'Status') {
-            $what = $(if ($Action -eq 'Request') { 'Collect a license request from' } else { 'Apply a license to' })
-            $ok = [System.Windows.Forms.MessageBox]::Show("$what $($items.Count) machine(s)?", 'Radmin licensing', 'OKCancel', 'Question')
-            if ($ok -ne 'OK') { return }
-        }
+        # The command window is the confirmation (template rule: every action shows its code).
+        $transport = @('Auto', 'WinRM', 'SMB')[[Math]::Max(0, $st.Via.SelectedIndex)]
+        $targets = @($items | ForEach-Object { [string]$_.Target })
+        $files = @{}; foreach ($it in $items) { if ($it.File) { $files[[string]$it.Target] = [string]$it.File } }
+        $tRoot = (& $st.R.TransferFolder -App $app)
+        $code = & $st.R.CommandText -Settings $set -Action $Action -Targets $targets -Files $files -TransferRoot $tRoot -Transport $transport -Force:$force
+        $what = @{ Status = 'Check Radmin Server and its license on'; Request = 'Collect a license request from'; License = 'Apply a license to' }[$Action]
+        $sum = "$what $($items.Count) machine(s), $($set.ParallelMachines) at a time, connecting via $transport" +
+               $(if ($st.Cred) { " as $($st.Cred.UserName)" } else { '' }) + '.' +
+               $(if ($force -and $Action -ne 'Status') { ' Machines that are already licensed are included.' } else { '' })
+        $kind = $(if ($Action -eq 'Status') { 'Read' } else { 'Change' })
+        $label = @{ Status = 'Check'; Request = 'Collect'; License = 'Apply' }[$Action]
+        if (-not (& $st.R.Confirm -App $app -Title "Fleet - $what" -Kind $kind -RunLabel $label -Summary $sum -Code $code)) { return }
 
         foreach ($it in $items) { $it.Row.LastAction = $Action; $it.Row.Result = 'Working...'; $it.Row.Outcome = ''; & $st.RepaintRow $it.Row }
         & $st.Busy $true
@@ -309,7 +319,6 @@ function Build-FleetTab {
         }.GetNewClosure()
 
         try {
-            $transport = @('Auto', 'WinRM', 'SMB')[[Math]::Max(0, $st.Via.SelectedIndex)]
             $st.Batch = & $st.StartBatch -App $app -Action $Action -Items @($items) -Transport $transport -Parallel $set.ParallelMachines `
                                          -TimeoutSec ($set.CallTimeoutSec * 2 + 30) -Credential $st.Cred -OnResult $onResult -OnDone $onDone
         }
@@ -371,7 +380,12 @@ function Build-FleetTab {
 
     $btn.Open.Add_Click({
         $t = & $st.R.TransferPaths -App $st.App
-        if ($t.Ok) { try { Start-Process explorer.exe ('"{0}"' -f $t.Root) } catch { } } else { $st.App.SetStatus($t.Error, 'err') }
+        if ($t.Ok) {
+            $r = & $st.R.Invoke -App $st.App -Title 'Open transfer folder' -Kind Read -RunLabel 'Open' `
+                -Summary 'Open the transfer folder in Explorer (it is created first if missing).' `
+                -Code ('Start-Process -FilePath explorer.exe -ArgumentList ' + (& $st.R.Fmt ('"' + $t.Root + '"')))
+            if ($r.Errors.Count) { $st.App.SetStatus("Not opened: $($r.Errors[0])", 'err') }
+        } else { $st.App.SetStatus($t.Error, 'err') }
         & $st.ShowTransfer
     }.GetNewClosure())
 

@@ -1,0 +1,29 @@
+{
+    "_note": "Hover help for this project's buttons, menu items and tabs (project-owned). Key = the control's text, optionally preceded by where it is: tab / sub-tab / group box titles (outermost first) or a dialog's title, joined with ' > '. The most specific match wins; '&', a trailing '...' and case are ignored. An empty text = no tooltip on purpose. Engine controls (developer buttons, Environment tab, OK / Cancel / Close ...) already have entries in Base\\Services_ToolTips.psm1; an entry here overrides them. The developer build lists every control still missing one in <data root>\\Logs\\ToolTips_missing.txt.",
+    "ToolTips": {
+        "Overview": "What is active right now, the last password sent, and Pause / Resume for every hotkey.",
+        "Password Config": "Set up the 5 password slots: name, password, hotkey, how it is sent. Nothing changes until Save.",
+
+        "Overview > Pause hotkeys": "Turn every password hotkey off until you resume them. Nothing is typed while paused.",
+        "Overview > Resume hotkeys": "Turn the password hotkeys back on.",
+
+        "Password Config > Show": "Reveal this slot's saved password in the box. Untick (or lock the window) to hide it again.",
+        "Password Config > Forget": "Remove this slot's saved password and turn the slot off when you click Save.",
+        "Password Config > Save": "Save every slot and option and re-register the hotkeys. Passwords are encrypted with your Windows account (DPAPI).",
+        "Password Config > Revert": "Throw away unsaved edits and reload the saved settings.",
+        "Password Config > Minimize to the system tray (hotkeys keep working)": "On: minimizing hides the window to the tray icon; the hotkeys keep working.",
+        "Password Config > Start with hotkeys paused": "On: PDubPaste starts with every hotkey paused until you resume them.",
+
+        "Unlock": "Sign in with Windows Hello or your Windows password to show the settings (and start the hotkeys after launch).",
+        "Exit": "Close PDubPaste. Every hotkey stops working.",
+
+        "PDubPaste > Unlock": "Check this Windows password and unlock the window. After 3 wrong tries the window stays locked.",
+        "PDubPaste > Use Windows Hello": "Switch to Windows Hello (face, fingerprint or PIN) instead of typing the password.",
+        "PDubPaste > Cancel": "Close this box. The window stays locked.",
+
+        "Tray > Open": "Show the PDubPaste window (asks you to sign in with Windows first).",
+        "Tray > Pause hotkeys": "Turn every password hotkey off until you resume them.",
+        "Tray > Resume hotkeys": "Turn the password hotkeys back on (unlock the window first).",
+        "Tray > Exit": "Close PDubPaste. Every hotkey stops working."
+    }
+}

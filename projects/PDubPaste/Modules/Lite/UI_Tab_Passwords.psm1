@@ -77,6 +77,10 @@ function New-PasswordsTab {
         $r.Status = New-Object System.Windows.Forms.Label
         $r.Status.AutoSize = $true; $r.Status.Margin = New-Object System.Windows.Forms.Padding(3, 6, 3, 3)
 
+        # Check boxes without text: the catalog matches on text, so set these here.
+        Set-AppToolTip -Control $r.On -Text "Turn this password's hotkey on or off (applies when you click Save)."
+        Set-AppToolTip -Control $r.Enter -Text 'Press Enter after the password is sent (e.g. to submit a sign-in box).'
+
         $col = 0
         foreach ($ctl in @($r.On, $r.Name, $r.Pw, $r.Show, $r.ForgetBtn, $r.Hk, $r.Method, $r.Enter, $r.Status)) {
             $grid.Controls.Add($ctl, $col, $i); $col++

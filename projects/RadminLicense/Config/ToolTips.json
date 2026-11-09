@@ -1,0 +1,34 @@
+{
+    "_note": "Hover help for this project's buttons, menu items and tabs (project-owned). Key = the control's text, optionally preceded by where it is: tab / sub-tab / group box titles (outermost first) or a dialog's title, joined with ' > '. The most specific match wins; '&', a trailing '...' and case are ignored. An empty text = no tooltip on purpose. Engine controls (developer buttons, Environment tab, OK / Cancel / Close ...) already have entries in Base\\Services_ToolTips.psm1; an entry here overrides them. The developer build lists every control still missing one in <data root>\\Logs\\ToolTips_missing.txt.",
+    "ToolTips": {
+        "Overview": "What this tool does and the licensing round trip, step by step.",
+        "This Machine": "License the PC this app runs on: save a request, then apply the license that comes back.",
+        "Fleet": "Collect requests from, and apply licenses to, many machines over the network.",
+        "Environment > Radmin": "This environment's Radmin license key, transfer folder and rserver3 command settings.",
+
+        "This Machine > Refresh": "Check again whether Radmin Server is installed here and whether it is licensed.",
+        "This Machine > Restart as administrator": "Start this app again as administrator (needed to save a request or apply a license), then close this copy.",
+        "This Machine > Change": "Pick the transfer folder on this PC (e.g. the USB stick). Remembered on this PC only.",
+        "This Machine > Open": "Open the transfer folder in Explorer.",
+        "This Machine > Save request": "Run rserver3.exe /saverequest with this environment's license key and copy <MACHINE>.request to <Transfer>\\Requests.",
+        "This Machine > Apply license": "Find <MACHINE>.license in <Transfer>\\Licenses, apply it with rserver3.exe /uselicense and check the licensed registry key.",
+        "This Machine > Browse for a license file": "Pick a .license file anywhere and apply it to this machine.",
+
+        "Fleet > Add machines": "Type or paste machine names to add to the list.",
+        "Fleet > Import list": "Add machine names from a text or CSV file (a Name / ComputerName column works).",
+        "Fleet > Remove selected": "Take the selected machines off this list. Nothing is changed on the machines.",
+        "Fleet > Check status": "Ask each machine whether Radmin Server is installed and licensed. Changes nothing.",
+        "Fleet > 1. Collect requests": "Make <MACHINE>.request on every unlicensed machine and bring it back into <Transfer>\\Requests.",
+        "Fleet > 3. Apply licenses": "Push each <MACHINE>.license from <Transfer>\\Licenses to its machine, apply it and check the registry key.",
+        "Fleet > Stop": "Stop the run: machines in progress are stopped, the rest are skipped. Results so far are kept.",
+        "Fleet > Open transfer folder": "Open the transfer folder in Explorer.",
+        "Fleet > Change": "Pick the transfer folder on this PC (e.g. the USB stick). Remembered on this PC only.",
+        "Fleet > Rescan folder": "Look in the transfer folder again for request and license files.",
+        "Fleet > Only the selected machines": "On: the buttons act on the selected rows only. Off: on every machine in the list.",
+        "Fleet > Also machines that are already licensed": "On: collect a request / apply a license even where the machine is already licensed.",
+        "Add machines > Add": "Add the names typed above to the list.",
+
+        "Environment > Radmin > Show": "Show or hide the license key.",
+        "Environment > Radmin > Reset command settings to defaults": "Put the device folder, rserver3 path, registry key, arguments, timeout and connection back to the defaults (Save to keep)."
+    }
+}

@@ -755,15 +755,16 @@ function Resolve-PwOtherCopies {
     $others = @(Get-PwOtherCopies)
     if ($others.Count -eq 0) { return }
     $list = ($others | ForEach-Object { "  $($_.ProcessName).exe  (PID $($_.Id), started $($_.StartTime.ToString('HH:mm')))" }) -join "`r`n"
-    $q = "Another copy of PDubPaste is still running and holding the hotkeys:`r`n`r`n$list`r`n`r`n" +
-         "It may be an older version left running after its window closed. Close it now?"
-    $ans = if ($Owner -and $Owner.Visible) { [System.Windows.Forms.MessageBox]::Show($Owner, $q, 'PDubPaste', 'YesNo', 'Question') }
-           else { [System.Windows.Forms.MessageBox]::Show($q, 'PDubPaste', 'YesNo', 'Question') }
-    if ($ans -ne 'Yes') { return }
-    foreach ($p in $others) {
-        try { Stop-Process -Id $p.Id -Force -ErrorAction Stop; $App.Log('INFO', 'PwPaste', "Closed other copy $($p.ProcessName) (PID $($p.Id)).") }
-        catch { $App.Log('WARN', 'PwPaste', "Could not close PID $($p.Id): $($_.Exception.Message)") }
-    }
+    # v1.2.2: the command window is the confirmation (template rule: every action shows its code).
+    $ids = @($others | ForEach-Object { [int]$_.Id })
+    $code = 'Stop-Process -Id ' + (Format-AppCommandValue $ids) + ' -Force -ErrorAction Stop'
+    $r = Invoke-AppCommand -App $App -Title 'Close other PDubPaste copies' -Kind Change -RunLabel 'Close them' `
+        -Summary ("Another copy of PDubPaste is still running and holding the hotkeys:`r`n$list`r`n" +
+                  "It may be an older version left running after its window closed.") `
+        -Code $code
+    if (-not $r.Ran) { return }
+    if ($r.Errors.Count) { $App.Log('WARN', 'PwPaste', "Could not close every other copy: $($r.Errors -join ' | ')") }
+    else { $App.Log('INFO', 'PwPaste', "Closed other copies: PID $($ids -join ', ').") }
     Start-Sleep -Milliseconds 400
     Update-PwHotkeys -App $App
 }

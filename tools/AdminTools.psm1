@@ -80,6 +80,18 @@ function Get-ChangelogEntries {
     $entries
 }
 
+function ConvertTo-ToolTipKey {
+    # Same rule as ConvertTo-AppToolTipKey in Base\Services_ToolTips.psm1: '&' mnemonics,
+    # a trailing '...' / ellipsis and repeated spaces are ignored; case-insensitive.
+    param([AllowNull()] [string]$Text)
+    if (-not $Text) { return '' }
+    $t = $Text.Replace('&&', [string][char]1).Replace('&', '').Replace([string][char]1, '&')
+    $t = $t.Replace([string][char]0x25BE, '').Replace([string][char]0x2026, '')
+    $t = ($t -replace '\s+', ' ').Trim()
+    $t = ($t -replace '\s*\.{2,}$', '').Trim()
+    return $t.ToLowerInvariant()
+}
+
 function Write-Utf8NoBom {
     # Writes text with CRLF line endings and no BOM (how the project files are kept on Windows).
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Text)

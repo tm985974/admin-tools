@@ -96,6 +96,110 @@ foreach ($root in Get-ProjectRoots) {
     $rows += [pscustomobject]@{ Project = $name; Version = $v; Template = $tv; Status = $state }
 }
 
+# ---- template rules: every PowerShell file parses ----------------------------
+$repo = Get-RepoRoot
+$psFiles = @(Get-ChildItem -Path (Join-Path $repo 'template'), (Join-Path $repo 'projects'), (Join-Path $repo 'tools') -Recurse -File -Include *.ps1, *.psm1)
+$parseErrors = 0
+foreach ($f in $psFiles) {
+    $tokens = $null; $perr = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$perr)
+    foreach ($e in @($perr)) {
+        $parseErrors++
+        $rel = $f.FullName.Substring($repo.Length + 1) -replace '\\', '/'
+        Err ("{0}:{1}: syntax error: {2}" -f $rel, $e.Extent.StartLineNumber, $e.Message)
+    }
+}
+Write-Host ("  {0} PowerShell files parsed, {1} syntax error(s)" -f $psFiles.Count, $parseErrors)
+
+# ---- template rules: tooltips and the command window (projects) ------------
+# Rule 1: every clickable control has hover help: an entry in Config\ToolTips.json
+#         (or the engine catalog). An empty text marks "no tooltip on purpose".
+# Rule 2: actions that run a command go through the command window
+#         (Invoke-AppCommand / Confirm-AppCommand), not a Yes/No message box.
+$engineKeys = @{}
+$ttAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $t 'Modules/Base/Services_ToolTips.psm1'), [ref]$null, [ref]$null)
+$ttAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.AssignmentStatementAst] -and $a.Left.Extent.Text -eq '$script:EngineToolTips' }, $true) | ForEach-Object {
+    $_.FindAll({ param($a) $a -is [System.Management.Automation.Language.HashtableAst] }, $true) | ForEach-Object {
+        foreach ($pair in $_.KeyValuePairs) { $engineKeys[(ConvertTo-ToolTipKey ([string]$pair.Item1.Value))] = $true }
+    }
+}
+$clickTypes = 'Button|CheckBox|RadioButton|LinkLabel|ToolStripMenuItem|ToolStripButton'
+foreach ($root in Get-ProjectRoots) {
+    $name = Split-Path $root -Leaf
+    $ttPath = Join-Path $root 'Config/ToolTips.json'
+    $keys = @{}
+    if (-not (Test-Path $ttPath)) { Err "${name}: Config/ToolTips.json is missing (template rule: every clickable control has hover help)"; continue }
+    try {
+        $j = [System.IO.File]::ReadAllText($ttPath) | ConvertFrom-Json
+        $src = $(if ($j.PSObject.Properties['ToolTips']) { $j.ToolTips } else { $j })
+        foreach ($p in $src.PSObject.Properties) { if ($p.Name -notlike '_*') { $keys[(ConvertTo-ToolTipKey (($p.Name -split '>')[-1]))] = $true } }
+    } catch { Err "${name}: Config/ToolTips.json is not valid JSON ($($_.Exception.Message))"; continue }
+
+    $missing = New-Object System.Collections.Generic.List[string]
+    $files = @(Get-ChildItem (Join-Path $root 'Modules') -Recurse -File -Filter *.psm1 | Where-Object { -not ($_.Directory.Name -eq 'Base' -and (Test-Path (Join-Path $t ('Modules/Base/' + $_.Name))) -and $_.Name -notin 'UI_Register-Tabs.psm1', 'UI_Tab_Overview.psm1') })
+    foreach ($f in $files) {
+        $rel = 'Modules/' + $f.Directory.Name + '/' + $f.Name
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
+        $captions = New-Object System.Collections.Generic.List[object]
+        # $x = New-Object ...Button  ->  remember $x as clickable
+        $clickVars = @{}
+        foreach ($a in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)) {
+            if ($a.Right.Extent.Text -match ('New-Object\s+(System\.Windows\.Forms\.)?(' + $clickTypes + ')\b')) { $clickVars[$a.Left.Extent.Text.ToLowerInvariant()] = $true }
+        }
+        foreach ($n in $ast.FindAll({ param($x) $true }, $true)) {
+            # $T.MakeButton('Save') / $App.Theme.MakeButton('Save')
+            if ($n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $n.Member.Extent.Text -eq 'MakeButton' -and
+                $n.Arguments.Count -ge 1 -and $n.Arguments[0] -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+                $captions.Add(@($n.Arguments[0].Value, $n.Extent.StartLineNumber))
+            }
+            # New-Object ...ToolStripMenuItem('Text') / New-Object ...Button -ArgumentList 'Text' is rare; menu items are usually .Text = '...'
+            # $x.Text = 'Caption'  where $x is a clickable control made in this file
+            if ($n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left -is [System.Management.Automation.Language.MemberExpressionAst] -and
+                $n.Left.Member.Extent.Text -eq 'Text' -and $n.Right -is [System.Management.Automation.Language.CommandExpressionAst] -and
+                $n.Right.Expression -is [System.Management.Automation.Language.StringConstantExpressionAst] -and
+                $clickVars.ContainsKey($n.Left.Expression.Extent.Text.ToLowerInvariant())) {
+                $captions.Add(@($n.Right.Expression.Value, $n.Extent.StartLineNumber))
+            }
+            # $menu.Items.Add('Open')  (context / tray menu items)
+            if ($n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $n.Member.Extent.Text -eq 'Add' -and
+                $n.Expression.Extent.Text -match '(?i)(menu|strip|cms|ctx)\w*\.(Items|DropDownItems)$' -and
+                $n.Arguments.Count -eq 1 -and $n.Arguments[0] -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+                $captions.Add(@($n.Arguments[0].Value, $n.Extent.StartLineNumber))
+            }
+            # Tab titles: @{ Title = 'Fleet'; Fn = ... } in UI_Register-Tabs, and Register-EnvironmentSection -Title 'Radmin'
+            if ($n -is [System.Management.Automation.Language.HashtableAst] -and $f.Name -eq 'UI_Register-Tabs.psm1') {
+                foreach ($pair in $n.KeyValuePairs) {
+                    if ($pair.Item1.Extent.Text -eq 'Title' -and $pair.Item2.Extent.Text -match "^'([^']+)'$") { $captions.Add(@($Matches[1], $pair.Item1.Extent.StartLineNumber)) }
+                }
+            }
+            if ($n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Register-EnvironmentSection') {
+                $els = $n.CommandElements
+                for ($i = 0; $i -lt $els.Count - 1; $i++) {
+                    if ($els[$i] -is [System.Management.Automation.Language.CommandParameterAst] -and $els[$i].ParameterName -eq 'Title' -and
+                        $els[$i + 1] -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
+                        $captions.Add(@($els[$i + 1].Value, $n.Extent.StartLineNumber))
+                    }
+                }
+            }
+            # Rule 2: [MessageBox]::Show(..., 'YesNo' | 'OKCancel' | 'YesNoCancel', ...)
+            if ($n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $n.Member.Extent.Text -eq 'Show' -and
+                $n.Expression.Extent.Text -match 'MessageBox\]$' -and $n.Static) {
+                $btnArg = @($n.Arguments | Where-Object { $_ -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $_.Value -in 'YesNo', 'OKCancel', 'YesNoCancel' })
+                $line = $f.FullName | ForEach-Object { ([System.IO.File]::ReadAllLines($_))[$n.Extent.StartLineNumber - 1] }
+                if ($btnArg.Count -and $line -notmatch '#\s*not-a-command') {
+                    Warn ("{0}: {1}:{2}: Yes/No message box - if it confirms an action that runs a command, use Confirm-AppCommand / Invoke-AppCommand (or mark the line '# not-a-command')" -f $name, $rel, $n.Extent.StartLineNumber)
+                }
+            }
+        }
+        foreach ($c in $captions) {
+            $k = ConvertTo-ToolTipKey ([string]$c[0])
+            if (-not $k -or $keys.ContainsKey($k) -or $engineKeys.ContainsKey($k)) { continue }
+            $missing.Add(("{0}:{1} '{2}'" -f $rel, $c[1], (([string]$c[0]) -replace '&', '')))
+        }
+    }
+    foreach ($m in ($missing | Sort-Object -Unique)) { Err "${name}: no tooltip for $m - add it to Config/ToolTips.json (an empty text = none on purpose)" }
+}
+
 $rows | Format-Table -AutoSize | Out-String | Write-Host
 Write-Host ("{0} error(s), {1} warning(s)" -f $errors, $warnings)
 if ($env:GITHUB_STEP_SUMMARY) {

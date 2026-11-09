@@ -193,6 +193,14 @@ function Initialize-PwWindow {
 
     # ---- first show: ask right away; start listening for a second launch ----
     $Form.Add_Shown({
+        # The tray menu belongs to no control, so the tooltip sweep never finds it:
+        # hand it over once the catalog is loaded (Config\ToolTips.json "Tray > ...").
+        try {
+            if (Get-Command Register-AppToolTipMenu -ErrorAction SilentlyContinue) {
+                [void](Get-AppToolTipCatalog -App $App)
+                Register-AppToolTipMenu -Menu $menu -Context @('Tray')
+            }
+        } catch { $App.Log('WARN', 'ToolTips', "Tray menu tooltips: $($_.Exception.Message)") }
         & $applyLock
         [PwPaste.SingleInstance]::Listen($Form, $showRequestHandler)
         & $unlockLater

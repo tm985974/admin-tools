@@ -135,10 +135,15 @@ function Build-ThisMachineTab {
     }.GetNewClosure()
 
     $st.ApplyFile = {
-        param([string]$file, [bool]$checkName = $true)
+        param([string]$file, [bool]$checkName = $true, [string]$warning = '')
         $app = $st.App
         $set = & $st.R.Settings -App $app
         $expect = $(if ($checkName) { [System.IO.Path]::GetFileNameWithoutExtension($file) } else { '' })
+        # The command window is the confirmation (template rule: every action shows its code).
+        $code = & $st.R.CommandText -Settings $set -Action License -Targets @($st.Me) -Files @{ $st.Me = $file }
+        $sum = "Apply $([System.IO.Path]::GetFileName($file)) to this machine ($($st.Me)) with rserver3.exe /uselicense, then check the licensed registry key."
+        if ($warning) { $sum = $warning + "`r`n" + $sum }
+        if (-not (& $st.R.Confirm -App $app -Title 'Apply license' -Kind Change -RunLabel 'Apply' -Summary $sum -Code $code)) { return }
         & $st.Write "Applying $file ..."
         & $st.Busy $true
         try {
@@ -161,11 +166,12 @@ function Build-ThisMachineTab {
     $btnRefresh.Add_Click({ $r = & $st.Refresh; & $st.Write ("Status: " + $r.Message) }.GetNewClosure())
 
     $btnElevate.Add_Click({
-        try {
-            Start-Process -FilePath $st.App.ExePath -Verb RunAs -ErrorAction Stop
-            $f = $st.Log.FindForm(); if ($f) { $f.Close() }
-        }
-        catch { & $st.Write "Not restarted: $($_.Exception.Message)" }
+        $code = 'Start-Process -FilePath ' + (& $st.R.Fmt ([string]$st.App.ExePath)) + ' -Verb RunAs -ErrorAction Stop'
+        $r = & $st.R.Invoke -App $st.App -Title 'Restart as administrator' -Kind Read -RunLabel 'Restart' -Code $code `
+            -Summary 'Start this app again as administrator (Windows asks for consent), then close this copy.'
+        if (-not $r.Ran) { return }
+        if ($r.Errors.Count) { & $st.Write "Not restarted: $($r.Errors[0])"; return }
+        $f = $st.Log.FindForm(); if ($f) { $f.Close() }
     }.GetNewClosure())
 
     $btnRequest.Add_Click({
@@ -175,13 +181,14 @@ function Build-ThisMachineTab {
             [void][System.Windows.Forms.MessageBox]::Show('No Radmin license key is set for this environment.' + "`r`n`r`n" + 'Set it on Environment > Radmin (admin password or developer build).', 'Save request', 'OK', 'Warning')
             return
         }
-        $force = $false
-        if ($st.Last -and $st.Last.Licensed) {
-            if ([System.Windows.Forms.MessageBox]::Show('This machine is already licensed. Make a request anyway?', 'Save request', 'YesNo', 'Question') -ne 'Yes') { return }
-            $force = $true
-        }
+        $force = [bool]($st.Last -and $st.Last.Licensed)
         $t = & $st.R.TransferPaths -App $app
         if (-not $t.Ok) { & $st.Write $t.Error; $app.SetStatus($t.Error, 'err'); return }
+        # The command window is the confirmation (it replaces the "already licensed?" question).
+        $sum = "Make $($st.Me).request with rserver3.exe /saverequest and copy it to $($t.Requests)."
+        if ($force) { $sum = "This machine is ALREADY LICENSED - this makes a request anyway.`r`n" + $sum }
+        $code = & $st.R.CommandText -Settings $set -Action Request -Targets @($st.Me) -TransferRoot $t.Root -Force:$force
+        if (-not (& $st.R.Confirm -App $app -Title 'Save request' -Kind Change -RunLabel 'Save request' -Summary $sum -Code $code)) { return }
         & $st.Write 'Saving license request ...'
         & $st.Busy $true
         try {
@@ -220,19 +227,24 @@ function Build-ThisMachineTab {
             $file = $d.FileName
             $check = $true
             $name = [System.IO.Path]::GetFileNameWithoutExtension($file)
+            $warn = ''
             if ($name -ne $st.Me) {
-                $q = "This file is named '$name', but this machine is '$($st.Me)'. A license only works on the machine it was made for." + "`r`n`r`n" + 'Apply it anyway?'
-                if ([System.Windows.Forms.MessageBox]::Show($q, 'Apply license', 'YesNo', 'Warning') -ne 'Yes') { $d.Dispose(); return }
+                $warn = "WARNING: this file is named '$name', but this machine is '$($st.Me)'. A license only works on the machine it was made for."
                 $check = $false
             }
-            & $st.ApplyFile $file $check
+            & $st.ApplyFile $file $check $warn
         }
         $d.Dispose()
     }.GetNewClosure())
 
     $btnOpen.Add_Click({
         $t = & $st.R.TransferPaths -App $st.App
-        if ($t.Ok) { try { Start-Process explorer.exe ('"{0}"' -f $t.Root) } catch { } } else { & $st.Write $t.Error }
+        if ($t.Ok) {
+            $r = & $st.R.Invoke -App $st.App -Title 'Open transfer folder' -Kind Read -RunLabel 'Open' `
+                -Summary 'Open the transfer folder in Explorer (it is created first if missing).' `
+                -Code ('Start-Process -FilePath explorer.exe -ArgumentList ' + (& $st.R.Fmt ('"' + $t.Root + '"')))
+            if ($r.Errors.Count) { & $st.Write "Not opened: $($r.Errors[0])" }
+        } else { & $st.Write $t.Error }
         & $st.ShowTransfer
     }.GetNewClosure())
 

@@ -527,6 +527,104 @@ function ConvertTo-RadminMachineNames {
     }
 }
 
+# The PowerShell an action amounts to, for the command window (Base\Services_Commands).
+# The app runs the same steps through $script:RadminCore (which also retries the
+# second argument syntax and waits for the registry key); this text is what you
+# would type to do it by hand. The license key is never shown: it appears as a
+# placeholder, so the window, the clipboard and Session.log never hold it.
+#   -Targets     machine names (one = this machine when it is this PC)
+#   -Files       Action License: machine name -> .license path
+function Get-RadminCommandText {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] $Settings,
+        [Parameter(Mandatory)] [ValidateSet('Status', 'Request', 'License')] [string]$Action,
+        [Parameter(Mandatory)] [string[]]$Targets,
+        [hashtable]$Files = @{},
+        [string]$TransferRoot = '',
+        [string]$Transport = 'Auto',
+        [switch]$Force
+    )
+    $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+    $dev = $(if ([string]$Settings.DeviceFolder) { [string]$Settings.DeviceFolder } else { 'C:\FAS' })
+    $reg = 'HKLM:\' + ((([string]$Settings.LicensedRegKey) -replace '(?i)^(HKLM:?\\|HKEY_LOCAL_MACHINE\\)', '').Trim('\'))
+    $saveTpl = $(if ([string]$Settings.SaveRequestArgs) { [string]$Settings.SaveRequestArgs } else { $script:RadminFallbackSave[0] })
+    $licTpl  = $(if ([string]$Settings.UseLicenseArgs) { [string]$Settings.UseLicenseArgs } else { $script:RadminFallbackLicense[0] })
+    $exeCands = @()
+    if ([string]$Settings.RserverPath) { $exeCands += (& $q ([string]$Settings.RserverPath)) }
+    $exeCands += '"$env:windir\SysWOW64\rserver30\rserver3.exe"', '"$env:windir\System32\rserver30\rserver3.exe"'
+
+    # The steps that run ON the machine (same order as the core).
+    $body = New-Object System.Collections.Generic.List[string]
+    $body.Add('$exe = @(' + ($exeCands -join ', ') + ') | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1')
+    $body.Add('$licensed = Test-Path -LiteralPath ' + (& $q $reg))
+    switch ($Action) {
+        'Status' {
+            $body.Add('[pscustomobject]@{ Computer = $env:COMPUTERNAME; RadminFound = [bool]$exe; Licensed = $licensed }')
+        }
+        'Request' {
+            $file = $dev.TrimEnd('\') + '\$env:COMPUTERNAME.request'
+            $argLine = $saveTpl.Replace('{Key}', '$key').Replace('{File}', $file)
+            if (-not $Force) { $body.Add('if ($licensed) { return }   # already licensed - no request') }
+            $body.Add('New-Item -ItemType Directory -Path ' + (& $q $dev) + ' -Force | Out-Null')
+            $body.Add('Start-Process -FilePath $exe -ArgumentList "' + $argLine.Replace('"', '`"') + '" -Wait -WindowStyle Hidden')
+            $body.Add('[IO.File]::ReadAllBytes("' + $file + '")   # the request, saved to <Transfer>\Requests\')
+        }
+        'License' {
+            $file = $dev.TrimEnd('\') + '\$env:COMPUTERNAME.license'
+            $argLine = $licTpl.Replace('{File}', $file)
+            if (-not $Force) { $body.Add('if ($licensed) { return }   # already licensed') }
+            $body.Add('New-Item -ItemType Directory -Path ' + (& $q $dev) + ' -Force | Out-Null')
+            $body.Add('[IO.File]::WriteAllBytes("' + $file + '", $license)')
+            $body.Add('Start-Process -FilePath $exe -ArgumentList "' + $argLine.Replace('"', '`"') + '" -Wait -WindowStyle Hidden')
+            $body.Add('Test-Path -LiteralPath ' + (& $q $reg) + '   # licensed = this key exists')
+        }
+    }
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $what = @{ Status = 'Check Radmin Server and its license on'; Request = 'Save a Radmin license request on'; License = 'Apply a Radmin license on' }[$Action]
+    $lines.Add("# $what $(@($Targets).Count) machine(s). Run as an administrator.")
+    if ($Action -eq 'Request') { $lines.Add('$key = ''<license key: Environment > Radmin>''   # not shown here') }
+    $local = (@($Targets).Count -eq 1 -and (Test-RadminLocalTarget -Name $Targets[0]))
+    if ($local) {
+        if ($Action -eq 'License') { $lines.Add('$license = [IO.File]::ReadAllBytes(' + (& $q $Files[$Targets[0]]) + ')') }
+        foreach ($b in $body) { $lines.Add($b) }
+    }
+    else {
+        $lines.Add('$machines = ' + (Format-RadminList $Targets))
+        if ($Action -eq 'License') {
+            $lines.Add('foreach ($m in $machines) {')
+            $lines.Add('    $files = ' + (Format-RadminMap $Files))
+            $lines.Add('    $license = [IO.File]::ReadAllBytes($files[$m])')
+            $lines.Add('    Invoke-Command -ComputerName $m -ArgumentList (,$license) -ScriptBlock {')
+            $lines.Add('        param($license)')
+            foreach ($b in $body) { $lines.Add('        ' + $b) }
+            $lines.Add('    }')
+            $lines.Add('}')
+        }
+        else {
+            $needKey = ($Action -eq 'Request')
+            $lines.Add('Invoke-Command -ComputerName $machines' + $(if ($needKey) { ' -ArgumentList $key' } else { '' }) + ' -ScriptBlock {')
+            if ($needKey) { $lines.Add('    param($key)') }
+            foreach ($b in $body) { $lines.Add('    ' + $b) }
+            $lines.Add('}')
+        }
+        if ($Transport -ne 'WinRM') {
+            $lines.Add('# Where WinRM is off (Connect via: ' + $Transport + '), the app runs the same steps through the')
+            $lines.Add('# admin share (\\<machine>\C$\FAS\_rlm\) and WMI (Win32_Process Create) instead.')
+        }
+    }
+    if ($Action -eq 'Request' -and $TransferRoot) { $lines.Add('# Each request is saved as ' + (Join-Path (Join-Path $TransferRoot 'Requests') '<MACHINE>.request')) }
+    if ($Action -ne 'Status' -and $TransferRoot) { $lines.Add('# Licensed machines: their request and license are moved to ' + (Join-Path $TransferRoot 'Done')) }
+    return ($lines -join "`r`n")
+}
+
+function Format-RadminList { param([string[]]$Items) '@(' + ((@($Items) | ForEach-Object { "'" + ([string]$_).Replace("'", "''") + "'" }) -join ', ') + ')' }
+function Format-RadminMap {
+    param([hashtable]$Map)
+    '@{ ' + ((@($Map.Keys) | Sort-Object | ForEach-Object { "'" + ([string]$_).Replace("'", "''") + "' = '" + ([string]$Map[$_]).Replace("'", "''") + "'" }) -join '; ') + ' }'
+}
+
 # Script blocks for UI closures (closures do not see module functions reliably).
 function Get-RadminApi {
     return @{
@@ -548,5 +646,9 @@ function Get-RadminApi {
         SaveFleet       = ${function:Save-RadminFleet}
         NewRow          = ${function:New-RadminFleetRow}
         ParseNames      = ${function:ConvertTo-RadminMachineNames}
+        CommandText     = ${function:Get-RadminCommandText}
+        Confirm         = ${function:Confirm-AppCommand}
+        Invoke          = ${function:Invoke-AppCommand}
+        Fmt             = ${function:Format-AppCommandValue}
     }
 }
