@@ -1,0 +1,39 @@
+# Builds every project's developer EXE and its Lite test EXE and keeps them as a
+# downloadable artifact for 3 days (Actions > Package > the run > Artifacts).
+# Run by hand only (Actions > Package > Run workflow, pick the branch).
+# The developer EXEs contain the source: the repository is private, and the artifact
+# expires. Never hand a developer or Lite EXE to users - use Build Sealed.
+name: Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build developer + Lite EXEs
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'exe'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          $failed = @()
+          $folders = @(Get-Item template) + @(Get-ChildItem projects -Directory | Sort-Object Name)
+          foreach ($f in $folders) {
+              $id = Get-Content (Join-Path $f.FullName 'AppIdentity.json') -Raw | ConvertFrom-Json
+              $exe = Join-Path $out ($id.ExeName + '.exe')
+              Write-Host "==== $($f.Name) -> $($id.ExeName).exe"
+              & cmd.exe /c "`"$(Join-Path $f.FullName 'Build-App.cmd')`" -NoPause -Output `"$exe`""
+              $lite = Join-Path $out ($id.ExeName + 'Lite.exe')
+              if (-not (Test-Path $exe))  { $failed += "$($id.ExeName).exe" }
+              if (-not (Test-Path $lite)) { $failed += "$($id.ExeName)Lite.exe" }
+          }
+          Get-ChildItem $out -Filter *.exe | Format-Table Name, Length | Out-String | Write-Host
+          if ($failed.Count) { throw "Not built: $($failed -join ', ')" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: admin-tools-exe
+          path: ${{ runner.temp }}/exe/*.exe
+          retention-days: 3
