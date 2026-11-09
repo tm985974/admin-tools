@@ -2,6 +2,18 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.2 (2026-11-09)  Command window and hover help
+  Changed : Closing other PDubPaste copies that hold the hotkeys now uses the command
+            window (Stop-Process -Id ... -Force, with Copy) instead of a Yes/No box.
+  Added   : Config\ToolTips.json - hover help for every button, check box, tab and the
+            tray menu (the tray menu is handed to the tooltip engine on first show).
+            The On / Enter after check boxes get theirs in code (they have no text).
+  Note    : Saving passwords is not a command and shows no code; a password never
+            appears in any command text.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
 v1.2.1 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
   Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
   Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed

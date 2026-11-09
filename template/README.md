@@ -301,6 +301,57 @@ new major.minor marks a contract change.
 
 ---
 
+## Template rules (every project)
+
+Every project built on this template follows these rules. `tools\Test-Template.ps1`
+(run on every push in the admin-tools repository) checks them, and a push that breaks
+one fails the check.
+
+### 1. Every action shows its code first
+
+Anything that runs a command against the system goes through the command engine
+(`Base\Services_Commands.psm1`): a script, cmdlet or program that changes something,
+starts something (RDP, Explorer, a console, an elevated copy), or reaches another
+computer or server. The command window shows the exact PowerShell, with the real values
+filled in, plus Copy and Run / Cancel, and the command is logged.
+
+| Use | When |
+|---|---|
+| `Invoke-AppCommand -Code $text` | the action IS the code shown: it runs that same text |
+| `Confirm-AppCommand -Code $text`, then run | the work happens in tested module code (retries, progress, waits); `$text` is the equivalent PowerShell |
+| `-Kind Change` / `-Kind Read` | changes something / only reads or launches (Environment > Commands decides when each kind is shown) |
+| `-Always` | always ask, whatever the setting: deletes, reboots, anything that used to have its own Yes/No box |
+
+- Build the text with `Format-AppCommandValue`, so it runs exactly as shown.
+- **Never put a secret in the code.** A password or key appears as a placeholder:
+  `Format-AppCommandValue` turns a SecureString into a `Read-Host` prompt.
+- The command window replaces the action's own Yes/No box, so there is never a second
+  popup. A `MessageBox` with YesNo / OKCancel buttons is flagged by the check. When one
+  is not about running a command (a list edit, an overwrite question, a gate before
+  the command window), end its line with `# not-a-command: <why>`.
+- Not covered: the app's own data (saving settings, editing its tables or lists),
+  filtering, selecting, copying to the clipboard, and read-only loads of the data a
+  tab shows.
+
+### 2. Every clickable control has hover help
+
+Every button, check box, radio button, link, menu item and tab has a tooltip from the
+catalog: the engine entries in `Base\Services_ToolTips.psm1` plus the project's
+`Config\ToolTips.json` (required in every project).
+
+- The key is the control's text, optionally with where it is (`Tab > Sub-tab > Text`, or
+  `Dialog title > Text`). In a key, `&&` is a literal `&` and a trailing `...` is ignored.
+- A control text cannot contain `>` (it separates places in a key).
+- A control without text, or one whose text changes at run time, gets its tooltip in
+  code with `Set-AppToolTip`. A menu that belongs to no control, such as a tray icon
+  menu, is handed to the engine with `Register-AppToolTipMenu` once the catalog is
+  loaded (see PDubPaste's `UI_PwWindow.psm1`).
+- An empty entry (`"Some button": ""`) means "no tooltip on purpose".
+- The check reads every caption written as a literal in the modules. The developer
+  build also lists controls it met with no entry in `<data root>\Logs\ToolTips_missing.txt`.
+
+---
+
 ## Making it your own (new project)
 
 Set the project's names in `AppIdentity.json` (project-owned, at the root):

@@ -2,6 +2,18 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.4 (2026-11-09)  Command window for driver changes; hover help
+  Changed : Add to this PC, Overwrite this PC and Remove selected IPs show the exact
+            registry changes (keys, values and IPs, as registry PowerShell) instead of a
+            Yes/No box. Delete backup, Open folder, Restart as administrator and Start
+            control panel (button) use the command window too.
+  Changed : The "Build preview  >>" button is now "Build preview" (a ">" cannot be part
+            of a tooltip key).
+  Added   : Config\ToolTips.json - hover help for every button, check box and tab.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
 v1.0.3 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
   Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
   Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed

@@ -2,6 +2,23 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.9 (2026-11-09)  Command window for every SCCM change; hover help
+  Changed : Confirm-SamBatch is now the command window: every batch action (add / remove
+            members, deploy, distribute / update content, retire, delete applications,
+            device records, collections, clear PXE, pull / upload, create in SCCM,
+            export) shows the ConfigMgr cmdlets with the real names, IDs and values.
+            They always ask, as the Yes/No box did.
+  Added   : Deploy, New collection, Rename and Update membership now show their code
+            too (they had no confirmation before).
+  Changed : Create in SCCM and Deploy build their parameters in one place
+            (Get-SamAppCreateSpec, Get-SamDeployParams), used both to run and to show.
+  Changed : Buttons with a tip use the engine's tooltip (Set-AppToolTip), so there is one
+            tooltip provider. Folder / Notepad opens go through the command window.
+  Added   : Config\ToolTips.json - hover help for every button, menu item and tab.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
 v1.0.8 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
   Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
   Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed

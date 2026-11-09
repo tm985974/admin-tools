@@ -2,6 +2,16 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.3.3 (2026-11-09)  Standard command window for commands that change things; hover help
+  Changed : Running an entry that changes things shows the standard command window
+            (the code, Copy, Run / Cancel, logged) instead of a Yes/No box. The run
+            window already shows the command, so read-only entries run from there.
+  Added   : Config\ToolTips.json - hover help for every button, check box, radio
+            button and tab.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
 v1.3.2 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
   Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
   Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed

@@ -54,7 +54,7 @@
         "Clear checks": "Untick every device.",
         "Hide current members": "Leave out devices that are already in the collection.",
         "Load from file": "Read device names from a text or CSV file.",
-        "Check & Add": "Look the names up in SCCM, then show what will be added.",
+        "Check && Add": "Look the names up in SCCM, then show what will be added.",
         "Required": "Install automatically by the deadline.",
         "Available": "Offer it in Software Center; nothing installs on its own.",
         "Use NEW value": "Use the new value for this field (untick to keep the current one).",

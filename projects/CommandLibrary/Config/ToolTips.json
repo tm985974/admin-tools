@@ -27,7 +27,7 @@
         "Set": "Enter the credential this value needs. It is never saved.",
         "On": "Include this switch in the command.",
         "Run on this computer": "Run the command here.",
-        "Run on these computers (remoting)": "Run the command on the computers listed (PowerShell remoting).",
+        "Run on these computers (remoting):": "Run the command on the computers listed (PowerShell remoting).",
         "Run on other computers (not available for this entry)": "This entry cannot run remotely.",
         "Connect with other credentials": "Ask for an account to connect to the remote computers with.",
         "Check the target answers before running": "Ping / test each target first and skip the ones that do not answer.",

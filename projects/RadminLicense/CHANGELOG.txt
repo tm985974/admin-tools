@@ -2,6 +2,19 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.4 (2026-11-09)  Command window for every action; hover help
+  Changed : Save request, Apply license (both buttons), Restart as administrator and
+            Open transfer folder show the command window first. Fleet: Check status,
+            Collect requests and Apply licenses show the Invoke-Command / rserver3.exe
+            steps for the machines in scope (Services_Radmin: Get-RadminCommandText).
+            The license key is never shown: it appears as a placeholder.
+  Changed : The command window replaces the "already licensed?", "wrong machine name?"
+            and "Collect / Apply for N machines?" boxes - one window, not two.
+  Added   : Config\ToolTips.json - hover help for every button, check box and tab.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
 v1.0.3 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
   Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
   Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed

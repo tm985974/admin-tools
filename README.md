@@ -85,12 +85,27 @@ check fails, and the next sync would overwrite it.
    powershell -ExecutionPolicy Bypass -File tools\Test-Template.ps1
    ```
 
+## Template rules
+
+Every project follows the rules in `template/README.md` ("Template rules"):
+
+1. **Every action shows its code first.** Anything that runs a command goes through the
+   command window: the exact PowerShell, Copy, Run / Cancel, logged. Secrets never appear
+   in the code.
+2. **Every clickable control has hover help**, from the project's `Config/ToolTips.json`.
+
+The template check enforces both, so a new button without a tooltip or an old-style Yes/No
+confirmation shows up on the next push.
+
 ## Automatic checks (GitHub Actions)
 
 - **Template check** (every push): `tools/Test-Template.ps1`. It fails on a stale template
-  manifest, engine drift in any project, version / changelog mismatches, or two projects
-  sharing an ExeName or AppDataFolder. Projects behind the template are listed as warnings.
-  The run summary shows a table of every project and its template version.
+  manifest, engine drift in any project, version / changelog mismatches, two projects
+  sharing an ExeName or AppDataFolder, a PowerShell syntax error in any file, a missing
+  `Config/ToolTips.json`, or a button / menu item / tab with no tooltip. It warns about
+  Yes/No message boxes that may need to be command windows. Projects behind the template
+  are listed as warnings. The run summary shows a table of every project and its template
+  version.
 - **Build** (code pushed to `main`, or by hand from the Actions tab): compiles every
   developer EXE on Windows to prove the source builds. Nothing is published.
 

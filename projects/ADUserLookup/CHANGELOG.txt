@@ -2,6 +2,19 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.18 (2026-11-09)  Every AD change shows its code
+  Changed : These actions now show the exact PowerShell in the command window (they used
+            the plain confirm before): Fix Display Name / Canonical Name / SAM uppercase,
+            Clear and Set Description, inline name / description edits on the Naming tab
+            (Cancel restores the cell), Edit Contacts, Add Users to Groups, Bulk Add
+            Groups, Bulk User Import, Create User, Run Offboarding and Reset Password.
+            Passwords never appear in the code (a Read-Host prompt stands in).
+  Added   : Hover help for the Cut / Paste menu, the Set DNS and paste-queue check boxes
+            and the five offboarding steps.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
 v1.2.17 (2026-11-05)  Engine synced v1.0.22 -> v1.0.23
   Changed : AppTemplate engine v1.0.22 -> v1.0.23 (Update Template): 1 file(s) replaced, 0 added, 0 removed.
   Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed

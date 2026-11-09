@@ -2,6 +2,18 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.4 (2026-11-09)  Command window for every step; hover help
+  Changed : Run selected step shows the step's exact commands first (sfc, DISM, chkdsk,
+            winmgmt, ccmsetup, service and WMI calls - Get-CcmStepCommandText, kept
+            beside Invoke-CcmStep). Steps that asked Yes/No before still always ask.
+  Changed : Reboot (button and after a step), Open related log, the Logs tab's Open in
+            viewer / Open folder and Discovery's "open the folder?" use the command
+            window. Reboot always asks.
+  Added   : Config\ToolTips.json - hover help for every button, check box and tab.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
 v1.0.3 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
   Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
   Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed
