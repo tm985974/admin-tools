@@ -2,6 +2,23 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.2  (2026-11-03)  Fleet: admin share + WMI where WinRM is off
+  Added   : Second way to reach a machine, for networks with WinRM (5985)
+            blocked: the core + options are copied to \\PC\C$\FAS\_rlm\<id>\,
+            WMI (Win32_Process.Create over DCOM, TCP 135/RPC) starts PowerShell
+            there with -EncodedCommand (not subject to the execution policy),
+            and the result is read back over the share. The job folder (which
+            holds the key or license) is deleted afterwards. Runs in background
+            runspaces, same parallel limit.
+  Added   : "Connect via" on the Fleet tab and Environment > Radmin: Auto (WinRM,
+            then the admin share when WinRM cannot connect), WinRM only, or
+            Admin share + WMI only. Auto remembers the route that worked per
+            machine (new Via column) and goes there first next time.
+  Changed : "The client cannot connect to the destination" is now reported as
+            "WinRM not reachable ..."; SMB/WMI errors name the step that failed
+            (open share / copy / start with WMI / wait) and RPC / access-denied
+            causes.
+
 v1.0.1  (2026-11-03)  Fix: Fleet results failed after every machine
   Fixed   : Check status / Collect requests / Apply licenses logged "The
             expression after '&' in a pipeline element produced an object that

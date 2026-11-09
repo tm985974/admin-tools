@@ -55,7 +55,8 @@ function New-OverviewTab {
 
     Add-Section 'Requirements'
     Add-Bullet 'Run as administrator - rserver3.exe needs it to save a request or apply a license. This Machine shows a Restart as administrator button when it is not.'
-    Add-Bullet 'Fleet: PowerShell remoting (WinRM) on the target machines and an account that is admin there (Credential..., or the current login).'
+    Add-Bullet 'Fleet reaches a machine over WinRM (TCP 5985) or, where WinRM is off, over its admin share C$ (TCP 445) + WMI (TCP 135 / RPC). Connect via: Auto tries WinRM, then the admin share, and remembers what worked (Via column).'
+    Add-Bullet 'Either way it needs an account that is admin on the target (Credential..., or the current login). Local accounts over the admin share need LocalAccountTokenFilterPolicy = 1 on the target.'
     Add-Bullet 'Nothing here needs internet access; the only internet step is the website, on another PC.'
 
     Add-Section 'If something fails'

@@ -17,6 +17,7 @@
             "RadminUseLicenseArgs": "/uselicense /licensefile:\"{File}\"",
             "RadminCallTimeoutSec": 60,
             "RadminParallelMachines": 16,
+            "RadminTransport": "Auto",
             "Notes": "Set the Radmin license key and the transfer folder on Environment > Radmin. One environment per site / license key."
         }
     ]

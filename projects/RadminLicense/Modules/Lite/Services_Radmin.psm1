@@ -47,6 +47,7 @@ $script:RadminDefaults = [ordered]@{
     UseLicenseArgs   = '/uselicense /licensefile:"{File}"'
     CallTimeoutSec   = 60
     ParallelMachines = 16
+    Transport        = 'Auto'
 }
 
 # The two scripts this replaces disagreed on the syntax (/requestfile:"x" vs
@@ -215,6 +216,7 @@ function Get-RadminSettings {
     if (-not [int]::TryParse([string]$s.CallTimeoutSec, [ref]$n) -or $n -lt 10) { $n = 60 };  $s.CallTimeoutSec = $n
     $n = 0
     if (-not [int]::TryParse([string]$s.ParallelMachines, [ref]$n) -or $n -lt 1) { $n = 16 }; $s.ParallelMachines = [Math]::Min($n, 64)
+    if ([string]$s.Transport -notin @('Auto', 'WinRM', 'SMB')) { $s.Transport = 'Auto' }
     return [pscustomobject]$s
 }
 
@@ -446,7 +448,7 @@ function Complete-RadminTransfer {
 }
 
 # ---- the fleet: machine list + last results, per environment ----
-$script:FleetColumns = @('Machine', 'Computer', 'Radmin', 'Licensed', 'LastAction', 'Result', 'Checked')
+$script:FleetColumns = @('Machine', 'Computer', 'Radmin', 'Licensed', 'Via', 'LastAction', 'Result', 'Checked')
 
 function Get-RadminFleetPath {
     param([Parameter(Mandatory)] $App)

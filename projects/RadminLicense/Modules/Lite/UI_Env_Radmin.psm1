@@ -31,6 +31,8 @@ function Register-RadminEnvironmentPage {
                H = 'How long one rserver3.exe call may take before it is stopped. 10 or more.' }
             @{ K = 'ParallelMachines'; C = 'Machines at a time (Fleet)';  W = 80
                H = 'How many remote machines the Fleet tab works on at once. 1 - 64.' }
+            @{ K = 'Transport';        C = 'Fleet connects via';          W = 200; Choices = @('Auto', 'WinRM', 'SMB')
+               H = 'Auto = WinRM, and over the admin share + WMI when WinRM cannot connect. WinRM = PowerShell remoting only (TCP 5985). SMB = admin share (C$, TCP 445) + WMI (TCP 135 / RPC) only. The Fleet tab can change it for a run.' }
         )
 
         $ctl = @{}
@@ -42,7 +44,10 @@ function Register-RadminEnvironmentPage {
         foreach ($f in $fields) {
             $l = New-Object System.Windows.Forms.Label
             $l.Text = $f.C; $l.Location = New-Object System.Drawing.Point(12, ($y + 3)); $l.Size = New-Object System.Drawing.Size(220, 20)
-            $t = New-Object System.Windows.Forms.TextBox
+            if ($f.Choices) {
+                $t = New-Object System.Windows.Forms.ComboBox
+                $t.DropDownStyle = 'DropDownList'; [void]$t.Items.AddRange([object[]]$f.Choices)
+            } else { $t = New-Object System.Windows.Forms.TextBox }
             $t.Location = New-Object System.Drawing.Point(240, $y); $t.Width = $f.W
             if ($f.K -like '*Args' -or $f.K -eq 'LicensedRegKey') { $t.Font = New-Object System.Drawing.Font($App.Theme.MonoFontName, 9) }
             $Page.Controls.Add($l); $Page.Controls.Add($t)
@@ -66,6 +71,7 @@ function Register-RadminEnvironmentPage {
         $btnDef.Location = New-Object System.Drawing.Point(240, ($y + 4))
         $btnDef.Add_Click({
             foreach ($k in @('DeviceFolder', 'RserverPath', 'LicensedRegKey', 'SaveRequestArgs', 'UseLicenseArgs', 'CallTimeoutSec', 'ParallelMachines')) { $ctl[$k].Text = [string]$defaults[$k] }
+            $ctl.Transport.SelectedIndex = 0
         }.GetNewClosure())
         $Page.Controls.Add($btnDef)
 
@@ -75,14 +81,16 @@ function Register-RadminEnvironmentPage {
                 foreach ($k in @($ctl.Keys)) {
                     $rk = 'Radmin' + $k
                     $v = $(if ($Record.Contains($rk) -and $null -ne $Record[$rk] -and [string]$Record[$rk] -ne '') { [string]$Record[$rk] } else { [string]$defaults[$k] })
-                    $ctl[$k].Text = $v
+                    if ($ctl[$k] -is [System.Windows.Forms.ComboBox]) {
+                        $ix = $ctl[$k].Items.IndexOf($v); $ctl[$k].SelectedIndex = $(if ($ix -ge 0) { $ix } else { 0 })
+                    } else { $ctl[$k].Text = $v }
                 }
             }.GetNewClosure()
             Collect = {
                 param($Record)
                 $h = [ordered]@{}
                 foreach ($k in @($ctl.Keys)) {
-                    $v = $ctl[$k].Text.Trim()
+                    $v = $(if ($ctl[$k] -is [System.Windows.Forms.ComboBox]) { [string]$ctl[$k].SelectedItem } else { $ctl[$k].Text.Trim() })
                     $n = 0
                     if ($k -in @('CallTimeoutSec', 'ParallelMachines') -and [int]::TryParse($v, [ref]$n)) { $h['Radmin' + $k] = $n } else { $h['Radmin' + $k] = $v }
                 }

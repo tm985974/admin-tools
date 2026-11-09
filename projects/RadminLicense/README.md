@@ -44,8 +44,17 @@ a different drive letter on every machine.
 ## Requirements
 
 - Run elevated (rserver3 needs admin to save a request / apply a license).
-- Fleet: WinRM / PowerShell remoting enabled on targets, and an account that
-  is admin there (Credential... or the current login).
+- Fleet reaches each machine one of two ways (**Connect via**, default Auto):
+  - **WinRM** - PowerShell remoting, TCP 5985.
+  - **Admin share + WMI** - where WinRM is off: the job is copied to
+    `\\PC\C$\FAS\_rlm\<id>\`, started with WMI `Win32_Process.Create`
+    (TCP 135 + RPC), the result read back over the share, and the job folder
+    deleted. Needs TCP 445 and 135/RPC.
+  - **Auto** tries WinRM, falls back to the admin share when WinRM can't
+    connect, and remembers the route that worked (Via column).
+- An account that is admin on the targets (Credential... or the current
+  login). Local (non-domain) accounts over the admin share also need
+  `LocalAccountTokenFilterPolicy = 1` on the target.
 
 ## Project files
 

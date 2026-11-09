@@ -7,8 +7,9 @@
 #   Apply licenses    - every machine with <NAME>.license in <Transfer>\Licenses\
 #                       gets it pushed and applied, then the registry key is checked
 # Licensed machines have their request + license moved to <Transfer>\Done\.
-# Remote machines need WinRM (PowerShell remoting) and an admin account;
-# this PC itself runs in-process.
+# Remote machines: WinRM, or the admin share (C$) + WMI where WinRM is off
+# (Connect via; Services_RadminBatch.psm1), with an admin account there.
+# This PC itself runs in-process.
 
 function New-FleetTab {
     [CmdletBinding()]
@@ -35,6 +36,7 @@ function Build-FleetTab {
         @{ P = 'Computer';   H = 'Reports as';       W = 130 }
         @{ P = 'Radmin';     H = 'Radmin';           W = 60 }
         @{ P = 'Licensed';   H = 'Licensed';         W = 70 }
+        @{ P = 'Via';        H = 'Via';              W = 55 }
         @{ P = 'Request';    H = 'Request file';     W = 120 }
         @{ P = 'License';    H = 'License file';     W = 120 }
         @{ P = 'LastAction'; H = 'Last action';      W = 90 }
@@ -83,6 +85,14 @@ function Build-FleetTab {
     $chkSel.Text = 'Only the selected machines'; $chkSel.AutoSize = $true; $chkSel.Location = New-Object System.Drawing.Point(470, 7)
     $chkForce = New-Object System.Windows.Forms.CheckBox
     $chkForce.Text = 'Also machines that are already licensed'; $chkForce.AutoSize = $true; $chkForce.Location = New-Object System.Drawing.Point(680, 7)
+    $lblVia = New-Object System.Windows.Forms.Label
+    $lblVia.Text = 'Connect via:'; $lblVia.AutoSize = $true; $lblVia.Location = New-Object System.Drawing.Point(960, 9)
+    $cboVia = New-Object System.Windows.Forms.ComboBox
+    $cboVia.DropDownStyle = 'DropDownList'; $cboVia.Location = New-Object System.Drawing.Point(1040, 5); $cboVia.Width = 250
+    [void]$cboVia.Items.AddRange([object[]]@('Auto (WinRM, then admin share + WMI)', 'WinRM only', 'Admin share + WMI only'))
+    $cboVia.SelectedIndex = switch ([string](& $R.Settings -App $App).Transport) { 'WinRM' { 1 } 'SMB' { 2 } default { 0 } }
+    $bar.Controls.AddRange(@($lblVia, $cboVia))
+    $st.Via = $cboVia
     $hint = New-Object System.Windows.Forms.Label
     $hint.AutoSize = $true; $hint.Location = New-Object System.Drawing.Point(58, 34); $hint.ForeColor = $App.Theme.Muted
     $hint.Text = (Get-FilterHintText) + '   Double-click a row for the full result.'
@@ -152,7 +162,7 @@ function Build-FleetTab {
     }.GetNewClosure()
 
     $select = ${function:Select-FilterMatch}
-    $props = @('Machine', 'Computer', 'Radmin', 'Licensed', 'LastAction', 'Result')
+    $props = @('Machine', 'Computer', 'Radmin', 'Licensed', 'Via', 'LastAction', 'Result')
     $onFilter = {
         param($Regex, $Text)
         $show = @(& $select -Items @($st.Rows) -Regex $Regex -Property $props)
@@ -197,6 +207,7 @@ function Build-FleetTab {
     $st.Busy = {
         param([bool]$on)
         foreach ($k in @('Add', 'Import', 'Remove', 'Status', 'Request', 'License', 'Change', 'Rescan', 'Cred')) { $st.Btn[$k].Enabled = -not $on }
+        $st.Via.Enabled = -not $on
         $st.Btn.Stop.Enabled = $on
     }.GetNewClosure()
 
@@ -222,7 +233,7 @@ function Build-FleetTab {
         $items = New-Object System.Collections.ArrayList
         switch ($Action) {
             'Status' {
-                foreach ($r in $base) { [void]$items.Add(@{ Target = $r.Machine; Row = $r; Opt = (& $st.R.Options -Settings $set -Action Status) }) }
+                foreach ($r in $base) { [void]$items.Add(@{ Target = $r.Machine; Row = $r; Via = $r.Via; Opt = (& $st.R.Options -Settings $set -Action Status) }) }
             }
             'Request' {
                 if (-not [string]$set.LicenseKey) { [void][System.Windows.Forms.MessageBox]::Show('No Radmin license key is set for this environment.' + "`r`n`r`n" + 'Set it on Environment > Radmin (admin password or developer build).', 'Collect requests', 'OK', 'Warning'); return }
@@ -230,7 +241,7 @@ function Build-FleetTab {
                 if (-not $t.Ok) { $app.SetStatus($t.Error, 'err'); return }
                 foreach ($r in $base) {
                     if ($r.Licensed -eq 'Yes' -and -not $force) { continue }
-                    [void]$items.Add(@{ Target = $r.Machine; Row = $r; Opt = (& $st.R.Options -Settings $set -Action Request -Force:$force) })
+                    [void]$items.Add(@{ Target = $r.Machine; Row = $r; Via = $r.Via; Opt = (& $st.R.Options -Settings $set -Action Request -Force:$force) })
                 }
                 if ($items.Count -eq 0) { $app.SetStatus('Every machine in scope is already licensed - nothing to collect.', 'ok'); return }
             }
@@ -241,7 +252,7 @@ function Build-FleetTab {
                     if (-not $f) { continue }
                     $bytes = [System.IO.File]::ReadAllBytes($f)
                     $expect = [System.IO.Path]::GetFileNameWithoutExtension($f)
-                    [void]$items.Add(@{ Target = $r.Machine; Row = $r; File = $f
+                    [void]$items.Add(@{ Target = $r.Machine; Row = $r; Via = $r.Via; File = $f
                                         Opt = (& $st.R.Options -Settings $set -Action License -LicenseBytes $bytes -ExpectedName $expect -Force:$force) })
                 }
                 if ($items.Count -eq 0) {
@@ -270,6 +281,7 @@ function Build-FleetTab {
             elseif ($Res.RadminFound -eq $false) { $row.Licensed = '-' }
             $msg = [string]$Res.Message
             $row.Outcome = $(if ($Res.Ok) { 'ok' } else { 'err' })
+            if ($Res.Ok -and [string]$Res.Via) { $row.Via = [string]$Res.Via }      # the route that worked - Auto goes there first next time
             if ($Action -eq 'Request' -and $Res.Ok -and -not $Res.Skipped) {
                 try { $p = & $st.R.SaveRequest -App $st.App -Result $Res -Source 'Fleet'; $msg += " Saved to $p" }
                 catch { $msg += " BUT it could not be saved: $($_.Exception.Message)"; $row.Outcome = 'err' }
@@ -297,7 +309,8 @@ function Build-FleetTab {
         }.GetNewClosure()
 
         try {
-            $st.Batch = & $st.StartBatch -App $app -Action $Action -Items @($items) -Parallel $set.ParallelMachines `
+            $transport = @('Auto', 'WinRM', 'SMB')[[Math]::Max(0, $st.Via.SelectedIndex)]
+            $st.Batch = & $st.StartBatch -App $app -Action $Action -Items @($items) -Transport $transport -Parallel $set.ParallelMachines `
                                          -TimeoutSec ($set.CallTimeoutSec * 2 + 30) -Credential $st.Cred -OnResult $onResult -OnDone $onDone
         }
         catch {
