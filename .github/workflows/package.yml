@@ -1,12 +1,14 @@
 # Builds every project's developer EXE and its Lite test EXE and keeps them as a
 # downloadable artifact for 3 days (Actions > Package > the run > Artifacts).
-# Run by hand only (Actions > Package > Run workflow, pick the branch).
+# Run by hand (Actions > Package > Run workflow), or by a push that changes this file.
 # The developer EXEs contain the source: the repository is private, and the artifact
 # expires. Never hand a developer or Lite EXE to users - use Build Sealed.
 name: Package
 
 on:
   workflow_dispatch:
+  push:
+    paths: ['.github/workflows/package.yml']
 
 jobs:
   package:
