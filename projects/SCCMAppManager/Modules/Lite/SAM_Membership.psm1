@@ -75,7 +75,10 @@ function Invoke-SamAddDevicesToCollection {
     $intro = "Add $($toAdd.Count) device(s) to '$($Collection.Name)' ($($Collection.ID))?"
     if ($already.Count -or $obsolete.Count) { $intro += "`r`n($($already.Count) already members, $($obsolete.Count) obsolete - skipped)" }
     if ($noClient.Count) { $intro += "`r`n$($noClient.Count) of them have no SCCM client." }
-    if (-not (Confirm-SamBatch 'Add to collection' $intro @($toAdd.ToArray() | ForEach-Object { $_.Name }))) { return }
+    $code = Get-SamCmCode -Note 'The app adds the direct rules through the SMS Provider (AddMembershipRules) and falls back to this cmdlet; then it asks the site to update the collection.' -Lines @(
+        'Add-CMDeviceCollectionDirectMembershipRule -CollectionId ' + (Format-SamCode ([string]$Collection.ID)) + ' -ResourceId ' + (Format-SamCode ([int[]]@($toAdd.ToArray() | ForEach-Object { [int]$_.ResourceID }))),
+        'Invoke-CMCollectionUpdate -CollectionId ' + (Format-SamCode ([string]$Collection.ID)))
+    if (-not (Confirm-SamBatch 'Add to collection' $intro @($toAdd.ToArray() | ForEach-Object { $_.Name }) -Code $code)) { return }
     Add-SamMembersAndRefresh -Collection $Collection -Devices $toAdd.ToArray()
 }
 
@@ -143,7 +146,10 @@ function Invoke-SamAddDevicesByName {
     $skipped = $notFound.Count + $obsolete.Count + $already.Count
     if ($skipped) { $intro += "`r`n($($notFound.Count) not found, $($obsolete.Count) obsolete, $($already.Count) already members - see the activity log)" }
     if ($noClient.Count) { $intro += "`r`n$($noClient.Count) of them have no SCCM client." }
-    if (-not (Confirm-SamBatch 'Add Devices' $intro @($toAdd.ToArray() | ForEach-Object { $_.Name }))) { return }
+    $code = Get-SamCmCode -Note 'The app adds the direct rules through the SMS Provider (AddMembershipRules) and falls back to this cmdlet; then it asks the site to update the collection.' -Lines @(
+        'Add-CMDeviceCollectionDirectMembershipRule -CollectionId ' + (Format-SamCode ([string]$Collection.ID)) + ' -ResourceId ' + (Format-SamCode ([int[]]@($toAdd.ToArray() | ForEach-Object { [int]$_.ResourceID }))),
+        'Invoke-CMCollectionUpdate -CollectionId ' + (Format-SamCode ([string]$Collection.ID)))
+    if (-not (Confirm-SamBatch 'Add Devices' $intro @($toAdd.ToArray() | ForEach-Object { $_.Name }) -Code $code)) { return }
     Add-SamMembersAndRefresh -Collection $Collection -Devices $toAdd.ToArray()
 }
 

@@ -1,7 +1,6 @@
 {
     "_note": "Hover help for AD User Lookup's buttons, menu items and tabs (project-owned, read by Base\\Services_ToolTips.psm1). Key = the control's text, optionally preceded by where it is: tab / sub-tab titles (outermost first) or a dialog's title (the part before ' - '), joined with ' > '. The most specific match wins; '&', a trailing '...' and case are ignored. Empty text = no tooltip on purpose. Engine entries (developer buttons, Environment tab, OK / Cancel / Close / Refresh / Export CSV / Export HTML / Copy to Clipboard / Select All / Select None / Stop / Browse) are in the engine; an entry here overrides them. The developer build writes every control still missing one to <data root>\\Logs\\ToolTips_missing.txt.",
     "ToolTips": {
-
         "_ main tabs": "",
         "User Lookup": "Search the directory for a person: name, phone, email, manager. Available with the user password.",
         "Users": "Browse the domain by OU, find users, see their groups and act on them from the right-click menu.",
@@ -13,7 +12,6 @@
         "Infrastructure": "Reports on the domain and forest: functional levels, trusts, DC health, privileged accounts, GPO scope.",
         "Tools": "Password generator, naming convention audit, DNS / DHCP lookups, operation log, environment report, abort reboot, ping list.",
         "Audit": "Hygiene reports: stale and never-used accounts, locked out, expiring passwords, empty groups and more.",
-
         "_ sub-tabs": "",
         "Bulk Operations > Batch Delete": "Paste lists of users, computers or groups and delete them (recovery details go in the admin mail).",
         "Bulk Operations > Bulk Add Users": "Create many users from a CSV file (template included).",
@@ -38,7 +36,6 @@
         "Environment > Accounts": "Naming patterns, UPN suffix, home drive and default OUs used when accounts are created or offboarded.",
         "Environment > Mail": "SMTP server, port and sender address for notification mail.",
         "Environment > Messages": "The New Account Welcome text and the Additional Info messages added to notification mail.",
-
         "_ Users / Groups / Computers tabs": "",
         "Refresh Tree": "Reload the OU tree from the domain.",
         "Clear Scope": "Stop limiting the lists to the selected OU - show the whole domain again.",
@@ -46,7 +43,6 @@
         "Filter as I type": "On: the list re-filters on every keystroke. Off: it filters when you press Enter (better for very large lists).",
         "Users > Export CSV": "Save the rows shown in this list to a CSV file (opens in Excel).",
         "Computers > Refresh": "Reload the computer list from the domain.",
-
         "_ user right-click menu": "",
         "Find Domain Sessions": "Search the domain's computers for sessions this user is logged on to (and log them off if needed).",
         "Check Lockout Status": "Show lockout state and bad-password counts on every DC, and find which computer caused the lockout.",
@@ -60,13 +56,11 @@
         "Disable Account": "Disable the selected account(s) with a description of why. Shows the exact command first.",
         "Delete User(s)": "Permanently delete the selected account(s). Shows the exact command first; recovery details go in the admin mail.",
         "Copy Username(s)": "Copy the selected account names to the clipboard, one per line.",
-
         "_ group right-click menu": "",
         "Edit Members": "Open the member list of this group: add members, or select and remove them.",
         "Remove User from Group(s)": "Remove the selected user from the selected group(s). Shows the exact command first.",
         "Delete Group(s)": "Permanently delete the selected group(s). Shows the exact command first; recovery details go in the admin mail.",
         "Copy Group Name(s)": "Copy the selected group names to the clipboard, one per line.",
-
         "_ computer right-click menu": "",
         "Test Connectivity": "Ping one computer and test its RDP, SMB, Radmin and WinRM ports (results on the Computers tab cards). For several, use Ping Selected on the Computers tab.",
         "RDP": "Open a Remote Desktop connection to each selected computer. Shows the exact command first.",
@@ -83,14 +77,12 @@
         "Open C$ Admin Share": "Open \\\\<computer>\\c$ in Explorer for each selected computer.",
         "Delete Computer(s)": "Permanently delete the selected computer object(s). Shows the exact command first.",
         "Copy Computer Name(s)": "Copy the selected computer names to the clipboard, one per line.",
-
         "_ OU tree right-click menu": "",
         "Users > Create User": "Start a new user on the Account Management tab with this OU as its target.",
         "Users > Create Group": "Create a new group in this OU.",
         "Refresh Items in this OU": "Reload the users, groups and computers of this OU.",
         "Clear Scope (show all)": "Stop limiting the lists to this OU - show the whole domain again.",
         "Create Group > Create": "Create the group with the name, scope and type entered.",
-
         "_ ping (dialog and Tools > Ping List)": "",
         "Ping once": "Ping every computer in the list once.",
         "Start continuous": "Ping every computer again and again at the chosen interval until you click Stop.",
@@ -99,7 +91,6 @@
         "ping -t selected": "Open a separate command window running ping -t for each selected row.",
         "Copy results": "Copy the whole results table to the clipboard (tab-separated - pastes into Excel).",
         "Tools > Ping List > Clear List": "Stop pinging, empty the paste box and the results.",
-
         "_ Account Management": "",
         "Use naming convention": "Build the display name and logon name from first / last name with this environment's naming patterns.",
         "Account Management > Browse": "Pick the OU the new user is created in.",
@@ -110,7 +101,6 @@
         "Clear Queue": "Empty the queue of pasted users.",
         "Load Selected": "Fill the Create User form with the selected queued user, to review and create it.",
         "Skip": "Skip this item and go on to the next one.",
-
         "_ Bulk Operations": "",
         "Delete Users": "Delete every account in the list above (asks to confirm first).",
         "Delete Computers": "Delete every computer object in the list above (asks to confirm first).",
@@ -128,7 +118,6 @@
         "Individual": "Send one mail per account to its own recipients.",
         "Both": "Send the admin summary and one mail per account.",
         "None": "Send no notification mail.",
-
         "_ Infrastructure / Tools": "",
         "GPO Scope > Browse": "Pick the OU to check.",
         "Get GPO Scope": "List every GPO linked to or inherited by the chosen OU, in order of precedence.",
@@ -146,10 +135,8 @@
         "Fix Canonical Name": "Rename the selected accounts' CN (object name) to the convention. Asks to confirm first.",
         "Fix SAM Uppercase": "Change the selected accounts' logon names to upper case. Asks to confirm first.",
         "Naming Convention > Browse": "Pick the OU to scan.",
-
         "_ Audit": "",
         "Refresh All": "Run every audit report again and update the cards.",
-
         "_ dialogs": "",
         "Reset Password > Generate": "Generate a new password.",
         "Reset Password > Copy": "Copy the password to the clipboard.",
@@ -176,7 +163,6 @@
         "Send Notification > Skip": "Do not send this mail.",
         "Include welcome message": "Add the New Account Welcome text (Environment > Messages) to the mail.",
         "Set Description > OK": "Use this description.",
-
         "_ Environment (project pages)": "",
         "Environment > Accounts > Browse": "Pick the OU from this environment's domain.",
         "Environment > Accounts > Clear": "Empty this OU field.",
@@ -185,22 +171,28 @@
         "Clear Slot": "Empty the selected message.",
         "More colors": "Pick any color.",
         "No highlight": "Remove the highlight color.",
-
         "_ User Lookup (user tier)": "",
         "Clear filters": "Empty the search box and every column filter.",
         "Copy selected": "Copy the name, phone and email of the selected people to the clipboard.",
         "Export visible": "Save every row currently shown to a CSV file.",
         "Export selected": "Save the selected rows to a CSV file.",
         "Refresh from AD": "Read the directory again.",
-
         "_ Ignition tab": "",
         "Ignition > Discover Gateways": "Probe every server once over HTTP for an Ignition gateway and list what responds. No SMB or admin-share access.",
         "Ignition > Reload Cached": "Show the gateways from the last discovery without re-probing anything.",
         "Ignition > Export CSV": "Save the discovered gateways to a CSV file.",
         "Ignition > Open Gateway Web Page": "Open the gateway home page in your browser.",
         "Ignition > RDP": "Open Remote Desktop to the selected server(s).",
-
         "_ Set DNS": "",
-        "Tools > Set DNS > Apply DNS Settings": "Set the DNS servers on every adapter that is up, on each pasted computer, over WinRM. Shows the exact command first."
+        "Tools > Set DNS > Apply DNS Settings": "Set the DNS servers on every adapter that is up, on each pasted computer, over WinRM. Shows the exact command first.",
+        "Cut": "Cut the selected text to the clipboard.",
+        "Paste": "Paste text from the clipboard.",
+        "Register this connection's addresses in DNS": "On: this adapter registers its IP addresses in DNS (dynamic DNS update).",
+        "Keep Job Details / Other between users": "On: Job Details and Other fields stay filled in for the next user in the queue.",
+        "1. Disable the account": "Offboarding step 1: disable the account (Disable-ADAccount).",
+        "2. Remove all group memberships": "Offboarding step 2: remove the account from every group except Domain Users.",
+        "3. Move to Disabled OU": "Offboarding step 3: move the account to the Disabled Accounts OU chosen below.",
+        "4. Stamp Description with date + admin": "Offboarding step 4: set the description to 'DISABLED <date> by <admin>' plus the note.",
+        "5. Reset password to random value": "Offboarding step 5: set a random password nobody knows."
     }
 }

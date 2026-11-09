@@ -180,6 +180,51 @@ function Format-SamDeploySummary {
     return $s
 }
 
+# New-CMApplicationDeployment parameters for one application (also shown in the command window).
+function Get-SamDeployParams {
+    param([string]$AppName, $Opt)
+    $dp = @{
+        Name                       = $AppName
+        CollectionName             = $Opt.CollectionName
+        DeployAction               = 'Install'
+        DeployPurpose              = $Opt.Purpose
+        AvailableDateTime          = $Opt.AvailableTime
+        TimeBaseOn                 = $Opt.TimeBase
+        PersistOnWriteFilterDevice = $false
+        EnableMomAlert             = $false
+        RaiseMomAlertsOnFailure    = $false
+        UseMeteredNetwork          = $false
+    }
+    if ($Opt.Purpose -eq 'Required') {
+        $dp['DeadlineDateTime']           = $Opt.DeadlineTime
+        $dp['UserNotification']           = 'DisplaySoftwareCenterOnly'
+        $dp['OverrideServiceWindow']      = $true
+        $dp['RebootOutsideServiceWindow'] = $false
+        $dp['SendWakeupPacket']           = $true
+    }
+    else {
+        $dp['UserNotification'] = 'DisplayAll'
+    }
+    return $dp
+}
+
+function Get-SamDeployCommandText {
+    param($AppNames, $Opt)
+    $S = $global:SAM
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($n in @($AppNames)) {
+        $lines.Add('')
+        $lines.Add("# ---- $n")
+        if ($Opt.Distribute -and $S.Settings.DPGroup) { $lines.Add('Start-CMContentDistribution -ApplicationName ' + (Format-SamCode ([string]$n)) + ' -DistributionPointGroupName ' + (Format-SamCode ([string]$S.Settings.DPGroup))) }
+        $lines.Add('$dp = ' + (Format-SamCode (Get-SamDeployParams -AppName $n -Opt $Opt)))
+        $lines.Add('New-CMApplicationDeployment @dp')
+        $lines.Add('Set-CMApplicationDeployment -ApplicationName ' + (Format-SamCode ([string]$n)) + ' -CollectionName ' + (Format-SamCode ([string]$Opt.CollectionName)) + ' -EnableRepair $true')
+    }
+    $note = @()
+    if ($Opt.Purpose -eq 'Required') { $note += 'Required: the app then sets OverrideServiceWindows / RebootOutsideOfServiceWindows on the SMS_ApplicationAssignment.' }
+    return (Get-SamCmCode -Lines $lines -Note $note)
+}
+
 function Invoke-SamDeployApp {
     param([string]$AppName, $Opt)
     $S = $global:SAM
@@ -192,28 +237,7 @@ function Invoke-SamDeployApp {
             catch { Write-SamLog "  Content distribution: $($_.Exception.Message)" -Level Warning }
         }
 
-        $dp = @{
-            Name                       = $AppName
-            CollectionName             = $Opt.CollectionName
-            DeployAction               = 'Install'
-            DeployPurpose              = $Opt.Purpose
-            AvailableDateTime          = $Opt.AvailableTime
-            TimeBaseOn                 = $Opt.TimeBase
-            PersistOnWriteFilterDevice = $false
-            EnableMomAlert             = $false
-            RaiseMomAlertsOnFailure    = $false
-            UseMeteredNetwork          = $false
-        }
-        if ($Opt.Purpose -eq 'Required') {
-            $dp['DeadlineDateTime']           = $Opt.DeadlineTime
-            $dp['UserNotification']           = 'DisplaySoftwareCenterOnly'
-            $dp['OverrideServiceWindow']      = $true
-            $dp['RebootOutsideServiceWindow'] = $false
-            $dp['SendWakeupPacket']           = $true
-        }
-        else {
-            $dp['UserNotification'] = 'DisplayAll'
-        }
+        $dp = Get-SamDeployParams -AppName $AppName -Opt $Opt
         try { $null = New-CMApplicationDeployment @dp -ErrorAction Stop; Write-SamLog "  Deployment created ($($Opt.Purpose))" -Level Success }
         catch { Write-SamLog "  New-CMApplicationDeployment failed: $($_.Exception.Message)" -Level Error; return $false }
 
@@ -267,6 +291,7 @@ function Invoke-SamDeployApps {
     $allowed = @(Confirm-SamNoNewerVersion -Items @($check) -Action 'deploy')
     $final = @($todo.ToArray() | Where-Object { $allowed -contains $_ })
     if (-not $final.Count) { return }
+    if (-not (Confirm-SamBatch 'Deploy' "Deploy these $($final.Count) application(s): $(Format-SamDeploySummary $opt)" $final -Code (Get-SamDeployCommandText -AppNames $final -Opt $opt))) { Write-SamLog 'Deploy cancelled.'; return }
 
     $i = 0; $ok = 0
     foreach ($n in $final) {

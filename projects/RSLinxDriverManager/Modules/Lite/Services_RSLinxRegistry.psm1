@@ -186,3 +186,81 @@ function Remove-RSLinxDriverNodes {
     } finally { $root.Close() }
     return [pscustomobject]@{ RemovedIPs = $removedIPs; RemovedDrivers = $removedDrivers }
 }
+
+# ---------------------------------------------------------------------------
+#  The PowerShell a change amounts to, for the command window (Base\Services_Commands)
+# ---------------------------------------------------------------------------
+# Same keys, values and IPs that Invoke-RSLinxApplyPlan / Remove-RSLinxDriverNodes
+# write (they do it through the .NET registry API in the 32-bit view; this is the
+# registry-provider equivalent you could run by hand, elevated).
+#   Get-RSLinxPlanCommandText   -Plan $plan [-BackupNote 'text']
+#   Get-RSLinxRemoveCommandText -Targets @(@{ Key; IP }) -Current (Get-RSLinxDrivers) [-BackupNote 'text']
+
+function Get-RSLinxRegistryRoot {
+    $base = $(if ([Environment]::Is64BitOperatingSystem) { 'HKLM:\SOFTWARE\WOW6432Node' } else { 'HKLM:\SOFTWARE' })
+    return ($base + '\Rockwell Software\RSLinx\Drivers\AB_ETH')
+}
+
+function Get-RSLinxCommandPreamble {
+    param([string]$BackupNote)
+    $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+    $l = New-Object System.Collections.Generic.List[string]
+    $l.Add('# Run elevated. RSLinx Classic Ethernet (AB_ETH) drivers, 32-bit registry view.')
+    if ($BackupNote) { $l.Add("# $BackupNote") }
+    $l.Add('$root = ' + (& $q (Get-RSLinxRegistryRoot)))
+    $l.Add('function Set-NodeTable([string]$Key, [string[]]$IPs) {   # replaces the numbered IP values')
+    $l.Add('    $nt = "$root\$Key\Node Table"')
+    $l.Add('    if (-not (Test-Path $nt)) { New-Item -Path $nt -Force | Out-Null }')
+    $l.Add("    (Get-Item -Path `$nt).Property | Where-Object { `$_ -match '^\d+$' } | ForEach-Object { Remove-ItemProperty -Path `$nt -Name `$_ }")
+    $l.Add('    for ($i = 0; $i -lt $IPs.Count; $i++) { New-ItemProperty -Path $nt -Name "$i" -Value $IPs[$i] -PropertyType String -Force | Out-Null }')
+    $l.Add('}')
+    return $l
+}
+
+function Format-RSLinxIpList {
+    param([string[]]$IPs)
+    return '@(' + ((@($IPs) | ForEach-Object { "'" + ([string]$_).Replace("'", "''") + "'" }) -join ', ') + ')'
+}
+
+function Get-RSLinxPlanCommandText {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $Plan, [string]$BackupNote = '')
+    $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+    $l = Get-RSLinxCommandPreamble -BackupNote $BackupNote
+    foreach ($k in @($Plan.DeleteKeys)) { $l.Add('Remove-Item -Path "$root\' + $k + '" -Recurse -Force') }
+    foreach ($it in @($Plan.Items)) {
+        if ($it.IsNew) {
+            $l.Add('New-Item -Path "$root\' + $it.Key + '" -Force | Out-Null   # new driver ' + $it.Name)
+            $l.Add('New-ItemProperty -Path "$root\' + $it.Key + '" -Name Name -Value ' + (& $q $it.Name) + ' -PropertyType String -Force | Out-Null')
+            foreach ($v in @(@('Startup', '0'), @('Station', '0x3f'), @('Inactivity Timeout', '0x1e'), @('Ping Timeout', '6'))) {
+                $l.Add('New-ItemProperty -Path "$root\' + $it.Key + '" -Name ' + (& $q $v[0]) + ' -Value ' + $v[1] + ' -PropertyType DWord -Force | Out-Null')
+            }
+        }
+        else { $l.Add('# ' + $it.Key + ' (' + $it.Name + '): +' + $it.Added + ' IP(s)') }
+        $l.Add('Set-NodeTable ' + (& $q $it.Key) + ' ' + (Format-RSLinxIpList $it.Nodes))
+    }
+    $l.Add('# Restart RSLinx (or the PC) to load the changed drivers.')
+    return ($l -join "`r`n")
+}
+
+function Get-RSLinxRemoveCommandText {
+    [CmdletBinding()]
+    param([AllowEmptyCollection()] [object[]]$Targets = @(), [AllowEmptyCollection()] [object[]]$Current = @(), [string]$BackupNote = '')
+    $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+    $byKey = @{}
+    foreach ($t in $Targets) {
+        $k = [string]$t.Key; if ($k -eq '') { continue }
+        if (-not $byKey.ContainsKey($k)) { $byKey[$k] = @{} }
+        $byKey[$k][[string]$t.IP] = $true
+    }
+    $l = Get-RSLinxCommandPreamble -BackupNote $BackupNote
+    foreach ($c in $Current) {
+        if (-not $byKey.ContainsKey($c.Key)) { continue }
+        $drop = $byKey[$c.Key]
+        $keep = @($c.Nodes | Where-Object { -not $drop.ContainsKey([string]$_) })
+        if ($keep.Count -eq 0) { $l.Add('Remove-Item -Path "$root\' + $c.Key + '" -Recurse -Force   # ' + $c.Name + ': no IPs left') }
+        else { $l.Add('Set-NodeTable ' + (& $q $c.Key) + ' ' + (Format-RSLinxIpList $keep) + '   # ' + $c.Name + ': -' + (@($c.Nodes).Count - $keep.Count) + ' IP(s)') }
+    }
+    $l.Add('# Restart RSLinx (or the PC) to load the changed drivers.')
+    return ($l -join "`r`n")
+}

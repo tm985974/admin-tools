@@ -154,12 +154,25 @@ function Invoke-Offboard {
                    "Steps:`n  $($stepLines -join "`n  ")`n`n" +
                    "Accounts:`n  $nameList$moreLine`n`n" +
                    "THIS CANNOT BE EASILY UNDONE."
-    if (-not (Confirm-Action -Title 'Run Offboarding' -Message $offboardMsg -ActionLabel 'Run Offboarding')) { return }
-
     $srvParam = if ($script:UAContext.TargetDC) { @{ Server = $script:UAContext.TargetDC } } else { @{} }
     $admin    = $script:UAContext.AdminAccount
     $ts       = Get-Date -Format 'yyyy-MM-dd'
     $stamp    = "DISABLED $ts by $admin$(if ($note) { " | $note" })"
+
+    # The command window shows the exact steps (template rule). The random password
+    # is made per account at run time, so it shows as a generated value.
+    $srvText = $(if ($script:UAContext.TargetDC) { ' -Server ' + (Format-AppCommandValue ([string]$script:UAContext.TargetDC)) } else { '' })
+    $sams = [string[]]@($rows | ForEach-Object { [string]$_.Cells['SamAccountName'].Value } | Where-Object { $_ })
+    $body = @()
+    if ($doDisable) { $body += "    Disable-ADAccount -Identity `$sam$srvText" }
+    if ($doGroups)  { $body += "    Get-ADPrincipalGroupMembership -Identity `$sam$srvText | Where-Object { `$_.Name -ne 'Domain Users' } | ForEach-Object { Remove-ADGroupMember -Identity `$_.DistinguishedName -Members `$sam -Confirm:`$false$srvText }" }
+    if ($doMoveOU)  { $body += "    Move-ADObject -Identity (Get-ADUser -Identity `$sam$srvText).DistinguishedName -TargetPath " + (Format-AppCommandValue $disabledOU) + $srvText }
+    if ($doStamp)   { $body += "    Set-ADUser -Identity `$sam -Description " + (Format-AppCommandValue $stamp) + $srvText }
+    if ($doPwReset) { $body += "    Set-ADAccountPassword -Identity `$sam -Reset -NewPassword (ConvertTo-SecureString (New-GeneratedPassword) -AsPlainText -Force)$srvText" }
+    $code = "# Each account's OU and groups are saved first (recovery block in the tracking mail).`r`n" +
+            'foreach ($sam in ' + (Format-AppCommandValue $sams) + ") {`r`n" + ($body -join "`r`n") + "`r`n}"
+
+    if (-not (Confirm-Action -Title 'Run Offboarding' -Message $offboardMsg -ActionLabel 'Run Offboarding' -Code $code)) { return }
 
     $okCount   = 0
     $failCount = 0

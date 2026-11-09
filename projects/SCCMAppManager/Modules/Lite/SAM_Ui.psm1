@@ -22,8 +22,9 @@ function New-SamButton {
     $b.Margin = New-Object System.Windows.Forms.Padding(3)
     if ($Color) { $b.BackColor = $Color; $b.UseVisualStyleBackColor = $false }
     if ($Tip) {
-        if (-not $global:SAM.ToolTip) { $global:SAM.ToolTip = New-Object System.Windows.Forms.ToolTip }
-        $global:SAM.ToolTip.SetToolTip($b, $Tip)
+        # One tooltip provider for the whole app (template rule): the engine's, so the
+        # "right-click: show command" hint and Config\ToolTips.json work here too.
+        Set-AppToolTip -Control $b -Text $Tip
     }
     return $b
 }
@@ -105,17 +106,47 @@ function Invoke-SamSafe {
     }
 }
 
+# The confirmation for every batch action IS the command window (template rule:
+# every action shows its code): the summary and list on top, the exact PowerShell
+# below, Copy and Run / Cancel. -Code is the text from Get-SamCmCode (or any
+# PowerShell). These always ask, whatever Environment > Commands says, as the
+# Yes/No box before them did.
 function Confirm-SamBatch {
-    param([string]$Title, [string]$Intro, $Lines)
+    param([string]$Title, [string]$Intro, $Lines, [string]$Code = '', [ValidateSet('Change', 'Read')] [string]$Kind = 'Change')
     # Untyped on purpose: [string[]] parameters hit "Argument types do not match" in PS 5.1.
     $all = New-Object System.Collections.ArrayList
     foreach ($l in $Lines) { [void]$all.Add([string]$l) }
     $shown = @($all.ToArray() | Select-Object -First 30)
-    $msg = $Intro
-    if ($shown.Count) { $msg += "`r`n`r`n" + (($shown | ForEach-Object { "  - $_" }) -join "`r`n") }
+    $msg = ([string]$Intro).TrimEnd('?', ' ') + '.'
+    if ($shown.Count) { $msg += "`r`n" + (($shown | ForEach-Object { "  - $_" }) -join "`r`n") }
     if ($all.Count -gt $shown.Count) { $msg += "`r`n  ... and $($all.Count - $shown.Count) more" }
-    $r = [System.Windows.Forms.MessageBox]::Show((Get-SamOwnerForm), $msg, $Title, 'YesNo', 'Question')
-    return ($r -eq [System.Windows.Forms.DialogResult]::Yes)
+    if (-not $Code) { $Code = '# (no command text was given for this action)' }
+    return [bool](Confirm-AppCommand -App $global:SAM.App -Title $Title -Kind $Kind -Always -RunLabel 'Run' -Summary $msg -Code $Code)
+}
+
+# ConfigMgr console PowerShell for the command window: loads the module, goes to
+# the site drive, then the given lines. -Note lines are added as comments.
+function Get-SamCmCode {
+    param($Lines, $Note = @())
+    $site = [string]$global:SAM.Settings.SiteCode
+    $out = New-Object System.Collections.Generic.List[string]
+    $out.Add('# ConfigMgr console PowerShell, site ' + $site + '.')
+    foreach ($n in @($Note)) { if ($n) { $out.Add('# ' + $n) } }
+    $out.Add("Import-Module (Join-Path `$env:SMS_ADMIN_UI_PATH '..\ConfigurationManager.psd1')")
+    $out.Add("Set-Location '" + $site + ":'")
+    foreach ($l in @($Lines)) { if ($null -ne $l) { $out.Add([string]$l) } }
+    return ($out -join "`r`n")
+}
+
+# A value as a PowerShell literal (Base\Services_Commands).
+function Format-SamCode { param($Value) return (Format-AppCommandValue $Value) }
+
+# Opens a folder or file through the command window (Kind Read: a launch).
+function Open-SamPath {
+    param([string]$Path, [string]$Exe = 'explorer.exe', [string]$Title = 'Open folder')
+    $r = Invoke-AppCommand -App $global:SAM.App -Title $Title -Kind Read -RunLabel 'Open' -Summary "Open $Path" `
+        -Code ('Start-Process -FilePath ' + (Format-AppCommandValue $Exe) + ' -ArgumentList ' + (Format-AppCommandValue ('"' + $Path + '"')))
+    if ($r.Errors.Count) { Write-SamLog "$Title failed: $($r.Errors[0])" -Level Warning }
 }
 
 # Searchable picker. Items are objects; Columns = @(@{ Name; Header; Width }, ...).

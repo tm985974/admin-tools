@@ -40,6 +40,129 @@ function Get-CcmSetupResult {
     return $null
 }
 
+# The PowerShell a step amounts to, for the command window (Base\Services_Commands).
+# It mirrors the switch in Invoke-CcmStep below: same programs, same arguments,
+# same paths. Invoke-CcmStep then runs the step (long tools in their own console
+# window, with waits and result checks the text leaves out).
+# KEEP IN STEP: a change to a step's commands below must be made here too.
+function Get-CcmStepCommandText {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] $App, [Parameter(Mandatory)] [string]$Id, [hashtable]$Ctx = @{})
+    $cfg = Get-CcmTSConfig -App $App
+    $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+    $run = { param([string]$exe, [string]$argLine) 'Start-Process -FilePath ' + (& $q $exe) + $(if ($argLine) { ' -ArgumentList ' + (& $q $argLine) } else { '' }) + ' -Wait   # own console window' }
+    $sys = { param([string]$n) Get-CcmSystemExe $n }
+    $trigger = { param([string]$guid) "Invoke-CimMethod -Namespace root\ccm -ClassName SMS_Client -MethodName TriggerSchedule -Arguments @{ sScheduleID = '$guid' }" }
+    $lines = New-Object System.Collections.Generic.List[string]
+    switch ($Id) {
+        'Elevate' { $lines.Add('Start-Process -FilePath ' + (& $q ([string]$App.ExePath)) + ' -Verb RunAs') }
+        'TimeSync' {
+            $lines.Add("if ((Get-Service W32Time).StartType -eq 'Disabled') { Set-Service W32Time -StartupType Manual }")
+            $lines.Add('Start-Service W32Time')
+            $lines.Add('& ' + (& $q (& $sys 'w32tm.exe')) + ' /resync /force')
+        }
+        'Services' {
+            $names = @(Get-CcmServiceSpec | ForEach-Object { $_.Name }) + 'CcmExec'
+            $lines.Add('# For each required service: a Disabled one goes back to its default start type, one that must run is started.')
+            $lines.Add('foreach ($s in Get-Service -Name ' + (($names | ForEach-Object { & $q $_ }) -join ', ') + ' -ErrorAction SilentlyContinue) {')
+            $lines.Add("    if ([string]`$s.StartType -eq 'Disabled') { Set-Service -Name `$s.Name -StartupType Manual }   # Automatic for those that default to it")
+            $lines.Add("    if (`$s.Status -ne 'Running') { Start-Service -Name `$s.Name }")
+            $lines.Add('}')
+        }
+        'ChkdskScan' { $lines.Add((& $run (& $sys 'chkdsk.exe') "$env:SystemDrive /scan")) }
+        'WmiVerify'  { $lines.Add('& ' + (& $q (& $sys 'wbem\winmgmt.exe')) + ' /verifyrepository') }
+        'WmiSalvage' {
+            $lines.Add((& $run (& $sys 'wbem\winmgmt.exe') '/salvagerepository'))
+            $lines.Add('& ' + (& $q (& $sys 'wbem\winmgmt.exe')) + ' /verifyrepository')
+        }
+        'DismScan' {
+            $lines.Add((& $run (& $sys 'dism.exe') '/Online /Cleanup-Image /ScanHealth'))
+            $lines.Add('& ' + (& $q (& $sys 'dism.exe')) + ' /Online /Cleanup-Image /CheckHealth')
+        }
+        'DismRestoreSource' {
+            $src = [string]$Ctx.RepairSource; if (-not $src) { $src = $cfg.RepairSource }
+            $path = $src
+            try { $t = Test-CcmRepairSource -Source $src; if ($t.Path) { $path = $t.Path } } catch { }
+            $lines.Add((& $run (& $sys 'dism.exe') "/Online /Cleanup-Image /RestoreHealth /Source:$path /LimitAccess"))
+        }
+        'DismRestoreWU' { $lines.Add((& $run (& $sys 'dism.exe') '/Online /Cleanup-Image /RestoreHealth')) }
+        'Sfc'           { $lines.Add((& $run (& $sys 'sfc.exe') '/scannow')) }
+        'DismCleanup'   { $lines.Add((& $run (& $sys 'dism.exe') '/Online /Cleanup-Image /StartComponentCleanup')) }
+        'WuReset' {
+            $stamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
+            $lines.Add("Stop-Service wuauserv, bits, cryptsvc, msiserver -Force")
+            $lines.Add("Rename-Item -LiteralPath '$env:windir\SoftwareDistribution' -NewName 'SoftwareDistribution.bak_$stamp'")
+            $lines.Add("Rename-Item -LiteralPath '$env:windir\System32\catroot2' -NewName 'catroot2.bak_$stamp'")
+            $lines.Add('Start-Service cryptsvc, bits, wuauserv')
+        }
+        'WuTroubleshooter' {
+            $res = Join-Path (Join-Path ([string]$App.DataRoot) 'Reports') ("WUTroubleshooter_{0}_<time>" -f $env:COMPUTERNAME)
+            $lines.Add("`$p = Get-TroubleshootingPack -Path '$env:windir\diagnostics\system\WindowsUpdate'")
+            $lines.Add("Invoke-TroubleshootingPack -Pack `$p -Unattended -Result '$res'   # in its own PowerShell window")
+        }
+        'RestartCcmExec' {
+            $lines.Add("if ((Get-Service CcmExec).StartType -eq 'Disabled') { Set-Service CcmExec -StartupType Automatic }")
+            $lines.Add('Stop-Service CcmExec -Force')
+            $lines.Add('Start-Service CcmExec')
+        }
+        'TriggerActions' {
+            foreach ($g in '021', '022', '003', '001', '121', '113') { $lines.Add((& $trigger "{00000000-0000-0000-0000-000000000$g}")) }
+            $lines.Add('# 021/022 machine policy retrieval + evaluation, 003 discovery data, 001 hardware inventory, 121 application evaluation, 113 software updates scan')
+        }
+        'ResetPolicy' {
+            $lines.Add('Invoke-CimMethod -Namespace root\ccm -ClassName SMS_Client -MethodName ResetPolicy -Arguments @{ uFlags = [uint32]1 }')
+            $lines.Add((& $trigger '{00000000-0000-0000-0000-000000000021}'))
+            $lines.Add((& $trigger '{00000000-0000-0000-0000-000000000022}'))
+        }
+        'ClientRepair' { $lines.Add((& $run (Join-Path $env:windir 'CCM\ccmrepair.exe') '')); $lines.Add('# then waits for ccmrepair / ccmsetup to finish') }
+        'ResetIdentity' {
+            $lines.Add('Stop-Service CcmExec -Force   # the process is ended if it has not stopped after 90 s')
+            $lines.Add("Remove-Item -LiteralPath '$env:windir\SMSCFG.ini' -Force")
+            $lines.Add('Get-ChildItem Cert:\LocalMachine\SMS | Remove-Item -Force')
+            $lines.Add('Start-Service CcmExec')
+        }
+        'Uninstall' {
+            $exe = @((Join-Path $env:windir 'ccmsetup\ccmsetup.exe'), (Join-Path $cfg.ClientSource 'ccmsetup.exe')) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+            if (-not $exe) { $exe = Join-Path $env:windir 'ccmsetup\ccmsetup.exe' }
+            $lines.Add((& $run $exe '/uninstall'))
+        }
+        'Cleanup' {
+            $lines.Add("foreach (`$s in 'CcmExec', 'ccmsetup', 'smstsmgr', 'CmRcService') { Stop-Service `$s -Force; & '$(& $sys 'sc.exe')' delete `$s }")
+            $lines.Add("Get-Process CcmExec, CcmRestart, SCNotification, SCClient, CmRcService -ErrorAction SilentlyContinue | Stop-Process -Force")
+            $lines.Add("Remove-Item '$env:windir\CCM', '$env:windir\ccmsetup', '$env:windir\ccmcache', '$env:windir\SMSCFG.ini', '$env:windir\SMS*.mif' -Recurse -Force")
+            $lines.Add("Remove-Item 'HKLM:\SOFTWARE\Microsoft\CCM', 'HKLM:\SOFTWARE\Microsoft\CCMSetup', 'HKLM:\SOFTWARE\Microsoft\SMS', 'HKLM:\SOFTWARE\Microsoft\DeviceManageabilityCSP' -Recurse -Force")
+            $lines.Add("Remove-Item 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\CCM', 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\CCMSetup', 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\SMS', 'HKLM:\SOFTWARE\Microsoft\SystemCertificates\SMS' -Recurse -Force")
+            $lines.Add("Get-CimInstance -Namespace root -ClassName __Namespace -Filter `"Name='ccm'`" | Remove-CimInstance")
+            $lines.Add("Get-CimInstance -Namespace root -ClassName __Namespace -Filter `"Name='SmsDm'`" | Remove-CimInstance")
+            $lines.Add("Get-CimInstance -Namespace root\cimv2 -ClassName __Namespace -Filter `"Name='sms'`" | Remove-CimInstance")
+            $lines.Add('Get-ChildItem Cert:\LocalMachine\SMS | Remove-Item -Force')
+            $lines.Add("Get-ScheduledTask -TaskPath '\Microsoft\Configuration Manager\*' | Unregister-ScheduledTask -Confirm:`$false")
+            $lines.Add("Get-ChildItem `"`$env:ProgramData\Microsoft\Windows\Start Menu\Programs`" -Recurse -Filter '*Software Center*.lnk' | Remove-Item -Force")
+        }
+        'RemoveTpmKey' {
+            $lines.Add("`$pcp = New-Object System.Security.Cryptography.CngProvider('Microsoft Platform Crypto Provider')")
+            $lines.Add("[System.Security.Cryptography.CngKey]::Open('ConfigMgrPrimaryKey', `$pcp, [System.Security.Cryptography.CngKeyOpenOptions]::MachineKey).Delete()")
+        }
+        'ServerSide' { $lines.Add('# Nothing runs here: the device details are copied to the clipboard for the console work on the site server.') }
+        { $_ -eq 'InstallLocal' -or $_ -eq 'InstallShare' } {
+            $isLocal = ($Id -eq 'InstallLocal')
+            $base = $(if ($isLocal) { $cfg.ClientSource } else { $cfg.SiteShare })
+            $args2 = @()
+            if ($isLocal) { $args2 += "/source:$base" }
+            $args2 += "/mp:$($cfg.ManagementPoint)"
+            if ($Ctx.ForceInstall) { $args2 += '/forceinstall' }
+            $args2 += "SMSSITECODE=$($cfg.SiteCode)"
+            $args2 += "SMSMP=$($cfg.ManagementPoint)"
+            if ($Ctx.ResetKey) { $args2 += 'RESETKEYINFORMATION=TRUE' }
+            $lines.Add((& $run (Join-Path $base 'ccmsetup.exe') ($args2 -join ' ')))
+            $lines.Add('# then waits for ccmsetup to finish and reads the result from ccmsetup.log')
+        }
+        'Verify' { $lines.Add('# Runs discovery again (read-only checks of the client, its services, WMI and registration).') }
+        default { $lines.Add("# Unknown step '$Id'.") }
+    }
+    return ($lines -join "`r`n")
+}
+
 function Invoke-CcmStep {
     [CmdletBinding()]
     param(
@@ -66,7 +189,7 @@ function Invoke-CcmStep {
             try {
                 Start-Process -FilePath ([string]$App.ExePath) -Verb RunAs -ErrorAction Stop | Out-Null
                 & $Done 'Done' 'Elevated copy started. Close this window and continue in the elevated one.'
-                $a = [System.Windows.Forms.MessageBox]::Show('The elevated copy has started. Close this (non-elevated) window now?', 'CCM Client Troubleshooter', 'YesNo', 'Question')
+                $a = [System.Windows.Forms.MessageBox]::Show('The elevated copy has started. Close this (non-elevated) window now?', 'CCM Client Troubleshooter', 'YesNo', 'Question')   # not-a-command: closes this window
                 if ($a -eq 'Yes') { foreach ($fm in @([System.Windows.Forms.Application]::OpenForms)) { try { $fm.Close() } catch { } } }
             } catch { & $Done 'Failed' "Elevation was cancelled or failed: $($_.Exception.Message)" }
             return
@@ -174,7 +297,7 @@ function Invoke-CcmStep {
             & $say $t.Detail
             if (-not $t.Ok) { & $Done 'Failed' "Repair source not usable: $($t.Detail)"; return }
             if ($t.Kind -eq 'Folder' -and -not $t.Match) {
-                $a = [System.Windows.Forms.MessageBox]::Show("The source build ($($t.SourceBuild)) does not match this PC ($($t.LocalBuild)).`r`n`r`nDISM will most likely fail with 0x800f081f. Run anyway?", 'Repair source', 'YesNo', 'Warning', 'Button2')
+                $a = [System.Windows.Forms.MessageBox]::Show("The source build ($($t.SourceBuild)) does not match this PC ($($t.LocalBuild)).`r`n`r`nDISM will most likely fail with 0x800f081f. Run anyway?", 'Repair source', 'YesNo', 'Warning', 'Button2')   # not-a-command: safety gate after the command window
                 if ($a -ne 'Yes') { & $Done 'Skipped' 'Cancelled: source build does not match.'; return }
             }
             $arg = "/Online /Cleanup-Image /RestoreHealth /Source:$($t.Path) /LimitAccess"
@@ -447,7 +570,7 @@ function Invoke-CcmStep {
             ) -join "`r`n"
             try { [System.Windows.Forms.Clipboard]::SetText($txt) } catch { }
             & $say $txt
-            $a = [System.Windows.Forms.MessageBox]::Show("The device details are on the clipboard (also in the output pane).`r`n`r`nDo the console work on the site server now. Is it done?", 'Clear the device on the server', 'YesNo', 'Information')
+            $a = [System.Windows.Forms.MessageBox]::Show("The device details are on the clipboard (also in the output pane).`r`n`r`nDo the console work on the site server now. Is it done?", 'Clear the device on the server', 'YesNo', 'Information')   # not-a-command: asks the operator
             if ($a -eq 'Yes') { & $Done 'Done' 'Server side cleared (confirmed by operator).' } else { & $Done 'Warning' 'Details copied; server side not confirmed yet.' }
             return
         }
@@ -464,7 +587,7 @@ function Invoke-CcmStep {
             if ($Ctx.ForceInstall) { $block = @($block | Where-Object { $_ -notmatch 'a client is installed' }); $ready = ($block.Count -eq 0) }
             if (-not $ready) {
                 $msg = "Discovery says this install is likely to FAIL:`r`n`r`n - " + ($block -join "`r`n - ") + "`r`n`r`nFix those first (recommended). Install anyway?"
-                $a = [System.Windows.Forms.MessageBox]::Show($msg, 'Install gate', 'YesNo', 'Warning', 'Button2')
+                $a = [System.Windows.Forms.MessageBox]::Show($msg, 'Install gate', 'YesNo', 'Warning', 'Button2')   # not-a-command: safety gate after the command window
                 if ($a -ne 'Yes') { & $Done 'Skipped' ('Install gate: ' + ($block -join '; ')); return }
                 & $say ('Install gate overridden by operator: ' + ($block -join '; '))
             }

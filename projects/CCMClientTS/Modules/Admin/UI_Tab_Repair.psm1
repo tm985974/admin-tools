@@ -225,10 +225,13 @@ function New-CcmRepairTab {
             $s = & $selStep
             if (-not $s) { $App.SetStatus('Select a step first.', 'warn'); return }
             if ($ui.Busy -or (Get-CcmActiveJob)) { $App.SetStatus("A step is running ($($ui.Running)) - wait for it to finish.", 'warn'); return }
-            if ($s.Confirm) {
-                $a = [System.Windows.Forms.MessageBox]::Show($s.Confirm, "$($s.Order). $($s.Title)", 'YesNo', 'Warning', 'Button2')
-                if ($a -ne 'Yes') { return }
-            }
+            $ctx = @{ RepairSource = $txtSrc.Text.Trim(); ResetKey = $chkReset.Checked; ForceInstall = $chkForce.Checked; Deep = $chkDeep.Checked }
+            # The command window is the confirmation (template rule: every action shows its code).
+            # Steps with a Confirm text always ask, whatever Environment > Commands says.
+            $code = Get-CcmStepCommandText -App $App -Id $s.Id -Ctx $ctx
+            $sum = $(if ($s.Confirm) { (([string]$s.Confirm -replace '\s*Continue\?\s*$', '') -replace '\s+now\?\s*$', '.') } else { [string]$s.Summary })
+            $kind = $(if ($s.Id -in @('Elevate', 'WmiVerify', 'DismScan', 'ServerSide', 'Verify')) { 'Read' } else { 'Change' })
+            if (-not (Confirm-AppCommand -App $App -Title "$($s.Order). $($s.Title)" -Kind $kind -RunLabel 'Run step' -Summary $sum -Code $code -Always:([bool]$s.Confirm))) { return }
             $ui.Busy = $true; $ui.Running = $s.Id; $btnRun.Enabled = $false
             & $ui.Refresh
             & $out "==== $($s.Order). $($s.Title)"
@@ -244,11 +247,11 @@ function New-CcmRepairTab {
                 $App.SetStatus("$stitle : $status", $lvl)
                 & $ui.Refresh
                 if ($status -eq 'Done - reboot') {
-                    $a = [System.Windows.Forms.MessageBox]::Show("$stitle finished and needs a reboot.`r`n`r`n$summary`r`n`r`nReboot now? (Progress is saved - reopen the tool after the restart.)", 'Reboot', 'YesNo', 'Question', 'Button2')
-                    if ($a -eq 'Yes') { try { Restart-Computer -Force } catch { & $out "Reboot failed: $($_.Exception.Message)" } }
+                    $r = Invoke-AppCommand -App $App -Title 'Reboot' -Kind Change -Always -RunLabel 'Reboot now' -Code 'Restart-Computer -Force' `
+                        -Summary "$stitle finished and needs a reboot.`r`n$summary`r`nProgress is saved - reopen the tool after the restart. Cancel = reboot later."
+                    if ($r.Errors.Count) { & $out "Reboot failed: $($r.Errors[0])" }
                 }
             }.GetNewClosure()
-            $ctx = @{ RepairSource = $txtSrc.Text.Trim(); ResetKey = $chkReset.Checked; ForceInstall = $chkForce.Checked; Deep = $chkDeep.Checked }
             try { Invoke-CcmStep -App $App -Id $sid -Ctx $ctx -Out $out -Done $done }
             catch {
                 & $out "ERROR: $($_.Exception.Message)"
@@ -267,7 +270,7 @@ function New-CcmRepairTab {
             Reset-CcmStepProgress -App $App -Id $s.Id; & $ui.Refresh
         }.GetNewClosure())
         $btnReset.Add_Click({
-            $a = [System.Windows.Forms.MessageBox]::Show("Clear the saved status of every step on $env:COMPUTERNAME?", 'Clear all statuses', 'YesNo', 'Question', 'Button2')
+            $a = [System.Windows.Forms.MessageBox]::Show("Clear the saved status of every step on $env:COMPUTERNAME?", 'Clear all statuses', 'YesNo', 'Question', 'Button2')   # not-a-command: the tool's own step list
             if ($a -eq 'Yes') { Reset-CcmStepProgress -App $App; & $ui.Refresh }
         }.GetNewClosure())
 
@@ -283,18 +286,26 @@ function New-CcmRepairTab {
                 ResetIdentity = (Join-Path $c 'ClientIDManagerStartup.log'); ServerSide = (Join-Path $c 'ClientIDManagerStartup.log'); Verify = (Join-Path $c 'ClientIDManagerStartup.log')
                 TriggerActions = (Join-Path $c 'PolicyAgent.log'); ResetPolicy = (Join-Path $c 'PolicyAgent.log')
             }
-            if ($s.Id -eq 'WuTroubleshooter' -and $global:CcmTS.LastReportFolder) { if (Test-Path -LiteralPath $global:CcmTS.LastReportFolder) { Start-Process explorer.exe ('"{0}"' -f $global:CcmTS.LastReportFolder) }; return }
+            $open = {
+                param([string]$exe, [string]$path, [string]$what)
+                $r = Invoke-AppCommand -App $App -Title "Open $what" -Kind Read -RunLabel 'Open' -Summary "Open $path" `
+                    -Code ('Start-Process -FilePath ' + (Format-AppCommandValue $exe) + ' -ArgumentList ' + (Format-AppCommandValue ('"' + $path + '"')))
+                if ($r.Errors.Count) { $App.SetStatus("Not opened: $($r.Errors[0])", 'err') }
+            }
+            if ($s.Id -eq 'WuTroubleshooter' -and $global:CcmTS.LastReportFolder) { if (Test-Path -LiteralPath $global:CcmTS.LastReportFolder) { & $open 'explorer.exe' $global:CcmTS.LastReportFolder 'report folder' }; return }
             if (-not $map.ContainsKey($s.Id)) { $App.SetStatus('This step has no log of its own - see the Output pane and Session.log.', 'info'); return }
             $p = $map[$s.Id]
             if (-not (Test-Path -LiteralPath $p)) { $App.SetStatus("Not found: $p", 'warn'); return }
             $cm = Join-Path $env:windir 'CCM\CMTrace.exe'
-            if (Test-Path -LiteralPath $cm) { Start-Process -FilePath $cm -ArgumentList ('"{0}"' -f $p) } else { Start-Process -FilePath 'notepad.exe' -ArgumentList ('"{0}"' -f $p) }
+            if (Test-Path -LiteralPath $cm) { & $open $cm $p 'log' } else { & $open 'notepad.exe' $p 'log' }
         }.GetNewClosure())
 
         $btnReboot.Add_Click({
             if (Get-CcmActiveJob) { [void][System.Windows.Forms.MessageBox]::Show('A step is still running. Wait for it to finish before rebooting.', 'Reboot', 'OK', 'Warning'); return }
-            $a = [System.Windows.Forms.MessageBox]::Show("Restart $env:COMPUTERNAME now?`r`n`r`nStep progress is saved; reopen the tool after the restart and run discovery.", 'Reboot', 'YesNo', 'Question', 'Button2')
-            if ($a -eq 'Yes') { try { $App.LogAction('Reboot requested from Repair Steps.'); Restart-Computer -Force } catch { & $out "Reboot failed: $($_.Exception.Message)" } }
+            $App.LogAction('Reboot offered from Repair Steps.')
+            $r = Invoke-AppCommand -App $App -Title 'Reboot' -Kind Change -Always -RunLabel 'Reboot now' -Code 'Restart-Computer -Force' `
+                -Summary "Restart $env:COMPUTERNAME now. Step progress is saved; reopen the tool after the restart and run discovery."
+            if ($r.Errors.Count) { & $out "Reboot failed: $($r.Errors[0])" }
         }.GetNewClosure())
 
         $applySource = { (Get-CcmTSState).RepairSourceOverride = $txtSrc.Text.Trim() }.GetNewClosure()

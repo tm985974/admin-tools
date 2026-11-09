@@ -365,7 +365,7 @@ function Build-FleetTab {
     $btn.Remove.Add_Click({
         $sel = @($st.Grid.SelectedRows | ForEach-Object { $_.Tag } | Where-Object { $_ })
         if ($sel.Count -eq 0) { $st.App.SetStatus('Select the machines to remove first.', 'warn'); return }
-        if ([System.Windows.Forms.MessageBox]::Show("Remove $($sel.Count) machine(s) from the list?", 'Remove', 'OKCancel', 'Question') -ne 'OK') { return }
+        if ([System.Windows.Forms.MessageBox]::Show("Remove $($sel.Count) machine(s) from the list?", 'Remove', 'OKCancel', 'Question') -ne 'OK') { return }   # not-a-command: list edit only
         foreach ($r in $sel) { $st.Rows.Remove($r) }
         & $st.Save; & $st.Filter.Apply
         $st.App.LogAction("Fleet: removed $($sel.Count) machine(s): $(@($sel | ForEach-Object { $_.Machine }) -join ', ')")

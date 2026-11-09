@@ -29,7 +29,9 @@ function Invoke-SamRemoveDevicesFromCollection {
     }
     if ($query.Count) { Write-SamLog "  Skipping $($query.Count) device(s) that are not direct members (change the collection query to remove them): $($query.ToArray() -join ', ')" -Level Warning }
     if (-not $direct.Count) { Write-SamLog 'Nothing to remove.' -Level Warning; return }
-    if (-not (Confirm-SamBatch 'Remove from collection' "Remove these $($direct.Count) direct member(s) from '$($Collection.Name)' ($($Collection.ID))?" @($direct.ToArray() | ForEach-Object { $_.Name }))) { return }
+    $code = Get-SamCmCode -Note 'The app removes the direct rules through the SMS Provider (DeleteMembershipRules) and falls back to this cmdlet.' -Lines @(
+        @($direct.ToArray()) | ForEach-Object { 'Remove-CMDeviceCollectionDirectMembershipRule -CollectionId ' + (Format-SamCode ([string]$Collection.ID)) + ' -ResourceId ' + [int]$_.ResourceID + ' -Force   # ' + $_.Name })
+    if (-not (Confirm-SamBatch 'Remove from collection' "Remove these $($direct.Count) direct member(s) from '$($Collection.Name)' ($($Collection.ID))?" @($direct.ToArray() | ForEach-Object { $_.Name }) -Code $code)) { return }
 
     $removed = Measure-SamStep "Remove $($direct.Count) direct rule(s) from '$($Collection.Name)'" { Remove-SamDirectMembers -CollectionID $Collection.ID -Devices $direct.ToArray() }
     Write-SamLog "Removed $removed of $($direct.Count) device(s) from '$($Collection.Name)'" -Level Success
@@ -68,7 +70,9 @@ function Invoke-SamRemoveDeployments {
     $S = $global:SAM
     $list = @(@($Deployments) | Where-Object { $_ -and $_.AssignmentID })
     if (-not $list.Count) { Write-SamLog 'Only application deployments can be deleted here.' -Level Warning; return }
-    if (-not (Confirm-SamBatch 'Delete deployments' "Delete these $($list.Count) application deployment(s)?" @($list | ForEach-Object { "$($_.Application)  ->  $($_.Collection)" }))) { return }
+    $code = Get-SamCmCode -Note 'The app deletes each SMS_ApplicationAssignment through the SMS Provider and falls back to this cmdlet.' -Lines @(
+        $list | ForEach-Object { 'Remove-CMApplicationDeployment -Name ' + (Format-SamCode ([string]$_.Application)) + ' -CollectionName ' + (Format-SamCode ([string]$_.Collection)) + ' -Force' })
+    if (-not (Confirm-SamBatch 'Delete deployments' "Delete these $($list.Count) application deployment(s)?" @($list | ForEach-Object { "$($_.Application)  ->  $($_.Collection)" }) -Code $code)) { return }
     $ok = 0
     foreach ($d in $list) {
         try {
@@ -98,7 +102,9 @@ function Invoke-SamSetAppRetired {
     $intro = "$verb these $($list.Count) application(s)?"
     $deployed = @($list | Where-Object { $_.Deployments -gt 0 })
     if ($Retire -and $deployed.Count) { $intro += "`r`n`r`n$($deployed.Count) of them still have deployments - existing installs are not removed, but they can no longer be deployed again." }
-    if (-not (Confirm-SamBatch "$verb applications" $intro @($list | ForEach-Object { $_.Name }))) { return }
+    $cmd = $(if ($Retire) { 'Suspend-CMApplication' } else { 'Resume-CMApplication' })
+    $code = Get-SamCmCode -Lines @($list | ForEach-Object { $cmd + ' -Name ' + (Format-SamCode ([string]$_.Name)) })
+    if (-not (Confirm-SamBatch "$verb applications" $intro @($list | ForEach-Object { $_.Name }) -Code $code)) { return }
     $cnt = @{ N = 0 }
     Invoke-SamCM {
         foreach ($a in $list) {
@@ -123,7 +129,8 @@ function Invoke-SamRemoveApplications {
     foreach ($b in $blocked) { Write-SamLog "  $($b.Name) has $($b.Deployments) deployment(s) - delete them first." -Level Warning }
     $list = @($list | Where-Object { $_.Deployments -eq 0 })
     if (-not $list.Count) { Write-SamLog 'Nothing to delete.' -Level Warning; return }
-    if (-not (Confirm-SamBatch 'Delete applications' "PERMANENTLY delete these $($list.Count) application(s) from site $($S.Settings.SiteCode)?`r`n(Content in the repository is not touched.)" @($list | ForEach-Object { $_.Name }))) { return }
+    $code = Get-SamCmCode -Lines @($list | ForEach-Object { 'Remove-CMApplication -Name ' + (Format-SamCode ([string]$_.Name)) + ' -Force' })
+    if (-not (Confirm-SamBatch 'Delete applications' "PERMANENTLY delete these $($list.Count) application(s) from site $($S.Settings.SiteCode)?`r`n(Content in the repository is not touched.)" @($list | ForEach-Object { $_.Name }) -Code $code)) { return }
     $cnt = @{ N = 0 }
     Invoke-SamCM {
         foreach ($a in $list) {
@@ -145,7 +152,9 @@ function Invoke-SamRemoveDeviceRecords {
     $S = $global:SAM
     $list = @(@($Devices) | Where-Object { $_ })
     if (-not $list.Count) { return }
-    if (-not (Confirm-SamBatch 'Delete device records' "PERMANENTLY delete these $($list.Count) device record(s) from site $($S.Settings.SiteCode)?`r`n(Discovery may bring them back; their direct collection rules are removed.)" @($list | ForEach-Object { $_.Name }))) { return }
+    $code = Get-SamCmCode -Note 'The app deletes each SMS_R_System record through the SMS Provider and falls back to this cmdlet.' -Lines @(
+        $list | ForEach-Object { 'Remove-CMResource -ResourceId ' + [int]$_.ResourceID + ' -Force   # ' + $_.Name })
+    if (-not (Confirm-SamBatch 'Delete device records' "PERMANENTLY delete these $($list.Count) device record(s) from site $($S.Settings.SiteCode)?`r`n(Discovery may bring them back; their direct collection rules are removed.)" @($list | ForEach-Object { $_.Name }) -Code $code)) { return }
     $ok = 0
     foreach ($d in $list) {
         try {
@@ -173,7 +182,9 @@ function Invoke-SamClearPxe {
     $S = $global:SAM
     $list = @(@($Devices) | Where-Object { $_ })
     if (-not $list.Count) { return }
-    if (-not (Confirm-SamBatch 'Clear PXE deployments' "Clear required PXE deployments for these $($list.Count) device(s)?" @($list | ForEach-Object { $_.Name }))) { return }
+    $code = Get-SamCmCode -Note 'The app calls SMS_Collection.ClearLastNBSAdvForMachines through the SMS Provider and falls back to this cmdlet.' -Lines @(
+        'Clear-CMPxeDeployment -ResourceId ' + (Format-SamCode ([string[]]@($list | ForEach-Object { [string]$_.ResourceID }))) + '   # ' + (@($list | ForEach-Object { $_.Name }) -join ', '))
+    if (-not (Confirm-SamBatch 'Clear PXE deployments' "Clear required PXE deployments for these $($list.Count) device(s)?" @($list | ForEach-Object { $_.Name }) -Code $code)) { return }
     $ids = [uint32[]]@($list | ForEach-Object { [uint32]$_.ResourceID })
     try {
         $r = Invoke-CimMethod -CimSession $S.Cim -Namespace $S.Ns -ClassName SMS_Collection -MethodName ClearLastNBSAdvForMachines -Arguments @{ ResourceIDs = $ids } -ErrorAction Stop
@@ -236,6 +247,9 @@ function New-SamDeviceCollection {
     if (-not $limit -or $limit.Type -ne 'Device') { Write-SamLog "Limiting collection not found: '$limitName'" -Level Warning; return }
     $p = @{ Name = $name; LimitingCollectionId = $limit.ID; RefreshType = $refresh }
     if ($comment) { $p['Comment'] = $comment }
+    $code = Get-SamCmCode -Lines @('$p = ' + (Format-SamCode $p), 'New-CMDeviceCollection @p')
+    if (-not (Confirm-AppCommand -App $S.App -Title 'New device collection' -Kind Change -RunLabel 'Create' -Code $code `
+            -Summary "Create device collection '$name', limited to '$($limit.Name)', membership updates: $refresh.")) { return }
     $new = Invoke-SamCM { New-CMDeviceCollection @p -ErrorAction Stop }
     Write-SamLog "Created device collection '$name' ($($new.CollectionID)), limited to '$($limit.Name)'" -Level Success
     try { $S.App.LogAction("Created device collection '$name' ($($new.CollectionID)) limited to '$($limit.Name)'") } catch { }
@@ -251,6 +265,9 @@ function Rename-SamCollection {
     $newName = ([string]$newName).Trim()
     if (-not $newName -or $newName -eq $Collection.Name) { return }
     if ($S.Cache.CollectionsByName.ContainsKey($newName)) { Write-SamLog "A collection named '$newName' already exists." -Level Warning; return }
+    $code = Get-SamCmCode -Lines @('Set-CMCollection -CollectionId ' + (Format-SamCode ([string]$Collection.ID)) + ' -NewName ' + (Format-SamCode $newName))
+    if (-not (Confirm-AppCommand -App $S.App -Title 'Rename collection' -Kind Change -RunLabel 'Rename' -Code $code `
+            -Summary "Rename '$($Collection.Name)' ($($Collection.ID)) to '$newName'.")) { return }
     Invoke-SamCM { Set-CMCollection -CollectionId $Collection.ID -NewName $newName -ErrorAction Stop }
     Write-SamLog "Renamed '$($Collection.Name)' to '$newName'" -Level Success
     try { $S.App.LogAction("Renamed collection $($Collection.ID) '$($Collection.Name)' to '$newName'") } catch { }
@@ -270,7 +287,8 @@ function Remove-SamCollections {
         [void]$list.Add($c)
     }
     if (-not $list.Count) { Write-SamLog 'Nothing to delete.' -Level Warning; return }
-    if (-not (Confirm-SamBatch 'Delete collections' "PERMANENTLY delete these $($list.Count) collection(s)?" @($list.ToArray() | ForEach-Object { "$($_.Name) ($($_.ID), $($_.Members) members)" }))) { return }
+    $code = Get-SamCmCode -Lines @(@($list.ToArray()) | ForEach-Object { 'Remove-CMCollection -Id ' + (Format-SamCode ([string]$_.ID)) + ' -Force   # ' + $_.Name })
+    if (-not (Confirm-SamBatch 'Delete collections' "PERMANENTLY delete these $($list.Count) collection(s)?" @($list.ToArray() | ForEach-Object { "$($_.Name) ($($_.ID), $($_.Members) members)" }) -Code $code)) { return }
     $cnt = @{ N = 0 }
     Invoke-SamCM {
         foreach ($c in $list) {

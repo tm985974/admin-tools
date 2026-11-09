@@ -1,0 +1,36 @@
+{
+    "_note": "Hover help for this project's buttons, menu items and tabs (project-owned). Key = the control's text, optionally preceded by where it is: tab / sub-tab / group box titles (outermost first) or a dialog's title, joined with ' > '. The most specific match wins; '&', a trailing '...' and case are ignored. An empty text = no tooltip on purpose. Engine controls (developer buttons, Environment tab, OK / Cancel / Close ...) already have entries in Base\\Services_ToolTips.psm1; an entry here overrides them. The developer build lists every control still missing one in <data root>\\Logs\\ToolTips_missing.txt.",
+    "ToolTips": {
+        "Overview": "What this tool does and the order to work in.",
+        "Discovery": "Read-only check of the client and the Windows pieces it needs, with the recommended next steps.",
+        "Repair Steps": "Every repair step in working order. Select one, read what it does, run it.",
+        "Logs": "Read the client, setup and Windows servicing logs, newest at the bottom.",
+
+        "Discovery > Run discovery": "Check the client, its services, WMI, certificates and registration again. Changes nothing.",
+        "Discovery > Deep checks (WMI verify + DISM CheckHealth, ~1 min)": "Also verify the WMI repository and ask DISM whether the component store is healthy (slower, still read-only).",
+        "Discovery > Export report": "Save the findings as a text report and a CSV in <data root>\\Reports (for the server admin).",
+        "Discovery > Copy report": "Copy the findings to the clipboard as text.",
+
+        "Repair Steps > Run discovery": "Check the client again and refresh which steps are recommended. Changes nothing.",
+        "Repair Steps > Deep": "Discovery also verifies WMI and runs DISM CheckHealth (about a minute longer).",
+        "Repair Steps > Select next recommended": "Select the next recommended step that has not been run since the last discovery.",
+        "Repair Steps > Run selected step": "Run the selected step. Its exact commands are shown first; long tools run in their own console window.",
+        "Repair Steps > Mark done": "Mark the selected step as done without running it (e.g. you did it by hand).",
+        "Repair Steps > Clear status": "Forget the saved status of the selected step on this computer.",
+        "Repair Steps > Clear all statuses": "Forget the saved status of every step on this computer.",
+        "Repair Steps > Open related log": "Open the log that belongs to the selected step (CMTrace if installed, else Notepad).",
+        "Repair Steps > Reboot now": "Restart this computer. Step progress is saved; reopen the tool afterwards.",
+        "Repair Steps > Use PC": "Use the healthy PC's C$\\Windows as the DISM repair source, then test it.",
+        "Repair Steps > Test source": "Check that the DISM repair source is reachable and is the same Windows build as this PC.",
+        "Repair Steps > Install: RESETKEYINFORMATION=TRUE": "Install steps add RESETKEYINFORMATION=TRUE: the client forgets the old site's trusted root key.",
+        "Repair Steps > Install: /forceinstall": "Install steps add /forceinstall: reinstall even when a client is already there.",
+
+        "Logs > Open other log": "Pick any log file to read here.",
+        "Logs > Refresh list": "Look for the known logs again (some only appear once the client is installed).",
+        "Logs > Refresh": "Read the selected log again.",
+        "Logs > Errors and warnings only": "Show only the error and warning lines of the log.",
+        "Logs > Follow (every 5 s)": "Re-read the log every 5 seconds and keep the newest lines in view.",
+        "Logs > Open in viewer": "Open the log in CMTrace (or Notepad when CMTrace is not installed).",
+        "Logs > Open folder": "Open the folder that holds this log in Explorer."
+    }
+}

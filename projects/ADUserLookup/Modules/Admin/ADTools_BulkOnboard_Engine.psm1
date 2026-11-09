@@ -369,4 +369,41 @@ function Invoke-BulkOnboard {
 }
 #endregion
 
-Export-ModuleMember -Function Show-BulkCSV, Invoke-BulkOnboard
+#region -- Get-BulkOnboardCode ----------------------------------------------------
+# The command window text for Invoke-BulkOnboard (template rule: every action shows
+# its code): one New-ADUser per grid row with the values as they are now. Passwords
+# never appear: a typed one shows as a Read-Host prompt, a blank one as generated.
+# Rows the engine skips (missing names / OU, account exists) are marked here too.
+function Get-BulkOnboardCode {
+    param($Rows, [string]$DefaultOU)
+    $srv = [string]$script:ToolsCtx.TargetDC
+    $srvText = $(if ($srv) { ' -Server ' + (Format-AppCommandValue $srv) } else { '' })
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add('# One account per row of the CSV Preview grid. Account Name Case (Domain Defaults) is applied to the logon name;')
+    $lines.Add('# rows whose account already exists are skipped. Passwords: typed in the grid, or generated (New-CustomPassword).')
+    foreach ($row in @($Rows)) {
+        $first = [string]($row.FirstName).Trim(); $last = [string]($row.LastName).Trim(); $logon = [string]($row.LogonName).Trim()
+        $display = [string]($row.DisplayName).Trim(); if (-not $display) { $display = $logon }
+        $ouDN = $(if ([string]$row.TargetOU -and [string]($row.TargetOU).Trim()) { [string]($row.TargetOU).Trim() } else { $DefaultOU })
+        if (-not $first -or -not $last -or -not $logon -or -not $ouDN) { $lines.Add("# skipped: '$logon' - missing First / Last / Logon name or OU"); continue }
+        $p = [ordered]@{ Name = $display; GivenName = $first; Surname = $last; SamAccountName = $logon; DisplayName = $display; Path = $ouDN }
+        $upnSfx = [string]($row.UpnSuffix).Trim()
+        if ($upnSfx) { $p['UserPrincipalName'] = $logon + $(if ($upnSfx.StartsWith('@')) { $upnSfx } else { "@$upnSfx" }) }
+        $email = [string]($row.Email).Trim(); if ($email) { $p['EmailAddress'] = $email }
+        $phone = [string]($row.Phone) -replace '\D', ''
+        $line = 'New-ADUser'
+        foreach ($k in $p.Keys) { $line += " -$k " + (Format-AppCommandValue ([string]$p[$k])) }
+        if ($phone) { $line += ' -OtherAttributes @{ telephoneNumber = ' + (Format-AppCommandValue $phone) + '; homePhone = ' + (Format-AppCommandValue $phone) + '; pager = ' + (Format-AppCommandValue $phone) + '; mobile = ' + (Format-AppCommandValue $phone) + ' }' }
+        $pwText = $(if ([string]($row.Password).Trim()) { "(Read-Host -AsSecureString -Prompt 'Password for $logon')" } else { '(ConvertTo-SecureString (New-CustomPassword) -AsPlainText -Force)' })
+        $line += " -AccountPassword $pwText -Enabled `$true -ChangePasswordAtLogon `$false$srvText"
+        $lines.Add($line)
+        $tmpl = [string]($row.CopyGroupsFrom).Trim()
+        if ($tmpl) {
+            $lines.Add('Get-ADPrincipalGroupMembership -Identity ' + (Format-AppCommandValue $tmpl) + "$srvText | Where-Object { `$_.Name -ne 'Domain Users' } | ForEach-Object { Add-ADGroupMember -Identity `$_.DistinguishedName -Members " + (Format-AppCommandValue $logon) + "$srvText }")
+        }
+    }
+    return ($lines -join "`r`n")
+}
+#endregion
+
+Export-ModuleMember -Function Show-BulkCSV, Invoke-BulkOnboard, Get-BulkOnboardCode

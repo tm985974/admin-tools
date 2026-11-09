@@ -22,6 +22,22 @@
 #                        ADAudit.Naming.Tab (Build-NamingTab).
 #endregion
 
+#region -- Get-NamingCode ----------------------------------------------------------
+# The command window text (template rule: every action shows its code). -Body runs
+# once per account with $sam set; ' -Server <dc>' is added where the tab targets a DC.
+function Get-NamingCode {
+    param([string[]]$Sams, [string[]]$Body)
+    $srv = ''
+    if ($script:NamingCtx.TargetDC) { $srv = ' -Server ' + (Format-AppCommandValue ([string]$script:NamingCtx.TargetDC)) }
+    $lines = @('foreach ($sam in ' + (Format-AppCommandValue ([string[]]$Sams)) + ') {')
+    foreach ($b in $Body) { $lines += '    ' + $b.Replace('{srv}', $srv) }
+    $lines += '}'
+    return ($lines -join "`r`n")
+}
+
+function Get-NamingRowSams { param($Rows) return [string[]]@($Rows | ForEach-Object { [string]$_.Cells['SamAccountName'].Value }) }
+#endregion
+
 #region -- Invoke-NamingFixDisplayName -------------------------------------------
 function Invoke-NamingFixDisplayName {
     param([System.Windows.Forms.DataGridViewRow[]]$Rows)
@@ -30,7 +46,11 @@ function Invoke-NamingFixDisplayName {
     $suffix = Get-NamingSuffixValue
     $msg    = "Fix Display Name for $($Rows.Count) selected account(s)?`n`n" +
               "Sets DisplayName to: Last, First$(if ($suffix) { " $suffix" })"
-    if (-not (Confirm-Action -Title 'Fix Display Name' -Message $msg -ActionLabel 'Fix Display Name')) { return }
+    $fmt = $(if ($suffix) { '"{0}, {1} ' + $suffix.Replace('"', '`"').Replace('$', '`$') + '"' } else { '"{0}, {1}"' })
+    $code = Get-NamingCode -Sams (Get-NamingRowSams $Rows) -Body @(
+        '$u = Get-ADUser -Identity $sam -Properties GivenName, Surname{srv}',
+        ('Set-ADUser -Identity $sam -DisplayName (' + $fmt + ' -f $u.Surname, $u.GivenName){srv}   # Surname only when there is no GivenName'))
+    if (-not (Confirm-Action -Title 'Fix Display Name' -Message $msg -ActionLabel 'Fix Display Name' -Code $code)) { return }
 
     $srvParam = if ($script:NamingCtx.TargetDC) { @{ Server = $script:NamingCtx.TargetDC } } else { @{} }
     $fixed = 0 ; $errors = 0
@@ -70,7 +90,10 @@ function Invoke-NamingFixCanonicalName {
 
     $msg = "Fix Canonical Name for $($Rows.Count) selected account(s)?`n`n" +
            "Renames the AD object so its CN path matches the Display Name."
-    if (-not (Confirm-Action -Title 'Fix Canonical Name' -Message $msg -ActionLabel 'Fix Canonical Name')) { return }
+    $code = Get-NamingCode -Sams (Get-NamingRowSams $Rows) -Body @(
+        '$u = Get-ADUser -Identity $sam -Properties DisplayName, DistinguishedName{srv}',
+        'Rename-ADObject -Identity $u.DistinguishedName -NewName $u.DisplayName{srv}')
+    if (-not (Confirm-Action -Title 'Fix Canonical Name' -Message $msg -ActionLabel 'Fix Canonical Name' -Code $code)) { return }
 
     $srvParam = if ($script:NamingCtx.TargetDC) { @{ Server = $script:NamingCtx.TargetDC } } else { @{} }
     $fixed = 0 ; $errors = 0
@@ -114,7 +137,11 @@ function Invoke-NamingFixSamUppercase {
 
     $msg = "Fix SAM uppercase for $($toFix.Count) account(s)?`n`n" +
            "Each SAM account name will be converted to uppercase."
-    if (-not (Confirm-Action -Title 'Fix SAM Uppercase' -Message $msg -ActionLabel 'Fix SAM Uppercase')) { return }
+    $code = Get-NamingCode -Sams (Get-NamingRowSams $toFix) -Body @(
+        'Set-ADUser -Identity $sam -SamAccountName $sam.ToUpper(){srv}',
+        '$u = Get-ADUser -Identity $sam.ToUpper() -Properties UserPrincipalName{srv}',
+        "if (`$u.UserPrincipalName -like `"`$sam@*`") { Set-ADUser -Identity `$sam.ToUpper() -UserPrincipalName (`$sam.ToUpper() + `$u.UserPrincipalName.Substring(`$sam.Length)){srv} }")
+    if (-not (Confirm-Action -Title 'Fix SAM Uppercase' -Message $msg -ActionLabel 'Fix SAM Uppercase' -Code $code)) { return }
 
     $srvParam = if ($script:NamingCtx.TargetDC) { @{ Server = $script:NamingCtx.TargetDC } } else { @{} }
     $fixed = 0 ; $errors = 0
@@ -172,6 +199,22 @@ function Invoke-NamingCellCommit {
 
     $srvParam = if ($script:NamingCtx.TargetDC) { @{ Server = $script:NamingCtx.TargetDC } } else { @{} }
 
+    # The command window first (template rule); Cancel puts the old value back in the grid.
+    $srvText = $(if ($script:NamingCtx.TargetDC) { ' -Server ' + (Format-AppCommandValue ([string]$script:NamingCtx.TargetDC)) } else { '' })
+    $code = switch ($ColumnName) {
+        'FirstName'   { 'Set-ADUser -Identity ' + (Format-AppCommandValue $sam) + ' -GivenName ' + (Format-AppCommandValue $newVal) + $srvText }
+        'LastName'    { 'Set-ADUser -Identity ' + (Format-AppCommandValue $sam) + ' -Surname ' + (Format-AppCommandValue $newVal) + $srvText }
+        'Description' {
+            if ($newVal -eq '') { 'Set-ADUser -Identity ' + (Format-AppCommandValue $sam) + ' -Clear Description' + $srvText }
+            else { 'Set-ADUser -Identity ' + (Format-AppCommandValue $sam) + ' -Description ' + (Format-AppCommandValue $newVal) + $srvText }
+        }
+    }
+    if (-not (Confirm-AppCommand -App $script:ADApp -Title "Edit $ColumnName" -Kind Change -RunLabel 'Save' -Code $code `
+            -Summary "Change $ColumnName of $sam from '$oldVal' to '$newVal'.")) {
+        $Row.Cells[$ColumnName].Value = $OldValue
+        return
+    }
+
     try {
         switch ($ColumnName) {
             'FirstName' { Set-ADUser -Identity $sam -GivenName $newVal @srvParam -ErrorAction Stop }
@@ -216,10 +259,14 @@ function Invoke-NamingBulkDescription {
     )
     if (-not $Rows -or $Rows.Count -eq 0 -or -not $script:NamingCtx) { return }
 
+    $body = $(if ($Clear -or $Value -eq '') { 'Set-ADUser -Identity $sam -Clear Description{srv}' } else { 'Set-ADUser -Identity $sam -Description ' + (Format-AppCommandValue $Value) + '{srv}' })
+    $code = Get-NamingCode -Sams (Get-NamingRowSams $Rows) -Body @($body)
     if ($Clear) {
         $msg = "Clear description for $($Rows.Count) selected account(s)?"
-        if (-not (Confirm-Action -Title 'Clear Description' -Message $msg -ActionLabel 'Clear Description')) { return }
+        if (-not (Confirm-Action -Title 'Clear Description' -Message $msg -ActionLabel 'Clear Description' -Code $code)) { return }
     }
+    elseif (-not (Confirm-AppCommand -App $script:ADApp -Title 'Set Description' -Kind Change -RunLabel 'Set Description' -Code $code `
+            -Summary "Set the description of $($Rows.Count) selected account(s) to '$Value'.")) { return }
 
     $srvParam = if ($script:NamingCtx.TargetDC) { @{ Server = $script:NamingCtx.TargetDC } } else { @{} }
     $fixed = 0 ; $errors = 0

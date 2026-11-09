@@ -231,17 +231,6 @@ function Show-EditContactsDialog {
             if ($v) { "$_ = $v" } else { "$_ = (cleared)" }
         }) -join '; '
 
-        $confirmed = $false
-        if ($confirmActionFn) {
-            $confirmed = & $confirmActionFn -Title 'Edit Contacts' `
-                -Message "Save contact changes for $Sam?`r`n`r`n$summary" -ActionLabel 'Save'
-        } else {
-            $confirmed = ([System.Windows.Forms.MessageBox]::Show(
-                "Save contact changes for $Sam?`r`n`r`n$summary",
-                'Edit Contacts','YesNo','Question') -eq [System.Windows.Forms.DialogResult]::Yes)
-        }
-        if (-not $confirmed) { return }
-
         # Build a single Set-ADUser call: named params for set values, -Replace
         # for pager set, -Clear (LDAP names) for emptied attributes.
         $setSplat  = @{}
@@ -262,6 +251,25 @@ function Show-EditContactsDialog {
                 $clearList += $attr
             }
         }
+
+        # The command window shows the exact Set-ADUser call (template rule).
+        $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+        $code = 'Set-ADUser -Identity ' + (& $q $Sam)
+        foreach ($k in $setSplat.Keys) { $code += " -$k " + (& $q $setSplat[$k]) }
+        if ($replace.Count -gt 0) { $code += ' -Replace @{ ' + ((@($replace.Keys) | ForEach-Object { "$_ = " + (& $q $replace[$_]) }) -join '; ') + ' }' }
+        if ($clearList.Count -gt 0) { $code += ' -Clear ' + ((@($clearList) | ForEach-Object { & $q $_ }) -join ', ') }
+        if ($srvParam.Count -gt 0) { $code += ' -Server ' + (& $q $srvParam['Server']) }
+
+        $confirmed = $false
+        if ($confirmActionFn) {
+            $confirmed = & $confirmActionFn -Title 'Edit Contacts' `
+                -Message "Save contact changes for $Sam?`r`n`r`n$summary" -ActionLabel 'Save' -Code $code
+        } else {
+            $confirmed = ([System.Windows.Forms.MessageBox]::Show(   # not-a-command: fallback when Confirm-Action is not loaded
+                "Save contact changes for $Sam?`r`n`r`n$summary",
+                'Edit Contacts','YesNo','Question') -eq [System.Windows.Forms.DialogResult]::Yes)
+        }
+        if (-not $confirmed) { return }
 
         try {
             $callParams = @{ Identity = $Sam } + $srvParam + $setSplat

@@ -194,7 +194,7 @@ function Save-SamExportedConfig {
     $path = Get-SamJsonTargetPath -Root $root -BaseName $base -SiteCode ([string]$Config.SiteCode)
     $file = [IO.Path]::GetFileName($path)
     if ([IO.File]::Exists($path)) {
-        $ans = [System.Windows.Forms.MessageBox]::Show((Get-SamOwnerForm), "$file already exists.`r`n`r`nOverwrite it? (A backup is kept in _Backup.)", 'Overwrite JSON', 'YesNo', 'Question')
+        $ans = [System.Windows.Forms.MessageBox]::Show((Get-SamOwnerForm), "$file already exists.`r`n`r`nOverwrite it? (A backup is kept in _Backup.)", 'Overwrite JSON', 'YesNo', 'Question')   # not-a-command: overwrite question
         if ($ans -ne [System.Windows.Forms.DialogResult]::Yes) { Write-SamLog "  Kept existing $file"; return $null }
         Backup-SamJson $path
     }
@@ -210,7 +210,9 @@ function Invoke-SamExportApps {
     if (-not (Test-SamLocalRoot)) { return }
     $names = @(@($AppNames) | Where-Object { $_ })
     if (-not $names.Count) { Write-SamLog 'Select one or more applications first.' -Level Warning; return }
-    if (-not (Confirm-SamBatch 'Export to JSON' "Export these application(s) to $($global:SAM.Settings.LocalRootResolved) ?" $names)) { return }
+    $code = Get-SamCmCode -Note 'Read-only in SCCM: each application and its deployment type are read, then written as <Local Root>\<AppBaseName>_<SITE>.json (an existing file is asked about and backed up to _Backup).' -Lines @(
+        $names | ForEach-Object { 'Get-CMApplication -Name ' + (Format-SamCode ([string]$_)) + ' | Select-Object -ExpandProperty SDMPackageXML   # -> JSON' })
+    if (-not (Confirm-SamBatch 'Export to JSON' "Export these application(s) to $($global:SAM.Settings.LocalRootResolved) ?" $names -Code $code -Kind Read)) { return }
     $i = 0; $saved = 0
     foreach ($n in $names) {
         $i++; Set-SamProgress $i $names.Count 'Export'

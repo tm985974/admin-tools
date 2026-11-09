@@ -98,7 +98,7 @@ function Initialize-VlanTab {
 
 function Show-VlanQuestion {
     param([string]$Text, [string]$Icon = 'Question')
-    return [string][System.Windows.Forms.MessageBox]::Show($script:V.Page.FindForm(), $Text, 'RSLinx Driver Manager',
+    return [string][System.Windows.Forms.MessageBox]::Show($script:V.Page.FindForm(), $Text, 'RSLinx Driver Manager',   # not-a-command: table edits only
         [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]$Icon)
 }
 
@@ -250,7 +250,7 @@ function Import-VlanCsv {
     try {
         $rows = @(ConvertFrom-VlanLookupCsv -Text ([System.IO.File]::ReadAllText($dlg.FileName)))
         if ($rows.Count -eq 0) { $script:V.App.SetStatus('No rows found in that file.', 'warn'); return }
-        $ans = [System.Windows.Forms.MessageBox]::Show($script:V.Page.FindForm(),
+        $ans = [System.Windows.Forms.MessageBox]::Show($script:V.Page.FindForm(),   # not-a-command: table import
             "$($rows.Count) row(s) read.`r`n`r`nYes = replace the table`r`nNo = add them to the table", 'RSLinx Driver Manager', 'YesNoCancel', 'Question')
         if ($ans -eq 'Cancel') { return }
         if ($ans -eq 'No') { $rows = @($script:V.Entries) + $rows }

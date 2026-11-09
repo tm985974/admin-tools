@@ -303,14 +303,17 @@ function Show-LibraryRunDialog {
         # known not to work here: say why before it fails
         if ($targets.Count -eq 0 -and $d.Readiness -and $d.Readiness.Level -eq 'Blocked') {
             $fix = @($d.Readiness.Lines | Where-Object { $_.Fix } | Select-Object -First 1 | ForEach-Object { "`r`n`r`nFix: $($_.Fix)" })
-            $r = [System.Windows.Forms.MessageBox]::Show($d.Form, "This will not work on this computer: $($d.Readiness.Summary).$fix`r`n`r`nRun anyway?", 'Will fail here', 'YesNo', 'Warning', 'Button2')
+            $r = [System.Windows.Forms.MessageBox]::Show($d.Form, "This will not work on this computer: $($d.Readiness.Summary).$fix`r`n`r`nRun anyway?", 'Will fail here', 'YesNo', 'Warning', 'Button2')   # not-a-command: readiness gate
             if ($r -ne 'Yes') { return }
             $d.Force = $true
         }
         if ($d.Entry.Modifies -and -not ($d.CanWhatIf -and $d.WhatIf.Checked)) {
             $where = if ($targets.Count) { "on $($targets.Count) computer(s)" } else { 'on this computer' }
-            $r = [System.Windows.Forms.MessageBox]::Show($d.Form, "This command changes things. Run it $where now?`r`n`r`n$($call.Display)", 'Confirm run', 'YesNo', 'Warning', 'Button2')
-            if ($r -ne 'Yes') { return }
+            # The standard command window (template rule): the exact code, Copy, Run / Cancel; logged.
+            # This window already shows the code, so read-only commands run straight from here.
+            $code = $(if ($d.Preview.Text) { $d.Preview.Text } else { [string]$call.Display })
+            if (-not (Confirm-AppCommand -App $d.App -Title "Run: $($d.Entry.Name)" -Kind Change -Always -RunLabel 'Run' -Code $code `
+                    -Summary "This command changes things. Run it $where now.")) { return }
         }
         $rcred = $null
         if ($targets.Count -and $d.RemoteCred.Checked) {

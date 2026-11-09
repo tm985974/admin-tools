@@ -204,7 +204,12 @@ function Build-BatchAddGroupsPage {
         $scope    = [string]$cmbScope.SelectedItem
         $category = [string]$cmbCategory.SelectedItem
         $msg = "Create $($names.Count) group(s) in:`n$ouDN`n`nScope: $scope   Category: $category"
-        $confirmed = if ($confirmActionFn) { & $confirmActionFn -Title 'Bulk Add Groups' -Message $msg -ActionLabel 'Create' } else { $true }
+        # The command window shows the exact code (template rule).
+        $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }   # PowerShell literal, local so the closure needs no lookup
+        $srvText = if ($capturedContext -and $capturedContext.TargetDC) { ' -Server ' + (& $q $capturedContext.TargetDC) } else { '' }
+        $code = 'foreach ($name in @(' + ((@($names) | ForEach-Object { & $q $_ }) -join ', ') + ")) {`r`n" +
+                "    New-ADGroup -Name `$name -GroupScope $scope -GroupCategory $category -Path " + (& $q $ouDN) + "$srvText`r`n}"
+        $confirmed = if ($confirmActionFn) { & $confirmActionFn -Title 'Bulk Add Groups' -Message $msg -ActionLabel 'Create' -Code $code } else { $true }
         if (-not $confirmed) { return }
 
         $srvParam = if ($capturedContext -and $capturedContext.TargetDC) { @{ Server = $capturedContext.TargetDC } } else { @{} }

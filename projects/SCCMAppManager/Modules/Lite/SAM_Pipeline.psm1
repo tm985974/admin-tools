@@ -109,7 +109,7 @@ function Confirm-SamNoNewerVersion {
     if ($lines.Count -gt 15) { $msg += "`r`n  ... and $($lines.Count - 15) more (see the activity log)" }
     $msg += "`r`n`r`nAre you sure you want to $Action the older version(s)?`r`n`r`n" +
             "Yes = $Action anyway`r`nNo = skip these, continue with the rest`r`nCancel = stop"
-    $ans = [System.Windows.Forms.MessageBox]::Show((Get-SamOwnerForm), $msg, 'Newer version already exists', 'YesNoCancel', 'Warning')
+    $ans = [System.Windows.Forms.MessageBox]::Show((Get-SamOwnerForm), $msg, 'Newer version already exists', 'YesNoCancel', 'Warning')   # not-a-command: version gate before the command window
     if ($ans -eq [System.Windows.Forms.DialogResult]::Yes) { Write-SamLog "  User chose to $Action anyway." -Level Warning; return $all }
     if ($ans -eq [System.Windows.Forms.DialogResult]::No)  { return @($all | Where-Object { -not $flagged[$_] }) }
     Write-SamLog '  Stopped by user.' -Level Warning

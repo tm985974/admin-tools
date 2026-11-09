@@ -253,13 +253,13 @@ function Build-BulkTab {
         }
         $script:BulkPreviewGrid.EndEdit()
         $defaultOU = $script:BulkTbOU.Text.Trim()
+        $gridRows = Get-GridRowsAsObjects -Grid $script:BulkPreviewGrid
         if (-not (Confirm-Action -Title 'Bulk User Import' `
             -Message "Import $($script:BulkPreviewGrid.Rows.Count) row(s) currently shown in the CSV Preview grid.`n`nThis will create AD accounts using whatever is currently in each cell - edits are included. All creations are logged." `
-            -ActionLabel 'Import')) { return }
+            -ActionLabel 'Import' -Code (Get-BulkOnboardCode -Rows $gridRows -DefaultOU $defaultOU))) { return }
         $mailMode = if (Get-Command Get-MailModeSelection -ErrorAction SilentlyContinue) {
             Get-MailModeSelection -Selector $script:BulkMailModeSelector
         } else { 'AdminOnly' }
-        $gridRows = Get-GridRowsAsObjects -Grid $script:BulkPreviewGrid
         Invoke-BulkOnboard -Rows $gridRows -DefaultOU $defaultOU -MailMode $mailMode
     })
 

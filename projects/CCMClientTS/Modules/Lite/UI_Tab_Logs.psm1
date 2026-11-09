@@ -134,9 +134,19 @@ function New-CcmLogsTab {
         $btnOpen.Add_Click({
             if (-not $ui.Path -or -not (Test-Path -LiteralPath $ui.Path)) { return }
             $cm = Join-Path $env:windir 'CCM\CMTrace.exe'
-            if (Test-Path -LiteralPath $cm) { Start-Process -FilePath $cm -ArgumentList ('"{0}"' -f $ui.Path) } else { Start-Process -FilePath 'notepad.exe' -ArgumentList ('"{0}"' -f $ui.Path) }
+            $exe = $(if (Test-Path -LiteralPath $cm) { $cm } else { 'notepad.exe' })
+            $r = Invoke-AppCommand -App $App -Title 'Open in viewer' -Kind Read -RunLabel 'Open' -Summary "Open $($ui.Path) in $([System.IO.Path]::GetFileName($exe))." `
+                -Code ('Start-Process -FilePath ' + (Format-AppCommandValue $exe) + ' -ArgumentList ' + (Format-AppCommandValue ('"' + $ui.Path + '"')))
+            if ($r.Errors.Count) { $App.SetStatus("Not opened: $($r.Errors[0])", 'err') }
         }.GetNewClosure())
-        $btnFolder.Add_Click({ if ($ui.Path) { $d = Split-Path $ui.Path -Parent; if (Test-Path -LiteralPath $d) { Start-Process explorer.exe ('"{0}"' -f $d) } } }.GetNewClosure())
+        $btnFolder.Add_Click({
+            if (-not $ui.Path) { return }
+            $d = Split-Path $ui.Path -Parent
+            if (-not (Test-Path -LiteralPath $d)) { return }
+            $r = Invoke-AppCommand -App $App -Title 'Open folder' -Kind Read -RunLabel 'Open' -Summary "Open $d in Explorer." `
+                -Code ('Start-Process -FilePath explorer.exe -ArgumentList ' + (Format-AppCommandValue ('"' + $d + '"')))
+            if ($r.Errors.Count) { $App.SetStatus("Not opened: $($r.Errors[0])", 'err') }
+        }.GetNewClosure())
 
         $timer = New-Object System.Windows.Forms.Timer; $timer.Interval = 5000
         $timer.Add_Tick({ if ($chkFollow.Checked -and $Page.Visible -and $ui.Path) { & $load } }.GetNewClosure())

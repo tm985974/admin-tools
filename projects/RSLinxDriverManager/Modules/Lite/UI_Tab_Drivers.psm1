@@ -127,7 +127,7 @@ function New-DrvImportColumn {
     $chkInact = New-Object System.Windows.Forms.CheckBox
     $chkInact.Text = 'Include inactive devices'; $chkInact.Checked = $false; $chkInact.AutoSize = $true
     $chkInact.Location = New-Object System.Drawing.Point(180, 8)
-    $btnBuild = $T.MakeButton('Build preview  >>')
+    $btnBuild = $T.MakeButton('Build preview')
     $btnBuild.Location = New-Object System.Drawing.Point(2, 36)
     $btnBuild.Font = New-Object System.Drawing.Font($T.FontName, ($T.FontSizePt + 1), [System.Drawing.FontStyle]::Bold)
     $lines = New-Object System.Windows.Forms.Label
@@ -287,7 +287,12 @@ function New-DrvCurrentColumn {
     $bSave.Add_Click({ Invoke-DrvSaveBackup })
     $bRestore.Add_Click({ Invoke-DrvRestoreBackup })
     $bDel.Add_Click({ Remove-DrvBackup })
-    $bOpen.Add_Click({ if ($script:D.BackupDir) { try { Start-Process explorer.exe ('"{0}"' -f $script:D.BackupDir) } catch { } } })
+    $bOpen.Add_Click({
+        if (-not $script:D.BackupDir) { return }
+        $r = Invoke-AppCommand -App $script:D.App -Title 'Open backup folder' -Kind Read -RunLabel 'Open' -Summary "Open $($script:D.BackupDir) in Explorer." `
+            -Code ('Start-Process -FilePath explorer.exe -ArgumentList ' + (Format-AppCommandValue ('"' + $script:D.BackupDir + '"')))
+        if ($r.Errors.Count) { $script:D.App.SetStatus("Not opened: $($r.Errors[0])", 'err') }
+    })
     $list.Add_DoubleClick({ Invoke-DrvRestoreBackup })
     $bk.Controls.Add($list)
     $bk.Controls.Add($bkBar)
@@ -322,7 +327,7 @@ function Write-DrvLog {
 
 function Show-DrvQuestion {
     param([string]$Text, [string]$Icon = 'Question')
-    return [string][System.Windows.Forms.MessageBox]::Show($script:D.Page.FindForm(), $Text, 'RSLinx Driver Manager',
+    return [string][System.Windows.Forms.MessageBox]::Show($script:D.Page.FindForm(), $Text, 'RSLinx Driver Manager',   # not-a-command: preview questions only
         [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]$Icon)
 }
 
@@ -340,12 +345,25 @@ function Get-DrvManufacturer {
 
 function Invoke-DrvRestartElevated {
     $App = $script:D.App
-    try {
-        Start-Process -FilePath $App.ExePath -Verb RunAs -ErrorAction Stop | Out-Null
-        $App.Log('INFO', 'Drivers', 'Restarting elevated.')
-        $f = $script:D.Page.FindForm(); if ($f) { $f.Close() }
-    }
-    catch { $App.SetStatus('Not restarted: elevation was cancelled or failed.', 'warn') }
+    $r = Invoke-AppCommand -App $App -Title 'Restart as administrator' -Kind Read -RunLabel 'Restart' `
+        -Summary 'Start this app again as administrator (Windows asks for consent), then close this copy.' `
+        -Code ('Start-Process -FilePath ' + (Format-AppCommandValue ([string]$App.ExePath)) + ' -Verb RunAs -ErrorAction Stop')
+    if (-not $r.Ran) { return }
+    if ($r.Errors.Count) { $App.SetStatus('Not restarted: elevation was cancelled or failed.', 'warn'); return }
+    $App.Log('INFO', 'Drivers', 'Restarting elevated.')
+    $f = $script:D.Page.FindForm(); if ($f) { $f.Close() }
+}
+
+# The command window is the confirmation for every change (template rule: every action shows its code).
+function Confirm-DrvChange {
+    param([string]$Title, [string]$Summary, [string]$Code)
+    return (Confirm-AppCommand -App $script:D.App -Title $Title -Kind Change -RunLabel 'Apply' -Summary $Summary -Code $Code)
+}
+
+function Get-DrvBackupNote {
+    $dir = $script:D.BackupDir
+    if (-not $dir) { try { $dir = (Get-RSLinxBackupDir -App $script:D.App).Path } catch { $dir = '<backup folder>' } }
+    return "The app first saves the current drivers to a CSV backup in $dir"
 }
 
 function Update-DrvPasteInfo {
@@ -588,14 +606,14 @@ function Invoke-DrvApply {
 
     if ($Mode -eq 'Add') {
         if (@($plan.Items).Count -eq 0) { Show-DrvMessage "Nothing to add: all $($plan.SkippedIPs) IP(s) are already on this PC."; return }
-        $q = "Add to this PC:`r`n`r`n  {0} new driver(s)`r`n  {1} existing driver(s) get more IPs`r`n  {2} IP(s) added, {3} already present`r`n`r`nThe current drivers are backed up first. Continue?" -f `
+        $q = "Add to this PC: {0} new driver(s), {1} existing driver(s) get more IPs, {2} IP(s) added, {3} already present. The current drivers are backed up first." -f `
                 $plan.NewDrivers, $plan.ExtendedDrivers, $plan.AddedIPs, $plan.SkippedIPs
-        if ((Show-DrvQuestion $q) -ne 'Yes') { return }
+        if (-not (Confirm-DrvChange 'Add drivers' $q (Get-RSLinxPlanCommandText -Plan $plan -BackupNote (Get-DrvBackupNote)))) { return }
     }
     else {
-        $q = "OVERWRITE this PC:`r`n`r`n  delete all {0} driver(s) ({1} IPs) now on this PC`r`n  write {2} driver(s) with {3} IP(s) from the preview`r`n`r`nThe current drivers are backed up first. Continue?" -f `
+        $q = "OVERWRITE this PC: delete all {0} driver(s) ({1} IPs) now on this PC and write {2} driver(s) with {3} IP(s) from the preview. The current drivers are backed up first." -f `
                 @($plan.DeleteKeys).Count, $curIPs, $plan.NewDrivers, $plan.AddedIPs
-        if ((Show-DrvQuestion $q 'Warning') -ne 'Yes') { return }
+        if (-not (Confirm-DrvChange 'Overwrite drivers' $q (Get-RSLinxPlanCommandText -Plan $plan -BackupNote (Get-DrvBackupNote)))) { return }
     }
 
     if (-not (Invoke-DrvAutoBackup -Drivers $current -Label "before-$($Mode.ToLower())")) { return }
@@ -654,9 +672,10 @@ function Invoke-DrvRemoveSelected {
     if (-not $script:D.IsAdmin) { return }
     $sel = @($script:D.CurrentGrid.SelectedRows | ForEach-Object { $_.Tag } | Where-Object { $_ })
     if ($sel.Count -eq 0) { $App.SetStatus('Select drivers / IPs on the right first.', 'warn'); return }
-    $q = "Remove {0} IP(s) from {1} driver(s) on this PC?`r`nA driver left with no IPs is deleted. The current drivers are backed up first." -f `
+    $q = "Remove {0} IP(s) from {1} driver(s) on this PC. A driver left with no IPs is deleted. The current drivers are backed up first." -f `
             $sel.Count, @($sel | ForEach-Object { $_.Key } | Sort-Object -Unique).Count
-    if ((Show-DrvQuestion $q 'Warning') -ne 'Yes') { return }
+    $targets0 = @($sel | ForEach-Object { [pscustomobject]@{ Key = $_.Key; IP = $_.IP } })
+    if (-not (Confirm-DrvChange 'Remove drivers' $q (Get-RSLinxRemoveCommandText -Targets $targets0 -Current $script:D.Current -BackupNote (Get-DrvBackupNote)))) { return }
     if (-not (Invoke-DrvAutoBackup -Drivers $script:D.Current -Label 'before-remove')) { return }
     try {
         $targets = @($sel | ForEach-Object { [pscustomobject]@{ Key = $_.Key; IP = $_.IP } })
@@ -677,7 +696,7 @@ function Copy-DrvCurrentToPreview {
     if ($sel.Count -eq 0) { $sel = @($script:D.CurrentRows | Where-Object { $_.IP }) }
     if ($sel.Count -eq 0) { return }
     $rows = @(ConvertFrom-RSLinxDriverList -Rows @($sel | ForEach-Object { @{ name = $_.Driver; node = $_.IP } }))
-    if ($script:D.Preview.Count -gt 0 -and (Show-DrvQuestion "Replace the $($script:D.Preview.Count) preview row(s) with $($rows.Count) row(s) from this PC?") -ne 'Yes') { return }
+    if ($script:D.Preview.Count -gt 0 -and (Show-DrvQuestion "Replace the $($script:D.Preview.Count) preview row(s) with $($rows.Count) row(s) from this PC?") -ne 'Yes') { return }   # preview only
     Set-DrvPreview -Rows $rows
     Write-DrvLog "Copied $($rows.Count) row(s) from this PC to the preview."
 }
@@ -765,12 +784,13 @@ function Invoke-DrvRestoreBackup {
 function Remove-DrvBackup {
     $f = Get-DrvSelectedBackup
     if (-not $f) { $script:D.App.SetStatus('Select a backup first.', 'warn'); return }
-    if ((Show-DrvQuestion "Delete backup $($f.Name)?" 'Warning') -ne 'Yes') { return }
-    try {
-        Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop
+    $r = Invoke-AppCommand -App $script:D.App -Title 'Delete backup' -Kind Change -RunLabel 'Delete' -Summary "Delete the backup file $($f.Name)." `
+        -Code ('Remove-Item -LiteralPath ' + (Format-AppCommandValue $f.FullName) + ' -Force -ErrorAction Stop')
+    if (-not $r.Ran) { return }
+    if ($r.Errors.Count) { Show-DrvMessage "Delete failed:`r`n$($r.Errors[0])" 'Error' }
+    else {
         Write-DrvLog "Deleted backup $($f.Name)"
         $script:D.App.LogAction("Deleted backup $($f.FullName)")
     }
-    catch { Show-DrvMessage "Delete failed:`r`n$($_.Exception.Message)" 'Error' }
     Update-DrvBackupList
 }

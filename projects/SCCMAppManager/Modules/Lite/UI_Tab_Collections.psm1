@@ -74,6 +74,11 @@ function Invoke-SamDeployToCollection {
 
 function Invoke-SamUpdateMembership {
     param($Collections)
+    $list = @(@($Collections) | Where-Object { $_ })
+    $code = Get-SamCmCode -Note 'The app calls SMS_Collection.RequestRefresh through the SMS Provider and falls back to this cmdlet.' -Lines @(
+        $list | ForEach-Object { 'Invoke-CMCollectionUpdate -CollectionId ' + (Format-SamCode ([string]$_.ID)) + '   # ' + $_.Name })
+    if (-not (Confirm-AppCommand -App $global:SAM.App -Title 'Update membership now' -Kind Read -RunLabel 'Update' -Code $code `
+            -Summary "Ask the site to evaluate the membership of $($list.Count) collection(s) now.")) { return }
     $n = 0
     foreach ($c in @($Collections)) {
         if (-not $c) { continue }

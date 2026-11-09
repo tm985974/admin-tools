@@ -127,7 +127,7 @@ function Build-SamPipelineTab {
     & $add 'Copy JSON to environment...' { $btnCopy.PerformClick() }.GetNewClosure()
     & $add 'Open local folder' { $r = @(Get-SamSelectedPipelineRows); if ($r.Count) { Open-SamLocalFolder $r[0] } }
     & $add 'Open repository folder' { $r = @(Get-SamSelectedPipelineRows); if ($r.Count) { Open-SamRepoFolder $r[0] } }
-    & $add 'Open JSON in Notepad' { $r = @(Get-SamSelectedPipelineRows); if ($r.Count) { try { Start-Process notepad.exe ('"{0}"' -f $r[0].JsonPath) } catch { } } }
+    & $add 'Open JSON in Notepad' { $r = @(Get-SamSelectedPipelineRows); if ($r.Count) { Open-SamPath -Path $r[0].JsonPath -Exe 'notepad.exe' -Title 'Open JSON in Notepad' } }
     & $add 'Show in Software tab' { $r = @(Get-SamSelectedPipelineRows); if ($r.Count) { Show-SamInSoftwareTab $r[0].AppName } }
     & $add 'Copy application name(s)' { Set-SamClipboard @(Get-SamSelectedPipelineRows | ForEach-Object { $_.AppName }) }
     $cms.Add_Opening({ param($s, $e)
@@ -214,14 +214,14 @@ function Invoke-SamPipelineDeploy {
 function Open-SamLocalFolder {
     param($Row)
     $p = [IO.Path]::Combine($global:SAM.Settings.LocalRootResolved, $Row.BaseName)
-    if ([IO.Directory]::Exists($p)) { Start-Process explorer.exe -ArgumentList "`"$p`"" }
+    if ([IO.Directory]::Exists($p)) { Open-SamPath -Path $p -Title 'Open local folder' }
     else { Write-SamLog "Folder not found: $p" -Level Warning }
 }
 
 function Open-SamRepoFolder {
     param($Row)
     $p = [IO.Path]::Combine([string]$global:SAM.Settings.RepositoryPath, $Row.BaseName)
-    if ($global:SAM.Settings.RepositoryPath -and [IO.Directory]::Exists($p)) { Start-Process explorer.exe -ArgumentList "`"$p`"" }
+    if ($global:SAM.Settings.RepositoryPath -and [IO.Directory]::Exists($p)) { Open-SamPath -Path $p -Title 'Open repository folder' }
     else { Write-SamLog "Folder not found: $p" -Level Warning }
 }
 

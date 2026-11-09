@@ -77,7 +77,7 @@ function Initialize-RSLinxTab {
 
     $bLaunch = $T.MakeButton('Start / re-attach control panel')
     $bDetach = $T.MakeButton('Open in its own window')
-    $bLaunch.Add_Click({ Start-RSLinxEmbedded })
+    $bLaunch.Add_Click({ Start-RSLinxEmbedded -Ask })
     $bDetach.Add_Click({ Close-RSLinxEmbedded -Release })
     $bar = New-RSLinxButtonBar -App $App -Buttons @($bLaunch, $bDetach) -Dock 'Top' -Height 38
     $left.Controls.Add($host1)
@@ -130,6 +130,7 @@ function Get-RSLinxMainWindow {
 }
 
 function Start-RSLinxEmbedded {
+    param([switch]$Ask)
     $App = $script:R.App
     if ($script:R.Hwnd -ne [IntPtr]::Zero) {
         try { if ([RSLinxDriverManager.Win32]::IsWindow($script:R.Hwnd)) { Resize-RSLinxEmbedded; return } } catch { }
@@ -144,7 +145,15 @@ function Start-RSLinxEmbedded {
     try {
         Initialize-RSLinxWin32
         $script:R.Msg.Text = 'Starting the RSLinx Classic control panel...'; $script:R.Msg.Visible = $true
-        if (-not $script:R.Proc -or $script:R.Proc.HasExited) { $script:R.Proc = Start-Process -FilePath $script:RSLinxCpPath -PassThru }
+        if (-not $script:R.Proc -or $script:R.Proc.HasExited) {
+            # From the button: the command window first (template rule). On tab open it just starts.
+            if ($Ask -and -not (Confirm-AppCommand -App $App -Title 'Start RSLinx control panel' -Kind Read -RunLabel 'Start' `
+                    -Summary 'Start the RSLinx Classic control panel and show it inside this tab.' `
+                    -Code ('Start-Process -FilePath ' + (Format-AppCommandValue ([string]$script:RSLinxCpPath))))) {
+                $script:R.Msg.Visible = $false; return
+            }
+            $script:R.Proc = Start-Process -FilePath $script:RSLinxCpPath -PassThru
+        }
         $h = Get-RSLinxMainWindow -Process $script:R.Proc
         if ($h -eq [IntPtr]::Zero) { $script:R.Msg.Text = 'The control panel started but its window was not found. Try Start / re-attach.'; return }
         [void][RSLinxDriverManager.Win32]::SetParent($h, $script:R.Host.Handle)

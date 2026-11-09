@@ -210,7 +210,13 @@ function Build-AddUsersToGroupsPage {
         $totalPairs = $users.Count * $groups.Count
         $msg = "Add $($users.Count) user(s) to $($groups.Count) group(s)?`n`n" +
                "That's $totalPairs membership add(s) total. This is reversible (Directory tab > Edit Groups) but not undone automatically."
-        $confirmed = if ($confirmActionFn) { & $confirmActionFn -Title 'Add Users to Groups' -Message $msg -ActionLabel 'Add' } else { $true }
+        # The command window shows the exact code (template rule).
+        $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }   # PowerShell literal, local so the closure needs no lookup
+        $srvText = if ($capturedContext -and $capturedContext.TargetDC) { ' -Server ' + (& $q $capturedContext.TargetDC) } else { '' }
+        $code = 'foreach ($user in @(' + ((@($users) | ForEach-Object { & $q $_ }) -join ', ') + ")) {`r`n" +
+                '    foreach ($group in @(' + ((@($groups) | ForEach-Object { & $q $_ }) -join ', ') + ")) {`r`n" +
+                "        Add-ADPrincipalGroupMembership -Identity `$user -MemberOf `$group$srvText`r`n    }`r`n}"
+        $confirmed = if ($confirmActionFn) { & $confirmActionFn -Title 'Add Users to Groups' -Message $msg -ActionLabel 'Add' -Code $code } else { $true }
         if (-not $confirmed) { return }
 
         $srvParam = if ($capturedContext -and $capturedContext.TargetDC) { @{ Server = $capturedContext.TargetDC } } else { @{} }

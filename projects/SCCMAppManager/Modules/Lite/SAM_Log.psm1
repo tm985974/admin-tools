@@ -82,7 +82,7 @@ function Show-SamActivityWindow {
     $bar = New-Object System.Windows.Forms.FlowLayoutPanel
     $bar.Dock = 'Bottom'; $bar.Height = 40
     $b1 = New-SamButton 'Open log folder' 120
-    $b1.Add_Click({ try { Start-Process explorer.exe ('"{0}"' -f $global:SAM.LogDir) } catch { } })
+    $b1.Add_Click({ Open-SamPath -Path $global:SAM.LogDir -Title 'Open log folder' })
     $b2 = New-SamButton 'Clear' 80
     $b2.Add_Click({ $global:SAM.LogLines.Clear(); foreach ($b in @($global:SAM.LogBoxes.ToArray())) { if (-not $b.IsDisposed) { $b.Clear() } } })
     $bar.Controls.Add($b1); $bar.Controls.Add($b2)

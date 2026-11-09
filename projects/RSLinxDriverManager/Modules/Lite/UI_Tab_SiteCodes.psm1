@@ -86,7 +86,7 @@ function Initialize-SiteCodesTab {
 
 function Show-SiteQuestion {
     param([string]$Text, [string]$Icon = 'Question')
-    return [string][System.Windows.Forms.MessageBox]::Show($script:S.Page.FindForm(), $Text, 'RSLinx Driver Manager',
+    return [string][System.Windows.Forms.MessageBox]::Show($script:S.Page.FindForm(), $Text, 'RSLinx Driver Manager',   # not-a-command: table edits only
         [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]$Icon)
 }
 

@@ -154,8 +154,10 @@ function New-CcmDiscoveryTab {
                 $csv = [System.IO.Path]::ChangeExtension($p, '.csv')
                 $d.Findings | Export-Csv -LiteralPath $csv -NoTypeInformation -Encoding UTF8
                 $App.LogAction("Discovery report exported: $p")
-                $a = [System.Windows.Forms.MessageBox]::Show("Saved:`r`n$p`r`n$csv`r`n`r`nOpen the folder?", 'Export report', 'YesNo', 'Information')
-                if ($a -eq 'Yes') { Start-Process explorer.exe ('"{0}"' -f $dir) }
+                $r = Invoke-AppCommand -App $App -Title 'Export report' -Kind Read -Always -RunLabel 'Open folder' `
+                    -Summary "Saved:`r`n$p`r`n$csv`r`nOpen the folder? (Cancel = no)" `
+                    -Code ('Start-Process -FilePath explorer.exe -ArgumentList ' + (Format-AppCommandValue ('"' + $dir + '"')))
+                if ($r.Errors.Count) { $App.SetStatus("Not opened: $($r.Errors[0])", 'err') }
             } catch { $App.SetStatus("Export failed: $($_.Exception.Message)", 'err') }
         }.GetNewClosure())
 

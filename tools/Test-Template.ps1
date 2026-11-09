@@ -166,6 +166,18 @@ foreach ($root in Get-ProjectRoots) {
                 $n.Arguments.Count -eq 1 -and $n.Arguments[0] -is [System.Management.Automation.Language.StringConstantExpressionAst]) {
                 $captions.Add(@($n.Arguments[0].Value, $n.Extent.StartLineNumber))
             }
+            # New-StyledButton 'Text' / New-SamButton 'Text' ... : any New-*Button command with a text first
+            if ($n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -match '^New-\w*Button$') {
+                $els = $n.CommandElements
+                for ($i = 1; $i -lt $els.Count; $i++) {
+                    if ($els[$i] -is [System.Management.Automation.Language.CommandParameterAst]) {
+                        if ($els[$i].ParameterName -eq 'Text' -and $i + 1 -lt $els.Count -and $els[$i + 1] -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $captions.Add(@($els[$i + 1].Value, $n.Extent.StartLineNumber)) }
+                        break
+                    }
+                    if ($els[$i] -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $captions.Add(@($els[$i].Value, $n.Extent.StartLineNumber)) }
+                    break
+                }
+            }
             # Tab titles: @{ Title = 'Fleet'; Fn = ... } in UI_Register-Tabs, and Register-EnvironmentSection -Title 'Radmin'
             if ($n -is [System.Management.Automation.Language.HashtableAst] -and $f.Name -eq 'UI_Register-Tabs.psm1') {
                 foreach ($pair in $n.KeyValuePairs) {
@@ -192,6 +204,10 @@ foreach ($root in Get-ProjectRoots) {
             }
         }
         foreach ($c in $captions) {
+            if (([string]$c[0]).Contains('>')) {
+                Err ("{0}: {1}:{2}: control text '{3}' contains '>', which separates places in a tooltip key - it can never have an entry; drop the '>' or set it with Set-AppToolTip" -f $name, $rel, $c[1], $c[0])
+                continue
+            }
             $k = ConvertTo-ToolTipKey ([string]$c[0])
             if (-not $k -or $keys.ContainsKey($k) -or $engineKeys.ContainsKey($k)) { continue }
             $missing.Add(("{0}:{1} '{2}'" -f $rel, $c[1], (([string]$c[0]) -replace '&', '')))

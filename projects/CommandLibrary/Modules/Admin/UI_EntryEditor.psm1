@@ -168,7 +168,7 @@ function Show-LibraryEntryEditor {
         if (-not $fn) { $d.Msg.Text = 'Pick the function to run.'; return }
         $cand = @($d.Candidates | Where-Object { $_.Function -eq $fn }) | Select-Object -First 1
         if ($cand -and $cand.Status -eq 'Blocked') {
-            $r = [System.Windows.Forms.MessageBox]::Show($d.Form, "'$fn' cannot run standalone:`r`n`r`n$((@($cand.Blockers) | ForEach-Object { "- $_" }) -join "`r`n")`r`n`r`nSave anyway?", 'Save entry', 'YesNo', 'Warning')
+            $r = [System.Windows.Forms.MessageBox]::Show($d.Form, "'$fn' cannot run standalone:`r`n`r`n$((@($cand.Blockers) | ForEach-Object { "- $_" }) -join "`r`n")`r`n`r`nSave anyway?", 'Save entry', 'YesNo', 'Warning')   # not-a-command: library edit
             if ($r -ne 'Yes') { return }
         }
         $x = $d.Entry

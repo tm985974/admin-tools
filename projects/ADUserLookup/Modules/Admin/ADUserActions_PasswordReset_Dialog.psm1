@@ -221,9 +221,18 @@ function Show-ResetPasswordDialog {
         $mustChange  = $false
         $neverExpires = $chkNever.Checked
 
+        # The command window shows the exact calls (template rule); the password is
+        # never put in the code (a Read-Host prompt stands in for it).
+        $q = { param($v) "'" + ([string]$v).Replace("'", "''") + "'" }
+        $srvText = if ($capturedContext -and $capturedContext.TargetDC) { ' -Server ' + (& $q $capturedContext.TargetDC) } else { '' }
+        $id = & $q $capturedSam
+        $code = "Set-ADAccountPassword -Identity $id -Reset -NewPassword (Read-Host -AsSecureString -Prompt 'New password')$srvText`r`n" +
+                "Set-ADUser -Identity $id -ChangePasswordAtLogon `$$([bool]$mustChange)$srvText" +
+                $(if ($neverExpires) { "`r`nSet-ADUser -Identity $id -PasswordNeverExpires `$true$srvText" } else { '' })
+
         if (-not (& $confirmActionFn -Title 'Reset Password' `
                 -Message "Reset password for $capturedDisp ($capturedSam)?`n`nNew password: $pw" `
-                -ActionLabel 'Reset')) { return }
+                -ActionLabel 'Reset' -Code $code)) { return }
 
         $result = & $resetPwFn `
             -Sam         $capturedSam `

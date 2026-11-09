@@ -106,7 +106,7 @@ function Register-RadminEnvironmentPage {
                 $key = $ctl.LicenseKey.Text.Trim()
                 if ($key -and $key.Length -ne 30) {
                     $q = "The license key '$($key.Substring(0, [Math]::Min(6, $key.Length)))...' does not look like a 30-character Radmin key. Save it anyway?"
-                    if ([System.Windows.Forms.MessageBox]::Show($q, 'Radmin', 'YesNo', 'Question') -ne 'Yes') { return 'Radmin: check the license key.' }
+                    if ([System.Windows.Forms.MessageBox]::Show($q, 'Radmin', 'YesNo', 'Question') -ne 'Yes') { return 'Radmin: check the license key.' }   # not-a-command: settings check
                 }
                 return ''
             }.GetNewClosure()

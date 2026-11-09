@@ -276,46 +276,59 @@ function Invoke-CreateUser {
                   "Email:    $(if ($email) { $email } else { '(none)' })`n" +
                   "Password: $pw$copyGroupsLine"
 
-    if (-not (Confirm-Action -Title 'Create User' -Message $confirmMsg -ActionLabel 'Create User')) { return }
+    $params = @{
+        Name                  = $cn
+        GivenName             = $first
+        Surname               = $last
+        DisplayName           = $display
+        SamAccountName        = $sam
+        UserPrincipalName     = $upn
+        Path                  = $ouDN
+        AccountPassword       = (ConvertTo-SecureString $pw -AsPlainText -Force)
+        Enabled               = $true
+        ChangePasswordAtLogon = $false
+        Description           = $optDesc
+        ErrorAction           = 'Stop'
+    }
+    if ($script:UAContext.TargetDC) { $params.Server = $script:UAContext.TargetDC }
+
+    $optTitle  = $script:UANewTitle.Text.Trim()
+    $optDept   = $script:UANewDept.Text.Trim()
+    $optComp   = $script:UANewCompany.Text.Trim()
+    $optOffice = $script:UANewOffice.Text.Trim()
+    if ($optTitle)  { $params['Title']      = $optTitle }
+    if ($optDept)   { $params['Department'] = $optDept }
+    if ($optComp)   { $params['Company']    = $optComp }
+    if ($optOffice) { $params['Office']     = $optOffice }
+    if ($managerDN) { $params['Manager']    = $managerDN }
+    if ($email)     { $params['EmailAddress'] = $email }
+    if ($rawPhone) {
+        $params['OtherAttributes'] = @{
+            telephoneNumber = $rawPhone
+            homePhone       = $rawPhone
+            pager           = $rawPhone
+            mobile          = $rawPhone
+        }
+    }
+
+    # The command window shows the exact New-ADUser call (template rule). The password
+    # is never put in the code: it appears as a Read-Host prompt.
+    $shown = @{}
+    foreach ($k in $params.Keys) { if ($k -ne 'ErrorAction') { $shown[$k] = $params[$k] } }
+    $code = '$user = ' + (Format-AppCommandValue $shown) + "`r`nNew-ADUser @user"
+    if ($script:UANewNotes -and $script:UANewNotes.Text.Trim()) {
+        $code += "`r`nSet-ADUser -Identity " + (Format-AppCommandValue $sam) + ' -Replace @{ info = ' + (Format-AppCommandValue $script:UANewNotes.Text.Trim()) + ' }'
+    }
+    if ($copyGroupNames.Count -gt 0) {
+        $srvText = $(if ($script:UAContext.TargetDC) { ' -Server ' + (Format-AppCommandValue ([string]$script:UAContext.TargetDC)) } else { '' })
+        $code += "`r`nforeach (`$g in " + (Format-AppCommandValue ([string[]]@($copyGroupNames))) + ") { Add-ADGroupMember -Identity `$g -Members " + (Format-AppCommandValue $sam) + "$srvText }   # groups copied from $copyGroupsSam"
+    }
+
+    if (-not (Confirm-Action -Title 'Create User' -Message $confirmMsg -ActionLabel 'Create User' -Code $code)) { return }
 
     $script:UACrStatus.Text = 'Creating user...'
 
     try {
-        $params = @{
-            Name                  = $cn
-            GivenName             = $first
-            Surname               = $last
-            DisplayName           = $display
-            SamAccountName        = $sam
-            UserPrincipalName     = $upn
-            Path                  = $ouDN
-            AccountPassword       = (ConvertTo-SecureString $pw -AsPlainText -Force)
-            Enabled               = $true
-            ChangePasswordAtLogon = $false
-            Description           = $optDesc
-            ErrorAction           = 'Stop'
-        }
-        if ($script:UAContext.TargetDC) { $params.Server = $script:UAContext.TargetDC }
-
-        $optTitle  = $script:UANewTitle.Text.Trim()
-        $optDept   = $script:UANewDept.Text.Trim()
-        $optComp   = $script:UANewCompany.Text.Trim()
-        $optOffice = $script:UANewOffice.Text.Trim()
-        if ($optTitle)  { $params['Title']      = $optTitle }
-        if ($optDept)   { $params['Department'] = $optDept }
-        if ($optComp)   { $params['Company']    = $optComp }
-        if ($optOffice) { $params['Office']     = $optOffice }
-        if ($managerDN) { $params['Manager']    = $managerDN }
-        if ($email)     { $params['EmailAddress'] = $email }
-        if ($rawPhone) {
-            $params['OtherAttributes'] = @{
-                telephoneNumber = $rawPhone
-                homePhone       = $rawPhone
-                pager           = $rawPhone
-                mobile          = $rawPhone
-            }
-        }
-
         New-ADUser @params
 
         # Notes field removed from UI - guard retained for forward compatibility

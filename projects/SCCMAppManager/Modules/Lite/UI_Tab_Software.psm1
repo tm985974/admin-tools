@@ -89,7 +89,8 @@ function Invoke-SamDistributeContent {
     $dpg = [string]$S.Settings.DPGroup
     if (-not $dpg) { Write-SamLog 'No DP group set for this environment (Environment > SCCM Site).' -Level Error; return }
     $list = @(@($Apps) | Where-Object { $_ })
-    if (-not (Confirm-SamBatch 'Distribute content' "Distribute the content of these $($list.Count) application(s) to DP group '$dpg'?" @($list | ForEach-Object { $_.Name }))) { return }
+    $code = Get-SamCmCode -Lines @($list | ForEach-Object { 'Start-CMContentDistribution -ApplicationName ' + (Format-SamCode ([string]$_.Name)) + ' -DistributionPointGroupName ' + (Format-SamCode $dpg) })
+    if (-not (Confirm-SamBatch 'Distribute content' "Distribute the content of these $($list.Count) application(s) to DP group '$dpg'?" @($list | ForEach-Object { $_.Name }) -Code $code)) { return }
     $cnt = @{ N = 0 }
     Invoke-SamCM {
         foreach ($a in $list) {
@@ -108,7 +109,9 @@ function Invoke-SamUpdateContent {
     param($Apps)
     $S = $global:SAM
     $list = @(@($Apps) | Where-Object { $_ })
-    if (-not (Confirm-SamBatch 'Update content' "Update the content of these $($list.Count) application(s) on their distribution points?`r`n(Use after changing files in the content folder.)" @($list | ForEach-Object { $_.Name }))) { return }
+    $code = Get-SamCmCode -Lines @($list | ForEach-Object {
+        'foreach ($dt in Get-CMDeploymentType -ApplicationName ' + (Format-SamCode ([string]$_.Name)) + ') { Update-CMDistributionPoint -ApplicationName ' + (Format-SamCode ([string]$_.Name)) + ' -DeploymentTypeName $dt.LocalizedDisplayName }' })
+    if (-not (Confirm-SamBatch 'Update content' "Update the content of these $($list.Count) application(s) on their distribution points?`r`n(Use after changing files in the content folder.)" @($list | ForEach-Object { $_.Name }) -Code $code)) { return }
     $cnt = @{ N = 0 }
     Invoke-SamCM {
         foreach ($a in $list) {

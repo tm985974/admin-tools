@@ -497,7 +497,7 @@ function Show-EditUserGroupsDialog {
             $warn = 'The following selected group(s) will be ignored:'
             $warn += "`n`nAlready a member ($($alreadyMbr.Count)):`n$($alreadyMbr -join ', ')"
             $warn += "`n`nContinue and add '$Sam' to the remaining $($actionable.Count) group(s)?"
-            $go = [System.Windows.Forms.MessageBox]::Show($warn,'Add to Groups','YesNo','Warning')
+            $go = [System.Windows.Forms.MessageBox]::Show($warn,'Add to Groups','YesNo','Warning')   # not-a-command: lists skipped items; the command window follows
             if ($go -ne [System.Windows.Forms.DialogResult]::Yes) { return }
         }
 

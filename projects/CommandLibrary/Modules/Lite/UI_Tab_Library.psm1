@@ -258,7 +258,7 @@ function Build-LibraryTab {
         $btnDelete.Add_Click({
             $e = Get-LibrarySelectedEntry -State $st
             if (-not $e) { return }
-            $r = [System.Windows.Forms.MessageBox]::Show($st.Page.FindForm(), "Delete '$($e.Name)' from the library?`r`n`r`nShipped entries you delete stay deleted.", 'Delete entry', 'YesNo', 'Warning')
+            $r = [System.Windows.Forms.MessageBox]::Show($st.Page.FindForm(), "Delete '$($e.Name)' from the library?`r`n`r`nShipped entries you delete stay deleted.", 'Delete entry', 'YesNo', 'Warning')   # not-a-command: library edit
             if ($r -ne 'Yes') { return }
             try { Remove-LibraryEntry -App $st.App -Id $e.Id; Import-LibraryEntries -State $st; $st.App.SetStatus("Deleted '$($e.Name)'.", 'ok') }
             catch { [System.Windows.Forms.MessageBox]::Show($st.Page.FindForm(), $_.Exception.Message, 'Delete failed', 'OK', 'Error') | Out-Null }

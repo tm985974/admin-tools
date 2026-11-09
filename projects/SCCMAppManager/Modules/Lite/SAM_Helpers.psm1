@@ -207,6 +207,20 @@ function Get-SamMsiProductCode {
     }
 }
 
+# The robocopy argument line (also shown in the command window by Get-SamRobocopyCode).
+function Get-SamRobocopyArgs {
+    param([string]$Source, [string]$Destination, [string]$LogPath)
+    $threads = [int]$global:SAM.Settings.RobocopyThreads
+    if ($threads -lt 1) { $threads = 8 }
+    return ('"{0}" "{1}" /E /COPY:DAT /R:2 /W:5 /MT:{2} /NP /NDL /NFL /LOG:"{3}"' -f $Source.TrimEnd('\'), $Destination.TrimEnd('\'), $threads, $LogPath)
+}
+
+function Get-SamRobocopyCode {
+    param([string]$Source, [string]$Destination)
+    $log = [IO.Path]::Combine([string]$global:SAM.LogDir, 'Robocopy', 'robocopy_<time>.log')
+    return ('Start-Process -FilePath robocopy.exe -ArgumentList ' + (Format-AppCommandValue (Get-SamRobocopyArgs -Source $Source -Destination $Destination -LogPath $log)) + ' -WindowStyle Hidden -Wait   # exit 0-7 = OK')
+}
+
 # Robocopy in a hidden process while the UI keeps pumping. Only changed files are
 # copied, so re-running an interrupted copy is safe. Exit 0-7 = success, 8+ = failure.
 function Invoke-SamRobocopy {
@@ -216,9 +230,7 @@ function Invoke-SamRobocopy {
     $dir = [IO.Path]::Combine([string]$global:SAM.LogDir, 'Robocopy')
     try { if (-not [IO.Directory]::Exists($dir)) { [void][IO.Directory]::CreateDirectory($dir) } } catch { }
     $rcLog = [IO.Path]::Combine($dir, ('robocopy_{0}.log' -f (Get-Date -Format 'yyyyMMdd_HHmmss_fff')))
-    $threads = [int]$global:SAM.Settings.RobocopyThreads
-    if ($threads -lt 1) { $threads = 8 }
-    $argLine = '"{0}" "{1}" /E /COPY:DAT /R:2 /W:5 /MT:{2} /NP /NDL /NFL /LOG:"{3}"' -f $src, $dst, $threads, $rcLog
+    $argLine = Get-SamRobocopyArgs -Source $src -Destination $dst -LogPath $rcLog
     Write-SamLog "  robocopy $src  ->  $dst"
     $p = Start-Process -FilePath 'robocopy.exe' -ArgumentList $argLine -WindowStyle Hidden -PassThru
     $null = $p.Handle   # required so ExitCode is populated

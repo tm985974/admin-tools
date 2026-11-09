@@ -263,7 +263,7 @@ function Invoke-ImportAdd {
     if ($sel.Count -eq 0) { $State.Result.Text = 'Nothing checked.'; return }
     $review = @($sel | Where-Object { $_.Status -eq 'Review' })
     if ($review.Count) {
-        $r = [System.Windows.Forms.MessageBox]::Show($State.Page.FindForm(),
+        $r = [System.Windows.Forms.MessageBox]::Show($State.Page.FindForm(),   # not-a-command: library import
             "$($review.Count) of these need a look before they are relied on:`r`n`r`n$((@($review | Select-Object -First 12 | ForEach-Object { "$($_.Function): $(@($_.Warnings)[0])" })) -join "`r`n")`r`n`r`nAdd them anyway? (The notes are saved with each entry.)",
             'Import', 'YesNo', 'Question')
         if ($r -ne 'Yes') { return }
@@ -307,7 +307,7 @@ function Invoke-ImportUpdate {
     $edited = @($changed | Where-Object { $State.Library[$_.Function.ToLower()].Entry.Edited })
     $msg = "Update the code of $($changed.Count) entr$(if ($changed.Count -eq 1) { 'y' } else { 'ies' }) from $($State.Source.Project)?`r`nDescriptions, categories and notes are kept."
     if ($edited.Count) { $msg += "`r`n`r`n$($edited.Count) of them were edited in the library; their edited code will be replaced: $((@($edited | ForEach-Object { $_.Function })) -join ', ')" }
-    $r = [System.Windows.Forms.MessageBox]::Show($State.Page.FindForm(), $msg, 'Update changed', 'YesNo', 'Question')
+    $r = [System.Windows.Forms.MessageBox]::Show($State.Page.FindForm(), $msg, 'Update changed', 'YesNo', 'Question')   # not-a-command: library edit
     if ($r -ne 'Yes') { return }
     $n = 0
     foreach ($c in $changed) {

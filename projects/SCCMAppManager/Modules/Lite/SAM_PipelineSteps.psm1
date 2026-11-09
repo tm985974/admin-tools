@@ -39,7 +39,9 @@ function Invoke-SamPullFromIncoming {
     $intro = 'Copy these versions from the Incoming share to Local Root?'
     if ($S.Settings.PruneOldLocalVersions) { $intro += "`r`n(Older local version folders are removed AFTER a successful copy, except a version not yet in the repository.)" }
     $lines = $targets | ForEach-Object { '{0}: {1} -> {2}' -f $_.BaseName, (Format-SamVer $_.LocalVersion), $_.IncomingVersion }
-    if (-not (Confirm-SamBatch 'Pull from Incoming' $intro $lines)) { return }
+    $code = @($targets | ForEach-Object { Get-SamRobocopyCode -Source $_.IncomingPath -Destination ([IO.Path]::Combine($S.Settings.LocalRootResolved, $_.BaseName, $_.IncomingVersion)) })
+    if ($S.Settings.PruneOldLocalVersions) { $code += '# then, after a successful copy: Remove-Item -Recurse -Force on the older version folders (not one still missing from the repository)' }
+    if (-not (Confirm-SamBatch 'Pull from Incoming' $intro $lines -Code ($code -join "`r`n"))) { return }
 
     $n = 0
     foreach ($r in $targets) {
@@ -163,7 +165,8 @@ function Invoke-SamUploadToRepository {
     $targets = @(Get-SamTargetRows $global:SamActUpload ${function:Test-SamCanUpload} $Selected)
     if (-not $targets.Count) { return }
     $lines = $targets | ForEach-Object { '{0} {1}' -f $_.BaseName, $_.JsonVersion }
-    if (-not (Confirm-SamBatch 'Upload to Repository' "Upload these version folders to $($S.Settings.RepositoryPath) ?" $lines)) { return }
+    $code = @($targets | ForEach-Object { Get-SamRobocopyCode -Source ([IO.Path]::Combine($S.Settings.LocalRootResolved, $_.BaseName, $_.JsonVersion)) -Destination ([IO.Path]::Combine($S.Settings.RepositoryPath, $_.BaseName, $_.JsonVersion)) }) -join "`r`n"
+    if (-not (Confirm-SamBatch 'Upload to Repository' "Upload these version folders to $($S.Settings.RepositoryPath) ?" $lines -Code $code)) { return }
 
     $n = 0; $ok = 0
     foreach ($r in $targets) {
@@ -189,20 +192,25 @@ function Get-SamAllowed {
     return $Default
 }
 
-function New-SamSccmAppFromConfig {
+# Everything New-SamSccmAppFromConfig passes to the ConfigMgr cmdlets, built once
+# so the command window (Get-SamCreateCommandText) shows exactly what runs.
+# Returns Ok / Error / Name / Content / App (New-CMApplication) / DT
+# (Add-CMScriptDeploymentType) / Folder / Warnings.
+function Get-SamAppCreateSpec {
     param($Config)
     $S = $global:SAM
     $app = $Config.Application; $dt = $Config.DeploymentType; $pc = $Config.PathConfiguration
     $name = [string]$app.Name
+    $spec = [pscustomobject]@{ Ok = $false; Error = ''; Name = $name; Content = ''; App = $null; DT = $null; Folder = [string]$app.FolderPath; Warnings = (New-Object System.Collections.ArrayList) }
 
-    if (-not $name -or -not $app.SoftwareVersion) { Write-SamLog '  Application.Name / SoftwareVersion missing in JSON' -Level Error; return $false }
-    if (-not $dt -or -not $dt.InstallCommand)      { Write-SamLog '  No DeploymentType / InstallCommand in JSON' -Level Error; return $false }
+    if (-not $name -or -not $app.SoftwareVersion) { $spec.Error = 'Application.Name / SoftwareVersion missing in JSON'; return $spec }
+    if (-not $dt -or -not $dt.InstallCommand)      { $spec.Error = 'No DeploymentType / InstallCommand in JSON'; return $spec }
     $detection = if ($dt.DetectionMethod) { [string]$dt.DetectionMethod.ScriptText } else { '' }
-    if (-not $detection) { Write-SamLog '  No detection script in JSON (script detection is required)' -Level Error; return $false }
+    if (-not $detection) { $spec.Error = 'No detection script in JSON (script detection is required)'; return $spec }
 
     $content = [IO.Path]::Combine($S.Settings.RepositoryPath, [string]$pc.AppBaseName, [string]$pc.CurrentVersion).TrimEnd('\') + '\'
-    if (-not (Test-SamFolderHasFiles $content)) { Write-SamLog "  Content not found in repository: $content (run Upload first)" -Level Error; return $false }
-    Write-SamLog "  Content: $content"
+    $spec.Content = $content
+    if (-not (Test-SamFolderHasFiles $content)) { $spec.Error = "Content not found in repository: $content (run Upload first)"; return $spec }
 
     $p = @{
         Name            = $name
@@ -221,10 +229,66 @@ function New-SamSccmAppFromConfig {
             $len = (New-Object IO.FileInfo $icon).Length
             $ext = [IO.Path]::GetExtension($icon).ToLower()
             if ($len -gt 0 -and $len -lt 5MB -and @('.ico', '.png', '.jpg', '.jpeg', '.gif', '.bmp') -contains $ext) { $p['IconLocationFile'] = $icon }
-            else { Write-SamLog "  Icon rejected ($ext, $len bytes) - creating without icon" -Level Warning }
+            else { [void]$spec.Warnings.Add("Icon rejected ($ext, $len bytes) - creating without icon") }
         }
-        else { Write-SamLog "  Icon not found: $icon - creating without icon" -Level Warning }
+        else { [void]$spec.Warnings.Add("Icon not found: $icon - creating without icon") }
     }
+    $spec.App = $p
+
+    $dtParams = @{
+        ApplicationName          = $name
+        DeploymentTypeName       = $(if ($dt.DeploymentTypeName) { [string]$dt.DeploymentTypeName } else { $name })
+        InstallCommand           = [string]$dt.InstallCommand
+        ContentLocation          = $content
+        ScriptLanguage           = (Get-SamAllowed $dt.DetectionMethod.ScriptLanguage @('PowerShell', 'VBScript', 'JavaScript') 'PowerShell')
+        ScriptText               = $detection
+        InstallationBehaviorType = (Get-SamAllowed $dt.InstallationBehavior.Type @('InstallForSystem', 'InstallForUser', 'InstallForSystemIfResourceIsDeviceOtherwiseInstallForUser') 'InstallForSystem')
+        LogonRequirementType     = (Get-SamAllowed $dt.LogonRequirement.Type @('OnlyWhenNoUserLoggedOn', 'OnlyWhenUserLoggedOn', 'WhetherOrNotUserLoggedOn') 'WhetherOrNotUserLoggedOn')
+        UserInteractionMode      = (Get-SamAllowed $dt.UserInteraction.Mode @('Normal', 'Hidden', 'Maximized', 'Minimized') 'Hidden')
+        RebootBehavior           = (Get-SamAllowed $dt.RebootBehavior.Type @('BasedOnExitCode', 'NoAction', 'ForceReboot', 'ProgramReboot') 'BasedOnExitCode')
+    }
+    if ($dt.UninstallCommand) { $dtParams['UninstallCommand'] = [string]$dt.UninstallCommand }
+    if ($dt.RepairCommand)    { $dtParams['RepairCommand']    = [string]$dt.RepairCommand }
+    if ($dt.ExecutionTime) {
+        if ([int]$dt.ExecutionTime.MaximumMinutes -gt 0)   { $dtParams['MaximumRuntimeMins']   = [int]$dt.ExecutionTime.MaximumMinutes }
+        if ([int]$dt.ExecutionTime.EstimatedMinutes -gt 0) { $dtParams['EstimatedRuntimeMins'] = [int]$dt.ExecutionTime.EstimatedMinutes }
+    }
+
+    $spec.DT = $dtParams
+    $spec.Ok = $true
+    return $spec
+}
+
+# The command window text for creating these applications (from their JSON).
+function Get-SamCreateCommandText {
+    param($Configs)
+    $lines = New-Object System.Collections.Generic.List[string]
+    foreach ($cfg in @($Configs)) {
+        $spec = Get-SamAppCreateSpec -Config $cfg
+        if (-not $spec.Ok) { $lines.Add("# $($spec.Name): not created - $($spec.Error)"); continue }
+        $lines.Add('')
+        $lines.Add("# ---- $($spec.Name)")
+        $lines.Add('$app = ' + (Format-SamCode $spec.App))
+        $lines.Add('New-CMApplication @app')
+        $lines.Add('$dt = ' + (Format-SamCode $spec.DT))
+        $lines.Add('Add-CMScriptDeploymentType @dt   # on failure the app removes the half-made application')
+        if ($spec.Folder) { $lines.Add('Move-CMObject -InputObject (Get-CMApplication -Name ' + (Format-SamCode $spec.Name) + ') -FolderPath ' + (Format-SamCode ("$($global:SAM.Settings.SiteCode):\Application\$($spec.Folder)"))) }
+    }
+    return (Get-SamCmCode -Lines $lines -Note 'If New-CMApplication rejects an optional value, the app retries without it (and logs which one).')
+}
+
+function New-SamSccmAppFromConfig {
+    param($Config)
+    $S = $global:SAM
+    $app = $Config.Application
+    $spec = Get-SamAppCreateSpec -Config $Config
+    if (-not $spec.Ok) { Write-SamLog "  $($spec.Error)" -Level Error; return $false }
+    $name = $spec.Name
+    $content = $spec.Content
+    Write-SamLog "  Content: $content"
+    foreach ($w in $spec.Warnings) { Write-SamLog "  $w" -Level Warning }
+    $p = $spec.App
+    $dtParams = $spec.DT
     Write-SamLog ('  New-CMApplication parameters: ' + (($p.Keys | Sort-Object) -join ', '))
 
     $newApp = Invoke-SamCM {
@@ -248,25 +312,6 @@ function New-SamSccmAppFromConfig {
     }
     if (-not $newApp) { Write-SamLog '  Application could not be created.' -Level Error; return $false }
     Write-SamLog '  Application created' -Level Success
-
-    $dtParams = @{
-        ApplicationName          = $name
-        DeploymentTypeName       = $(if ($dt.DeploymentTypeName) { [string]$dt.DeploymentTypeName } else { $name })
-        InstallCommand           = [string]$dt.InstallCommand
-        ContentLocation          = $content
-        ScriptLanguage           = (Get-SamAllowed $dt.DetectionMethod.ScriptLanguage @('PowerShell', 'VBScript', 'JavaScript') 'PowerShell')
-        ScriptText               = $detection
-        InstallationBehaviorType = (Get-SamAllowed $dt.InstallationBehavior.Type @('InstallForSystem', 'InstallForUser', 'InstallForSystemIfResourceIsDeviceOtherwiseInstallForUser') 'InstallForSystem')
-        LogonRequirementType     = (Get-SamAllowed $dt.LogonRequirement.Type @('OnlyWhenNoUserLoggedOn', 'OnlyWhenUserLoggedOn', 'WhetherOrNotUserLoggedOn') 'WhetherOrNotUserLoggedOn')
-        UserInteractionMode      = (Get-SamAllowed $dt.UserInteraction.Mode @('Normal', 'Hidden', 'Maximized', 'Minimized') 'Hidden')
-        RebootBehavior           = (Get-SamAllowed $dt.RebootBehavior.Type @('BasedOnExitCode', 'NoAction', 'ForceReboot', 'ProgramReboot') 'BasedOnExitCode')
-    }
-    if ($dt.UninstallCommand) { $dtParams['UninstallCommand'] = [string]$dt.UninstallCommand }
-    if ($dt.RepairCommand)    { $dtParams['RepairCommand']    = [string]$dt.RepairCommand }
-    if ($dt.ExecutionTime) {
-        if ([int]$dt.ExecutionTime.MaximumMinutes -gt 0)   { $dtParams['MaximumRuntimeMins']   = [int]$dt.ExecutionTime.MaximumMinutes }
-        if ([int]$dt.ExecutionTime.EstimatedMinutes -gt 0) { $dtParams['EstimatedRuntimeMins'] = [int]$dt.ExecutionTime.EstimatedMinutes }
-    }
 
     $dtOk = Measure-SamStep "  Add deployment type ($name)" {
         Invoke-SamCM {
@@ -310,7 +355,8 @@ function Invoke-SamCreateInSccm {
     $targets = @($targets | Where-Object { $allowed -contains $_.AppName })
     if (-not $targets.Count) { return }
     $lines = $targets | ForEach-Object { '{0}   (folder: {1})' -f $_.AppName, $(if ($_.Config.Application.FolderPath) { $_.Config.Application.FolderPath } else { 'root' }) }
-    if (-not (Confirm-SamBatch 'Create in SCCM' "Create these applications in site $($global:SAM.Settings.SiteCode)?" $lines)) { return }
+    $code = Get-SamCreateCommandText -Configs @($targets | ForEach-Object { Read-SamAppConfig $_.JsonPath })
+    if (-not (Confirm-SamBatch 'Create in SCCM' "Create these applications in site $($global:SAM.Settings.SiteCode)?" $lines -Code $code)) { return }
 
     $n = 0; $ok = 0
     foreach ($r in $targets) {

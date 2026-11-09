@@ -1,0 +1,51 @@
+{
+    "_note": "Hover help for this project's buttons, menu items and tabs (project-owned). Key = the control's text, optionally preceded by where it is: tab / sub-tab / group box titles (outermost first) or a dialog's title, joined with ' > '. The most specific match wins; '&', a trailing '...' and case are ignored. An empty text = no tooltip on purpose. Engine controls (developer buttons, Environment tab, OK / Cancel / Close ...) already have entries in Base\\Services_ToolTips.psm1; an entry here overrides them. The developer build lists every control still missing one in <data root>\\Logs\\ToolTips_missing.txt.",
+    "ToolTips": {
+        "Overview": "What this tool does and how the tabs fit together.",
+        "Drivers": "Build RSLinx Ethernet drivers from the device registry and put them on this PC; back up and restore them.",
+        "Site Codes": "Lease -> site code table used to name drivers. Saved per environment.",
+        "VLAN Lookup": "Subnet -> VLAN / driver name table used to group IPs into drivers. Saved per environment.",
+        "RSLinx": "The RSLinx Classic control panel, shown inside this tab.",
+
+        "Drivers > Restart as administrator": "Start this app again as administrator (needed to change drivers), then close this copy.",
+        "Drivers > Load CSV file": "Read a device registry CSV export and build the preview from it.",
+        "Drivers > Paste clipboard": "Paste device registry rows (or a Name,Node driver list) from the clipboard.",
+        "Drivers > Clear": "Empty the paste box.",
+        "Drivers > Build preview": "Turn the pasted rows into drivers (named from the VLAN lookup and site codes) in the preview.",
+        "Drivers > Include inactive devices": "Also use devices marked inactive in the device registry.",
+        "Drivers > Include Secondary IPs": "Also use each device's secondary IP addresses, not only the primary one.",
+        "Drivers > All": "Tick every site in the site list.",
+        "Drivers > None": "Untick every site in the site list.",
+        "Drivers > Add to this PC": "Add the ticked preview rows to this PC's drivers; existing drivers are kept. A backup is taken first.",
+        "Drivers > Overwrite this PC": "Replace ALL of this PC's Ethernet drivers with the ticked preview rows. A backup is taken first.",
+        "Drivers > Use selected": "Tick the selected preview rows so they are applied.",
+        "Drivers > Skip selected": "Untick the selected preview rows so they are left out.",
+        "Drivers > Remove selected rows": "Take the selected rows out of the preview (nothing on this PC changes).",
+        "Drivers > Clear preview": "Empty the preview (nothing on this PC changes).",
+        "Drivers > Refresh": "Read this PC's drivers and the backup list again.",
+        "Drivers > Remove selected IPs": "Remove the selected IPs from this PC's drivers; a driver left empty is deleted. A backup is taken first.",
+        "Drivers > Copy to preview": "Copy the selected (or all) drivers on this PC into the preview, e.g. to edit and write them back.",
+        "Drivers > Save current": "Save this PC's drivers to a CSV backup now (you can add a name).",
+        "Drivers > Restore to preview": "Load the selected backup into the preview; then Add or Overwrite puts it on this PC.",
+        "Drivers > Delete": "Delete the selected backup file.",
+        "Drivers > Open folder": "Open the backup folder in Explorer.",
+
+        "Site Codes > Add row": "Add an empty row to the table.",
+        "Site Codes > Delete selected": "Delete the selected rows (saved only when you click Save).",
+        "Site Codes > Save": "Save the table for this environment (the old one is kept as .bak).",
+        "Site Codes > Reload": "Throw away unsaved edits and load the saved table again.",
+        "Site Codes > Reset to shipped defaults": "Replace the table with the one that ships with the app (saved only when you click Save).",
+
+        "VLAN Lookup > Add row": "Add an empty row to the table.",
+        "VLAN Lookup > Delete selected": "Delete the selected rows (saved only when you click Save).",
+        "VLAN Lookup > Save": "Save the table for this environment (the old one is kept as .bak).",
+        "VLAN Lookup > Reload": "Throw away unsaved edits and load the saved table again.",
+        "VLAN Lookup > Import CSV": "Replace or extend the table from a CSV file (Site, IpBase, Cidr, Vlan, Description).",
+        "VLAN Lookup > Export CSV": "Save the table to a CSV file.",
+        "VLAN Lookup > Reset to shipped defaults": "Replace the table with the one that ships with the app (saved only when you click Save).",
+
+        "RSLinx > Refresh": "Read the RSLinx version, service and driver details again.",
+        "RSLinx > Start / re-attach control panel": "Start the RSLinx Classic control panel (or find it again) and show it inside this tab.",
+        "RSLinx > Open in its own window": "Let go of the control panel so it runs in its own window."
+    }
+}

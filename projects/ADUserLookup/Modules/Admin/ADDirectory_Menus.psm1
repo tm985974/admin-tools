@@ -317,7 +317,7 @@ function New-UserContextMenu {
             if ($already.Count -gt 0)    { $warn += "`n`nAlready unlocked ($($already.Count)):`n$($already -join ', ')" }
             if ($unreadable.Count -gt 0) { $warn += "`n`nState could not be read ($($unreadable.Count)):`n$($unreadable -join ', ')" }
             $warn += "`n`nContinue and unlock the remaining $($actionable.Count) account(s)?"
-            $go = [System.Windows.Forms.MessageBox]::Show($warn,'Unlock Account','YesNo','Warning')
+            $go = [System.Windows.Forms.MessageBox]::Show($warn,'Unlock Account','YesNo','Warning')   # not-a-command: lists skipped items; the command window follows
             if ($go -ne [System.Windows.Forms.DialogResult]::Yes) { return }
         }
 
@@ -438,7 +438,7 @@ function New-UserContextMenu {
             if ($already.Count -gt 0)    { $warn += "`n`nAlready enabled ($($already.Count)):`n$($already -join ', ')" }
             if ($unreadable.Count -gt 0) { $warn += "`n`nState could not be read ($($unreadable.Count)):`n$($unreadable -join ', ')" }
             $warn += "`n`nContinue and enable the remaining $($actionable.Count) account(s)?"
-            $go = [System.Windows.Forms.MessageBox]::Show($warn,'Enable Account','YesNo','Warning')
+            $go = [System.Windows.Forms.MessageBox]::Show($warn,'Enable Account','YesNo','Warning')   # not-a-command: lists skipped items; the command window follows
             if ($go -ne [System.Windows.Forms.DialogResult]::Yes) { return }
         }
 
@@ -563,7 +563,7 @@ function New-UserContextMenu {
             if ($already.Count -gt 0)    { $warn += "`n`nAlready disabled ($($already.Count)):`n$($already -join ', ')" }
             if ($unreadable.Count -gt 0) { $warn += "`n`nState could not be read ($($unreadable.Count)):`n$($unreadable -join ', ')" }
             $warn += "`n`nContinue and disable the remaining $($actionable.Count) account(s)?"
-            $go = [System.Windows.Forms.MessageBox]::Show($warn,'Disable Account','YesNo','Warning')
+            $go = [System.Windows.Forms.MessageBox]::Show($warn,'Disable Account','YesNo','Warning')   # not-a-command: lists skipped items; the command window follows
             if ($go -ne [System.Windows.Forms.DialogResult]::Yes) { return }
         }
 

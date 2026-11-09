@@ -99,7 +99,7 @@ function Copy-SamJsonToEnvironment {
         $path = Find-SamSiteJson -Root $t.LocalRootResolved -BaseName $base -SiteCode $t.SiteCode
         if (-not $path) { $path = [IO.Path]::Combine($t.LocalRootResolved, ('{0}_{1}.json' -f ($base -replace '[\\/:*?"<>|]', '_'), $t.SiteCode)) }
         if ([IO.File]::Exists($path)) {
-            $ans = [System.Windows.Forms.MessageBox]::Show((Get-SamOwnerForm),
+            $ans = [System.Windows.Forms.MessageBox]::Show((Get-SamOwnerForm),   # not-a-command: overwrite question
                 "$([IO.Path]::GetFileName($path)) already exists for site $($t.SiteCode).`r`n`r`nOverwrite it? (A backup is kept in _Backup.)", 'Copy JSON', 'YesNo', 'Question')
             if ($ans -ne [System.Windows.Forms.DialogResult]::Yes) { Write-SamLog "  [$base] kept the existing $path"; continue }
             Backup-SamJson $path
@@ -113,9 +113,9 @@ function Copy-SamJsonToEnvironment {
         $srcLocal = [IO.Path]::Combine($S.Settings.LocalRootResolved, $base, $ver)
         $dstLocal = [IO.Path]::Combine($t.LocalRootResolved, $base, $ver)
         if ($srcLocal -ne $dstLocal -and (Test-SamFolderHasFiles $srcLocal) -and -not (Test-SamFolderHasFiles $dstLocal)) {
-            $ans = [System.Windows.Forms.MessageBox]::Show((Get-SamOwnerForm),
-                "Copy the local content folder too?`r`n`r`n$srcLocal`r`n  ->  $dstLocal", 'Copy JSON', 'YesNo', 'Question')
-            if ($ans -eq [System.Windows.Forms.DialogResult]::Yes) { [void](Invoke-SamRobocopy -Source $srcLocal -Destination $dstLocal) }
+            if (Confirm-AppCommand -App $S.App -Title 'Copy JSON - local content' -Kind Change -Always -RunLabel 'Copy' `
+                    -Summary "Copy the local content folder too? (Cancel = no)`r`n$srcLocal`r`n  ->  $dstLocal" `
+                    -Code (Get-SamRobocopyCode -Source $srcLocal -Destination $dstLocal)) { [void](Invoke-SamRobocopy -Source $srcLocal -Destination $dstLocal) }
         }
     }
     Write-SamLog "Copy finished: $done JSON file(s) written for '$($t.EnvLabel)' (site $($t.SiteCode)). Switch to that environment to Upload / Create / Deploy." -Level Success
