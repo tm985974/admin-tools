@@ -2,6 +2,15 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.1  (2026-11-03)  Fix: Fleet results failed after every machine
+  Fixed   : Check status / Collect requests / Apply licenses logged "The
+            expression after '&' in a pipeline element produced an object that
+            was not valid" for every machine, and the grid row was not updated.
+            The per-machine result handler is a closure created inside another
+            closure; GetNewClosure copies only the current scope's variables, so
+            it saw the tab state ($st) as $null. $st is now made local before
+            the inner closures are created.
+
 v1.0.0  (2026-11-03)  Radmin License Manager - created from AppTemplate v1.0.20
   Added   : Replaces RadminSaveRequest.ps1, RadminSaveLic.ps1 and
             RadminLoadLicense.ps1 with one tool for the offline round trip

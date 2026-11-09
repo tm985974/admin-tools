@@ -208,6 +208,10 @@ function Build-FleetTab {
     # ---------------- the three actions ----------------
     $st.Run = {
         param([string]$Action)
+        # GetNewClosure copies only THIS scope's variables: $st lives in the outer
+        # closure's module, so make it local here or $onResult / $onDone below
+        # would see $st = $null ("The expression after '&' ... was not valid").
+        $st = $st
         if ($st.Batch) { return }
         $app = $st.App
         $set = & $st.R.Settings -App $app
