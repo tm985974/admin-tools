@@ -328,27 +328,26 @@ function Get-ADSharedContext {
 # Tabs built in the background once connected (titles as in UI_Register-Tabs).
 $script:ADWarmTitles = @('Users', 'Groups', 'Account Management', 'Computers')
 
-# Run -Action once, the first time -Page is really on screen (v1.2.20).
-# The ported tabs load their data in $Tab.Add_Enter, i.e. when keyboard focus
-# moves into the tab. That is not reliable for a tab built in the background
-# (Invoke-LazyTabWarmup): if focus does not land inside it on the first visit,
-# nothing loads until you click into the list. This hooks the main tab strip
-# instead: the first time -Page is the selected tab (or now, if it already
-# is), -Action runs - after the click has been handled, so the tab paints first.
+# Run -Action whenever -Page comes on screen (v1.2.20), after the click has
+# been handled, so the tab paints first. -Action must do nothing when its data
+# is already loaded (the Invoke-*FirstLoad functions check a flag), so this
+# loads a tab's data on its first view - and again on the next view after an
+# environment change marked it stale, or after a view while not connected.
+# The ported tabs loaded in $Tab.Add_Enter, i.e. when keyboard focus moved into
+# the tab - not reliable for a tab built in the background (Invoke-LazyTabWarmup):
+# if focus did not land inside it, nothing loaded until you clicked the list.
 function Register-ADTabFirstShow {
     param([System.Windows.Forms.TabPage]$Page, [scriptblock]$Action)
     $tabs = $Page.Parent
     if (-not ($tabs -is [System.Windows.Forms.TabControl])) { return }
-    $state = @{ Done = $false }                       # a hashtable, so the flag survives between handler calls
     $app = $script:ADApp
     $run = {
-        if ($state.Done -or $tabs.SelectedTab -ne $Page) { return }
-        $state.Done = $true
+        if ($tabs.SelectedTab -ne $Page) { return }
         try { & $Action }
-        catch { if ($app) { $app.Log('ERROR', 'Tabs', "$($Page.Text.Trim()) first load: $($_.Exception.Message)") } }
+        catch { if ($app) { $app.Log('ERROR', 'Tabs', "$($Page.Text.Trim()) load: $($_.Exception.Message)") } }
     }.GetNewClosure()
     $tabs.Add_SelectedIndexChanged({
-        if (-not $state.Done -and $tabs.SelectedTab -eq $Page) {
+        if ($tabs.SelectedTab -eq $Page) {
             try { [void]$tabs.BeginInvoke([System.Windows.Forms.MethodInvoker]$run) } catch { }
         }
     }.GetNewClosure())
@@ -463,13 +462,27 @@ function Invoke-ADEnvironmentChanged {
     Update-DomainBar
     if (-not $script:ADConnected) { return }
 
+    # v1.2.20: the old domain's lists are cleared and marked stale; only the tab
+    # on screen loads now, every other tab loads its list when next shown
+    # (Register-ADTabFirstShow). Before, users, groups and computers were all
+    # re-read here, for tabs that might never be opened.
+    $script:UsersFirstLoaded  = $false
+    $script:GroupsFirstLoaded = $false
+    if (Get-Command Stop-ADIPv4Fill -ErrorAction SilentlyContinue) { Stop-ADIPv4Fill }
+    try { $script:AllUsers.Clear();  if (Get-Command Update-UserGrid  -ErrorAction SilentlyContinue) { Update-UserGrid } } catch { }
+    try { $script:AllGroups.Clear(); if (Get-Command Update-GroupGrid -ErrorAction SilentlyContinue) { Update-GroupGrid } } catch { }
+    try { $script:AllConnComputers.Clear(); if (Get-Command Update-ConnCompGrid -ErrorAction SilentlyContinue) { Update-ConnCompGrid } } catch { }
+    $shown = if ($global:MainTabs -and $global:MainTabs.SelectedTab) { $global:MainTabs.SelectedTab.Text.Trim() } else { '' }
+
     $frm = if ($global:AppForm) { $global:AppForm } else { $null }
     if ($frm) { $frm.Cursor = [System.Windows.Forms.Cursors]::WaitCursor }
     try {
-        if (Get-Command Update-DirectoryTree    -ErrorAction SilentlyContinue) { try { Update-DirectoryTree -Context $ctx } catch { } }
-        if (Get-Command Read-DirectoryUsers     -ErrorAction SilentlyContinue) { try { Read-DirectoryUsers     } catch { } }
-        if (Get-Command Read-DirectoryGroups    -ErrorAction SilentlyContinue) { try { Read-DirectoryGroups    } catch { } }
-        if (Get-Command Read-DirectoryComputers -ErrorAction SilentlyContinue) { try { Read-DirectoryComputers } catch { } }
+        if (Get-Command Update-DirectoryTree -ErrorAction SilentlyContinue) { try { Update-DirectoryTree -Context $ctx } catch { } }
+        switch ($shown) {
+            'Users'     { try { Invoke-UsersFirstLoad } catch { } }
+            'Groups'    { try { Invoke-GroupsFirstLoad } catch { } }
+            'Computers' { try { Reset-ConnCompCards; Read-ConnComputers } catch { } }
+        }
     }
     finally { if ($frm) { $frm.Cursor = [System.Windows.Forms.Cursors]::Default } }
     if (Get-Command Write-OperationLog -ErrorAction SilentlyContinue) {

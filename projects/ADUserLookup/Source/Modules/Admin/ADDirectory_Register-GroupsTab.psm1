@@ -190,7 +190,7 @@ function Register-GroupsTab {
 $script:GroupsFirstLoaded = $false
 function Invoke-GroupsFirstLoad {
     if ($script:GroupsFirstLoaded) { return }
-    $script:GroupsFirstLoaded = $true
+    if (-not $script:DirContext -or -not $script:DirContext.DomainDN) { return }    # not connected: try again on the next view
     Read-DirectoryGroups
 }
 #endregion

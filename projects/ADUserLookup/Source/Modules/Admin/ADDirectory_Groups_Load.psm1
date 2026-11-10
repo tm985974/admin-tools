@@ -60,6 +60,7 @@ function Read-DirectoryGroups {
         tab's per-user membership pane.
     #>
     if (-not $script:DirContext) { return }
+    $script:GroupsFirstLoaded = $true                 # any load counts (Refresh, environment change, first view)
     $ouDN = $script:DirContext.SelectedOUDN
     if (Get-Command Invoke-SetStatus -ErrorAction SilentlyContinue) { Invoke-SetStatus 'Loading groups...' }
     $script:AllGroups.Clear()

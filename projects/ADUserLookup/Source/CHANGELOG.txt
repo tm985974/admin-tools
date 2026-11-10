@@ -2,7 +2,7 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
-v1.2.20 (2026-11-10)  Groups / Computers load on first view; faster loading (+ engine v1.1.1)
+v1.2.20 (2026-11-10)  Lists load when first shown; IPs fill in the background; faster grids (+ engine v1.1.1)
   Fixed   : Groups and Computers sometimes stayed empty on the first visit until you
             clicked in the list: they loaded when keyboard focus entered the tab,
             which does not always happen for a tab built in the background. They now
@@ -23,6 +23,21 @@ v1.2.20 (2026-11-10)  Groups / Computers load on first view; faster loading (+ e
             computer query.
   Changed : Computer list and Audit / Bulk Import / Create User / OU tree loops no
             longer look up Get-OUFromDN with Get-Command once per row.
+  Changed : Computers tab: the list shows without waiting for DNS. AD was asked for
+            IPv4Address, which makes Get-ADComputer resolve every computer's name one
+            after another before returning. The IP column now fills in as the names
+            resolve in the background, 24 at a time (Start-ADIPv4Fill); filter, sort
+            and export see each address as it arrives. The Sessions dialog skips the
+            lookups altogether (it only needs names and OS).
+  Changed : The Users list loads when the Users tab is first opened (or when another
+            tab first needs it, e.g. Copy Groups From), not while the tab is built in
+            the background right after connecting - that froze the window at start.
+  Changed : Switching environment reloads only the tab on screen; Users, Groups and
+            Computers each load the new domain's list when next shown. Their old lists
+            are cleared at once, so nothing from the previous domain stays visible.
+  Removed : The hidden OU-scoped computer list that every Users-tab Reload and every
+            environment switch loaded (with a DNS lookup per computer) - nothing in
+            the app showed or used it.
   Changed : AppTemplate engine v1.1.0 -> v1.1.1 (Update Template): 1 file(s) replaced, 0 added, 0 removed.
   Note    : template v1.1.1  Session.log no longer rewritten on every line once full
 

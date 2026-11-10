@@ -41,12 +41,15 @@ function Read-ConnComputers {
     }
 
     if (Get-Command Set-Status -ErrorAction SilentlyContinue) { Set-Status 'Loading computers...' }
+    if (Get-Command Stop-ADIPv4Fill -ErrorAction SilentlyContinue) { Stop-ADIPv4Fill }   # the old list's lookups
     $script:AllConnComputers.Clear()
     $srvParam = if ($script:CompCtx -and $script:CompCtx.TargetDC) { @{ Server = $script:CompCtx.TargetDC } } else { @{} }
     try {
-        $raw = Get-DomainComputers @srvParam -IncludeDisabled
+        $raw = Get-DomainComputers @srvParam -IncludeDisabled -NoIPv4      # IPs: Start-ADIPv4Fill below (v1.2.20)
         $hasOuFn = [bool](Get-Command Get-OUFromDN -ErrorAction SilentlyContinue)   # once, not per computer (v1.2.20)
+        $dnsNames = @{}
         foreach ($c in $raw) {
+            if ($c.DNSHostName) { $dnsNames[[string]$c.Name] = [string]$c.DNSHostName }
             [void]$script:AllConnComputers.Add([PSCustomObject]@{
                 Name              = [string]$c.Name
                 Enabled           = [string]$c.Enabled
@@ -62,7 +65,10 @@ function Read-ConnComputers {
         }
         $script:ConnCompLoaded = $true
         if (Get-Command Update-ConnCompGrid -ErrorAction SilentlyContinue) { Update-ConnCompGrid }
-        if (Get-Command Set-Status -ErrorAction SilentlyContinue) { Set-Status "$($script:AllConnComputers.Count) computers loaded." 'ok' }
+        if (Get-Command Set-Status -ErrorAction SilentlyContinue) { Set-Status "$($script:AllConnComputers.Count) computers loaded - IP addresses fill in as they resolve." 'ok' }
+        if (Get-Command Start-ADIPv4Fill -ErrorAction SilentlyContinue) {
+            Start-ADIPv4Fill -Items $script:AllConnComputers -HostNames $dnsNames -Grid $script:ConnCompGrid
+        }
     } catch {
         $script:ConnCompLoaded = $false
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) { Set-Status "Computer load failed: $($_.Exception.Message)" 'err' }

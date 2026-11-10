@@ -55,6 +55,7 @@ function Read-DirectoryUsers {
         Write-ModuleDebugLog "[Users] Read-DirectoryUsers: entered. script:DirContext present = $([bool]$script:DirContext)"
     }
     if (-not $script:DirContext) { return }
+    $script:UsersFirstLoaded = $true                  # any load counts (Reload, environment change, first view)
     $ouDN = $script:DirContext.SelectedOUDN
     if (Get-Command Invoke-SetStatus -ErrorAction SilentlyContinue) { Invoke-SetStatus 'Loading users...' }
     $script:AllUsers.Clear()
@@ -102,6 +103,18 @@ function Read-DirectoryUsers {
 }
 #endregion
 
+#region -- Invoke-UsersFirstLoad -----------------------------------------------
+# v1.2.20: the user list loads when the Users tab is first shown (or when another
+# tab first asks for it through Get-CachedUsers) - not while the tab is built in
+# the background right after connecting, when it froze the window.
+$script:UsersFirstLoaded = $false
+function Invoke-UsersFirstLoad {
+    if ($script:UsersFirstLoaded) { return }
+    if (-not $script:DirContext -or -not $script:DirContext.DomainDN) { return }    # not connected: try again on the next view
+    Read-DirectoryUsers
+}
+#endregion
+
 #region -- Get-CachedUsers -----------------------------------------------------
 function Get-CachedUsers {
     <#
@@ -112,7 +125,10 @@ function Get-CachedUsers {
         User's "Copy Groups From" dropdown). Returns the live list reference;
         callers should not mutate it directly - use Update-CachedUser /
         Add-CachedUser instead so the grid stays in sync.
+        v1.2.20: loads the list first if it has not been loaded yet, so a
+        caller never has to run its own full-domain query.
     #>
+    Invoke-UsersFirstLoad
     return $script:AllUsers
 }
 #endregion

@@ -315,9 +315,9 @@ function Register-DirectoryTab {
         Show-ExportResult -FilePath (Export-ToCSV -Context $script:DirContext -Data $data -BaseName 'UserGroups')
     })
 
-    if ($Context.DomainDN) {
-        Read-DirectoryUsers
-    }
+    # v1.2.20: the list loads when the Users tab is first shown (UI_Directory:
+    # Register-ADTabFirstShow -> Invoke-UsersFirstLoad), not while this tab is
+    # built in the background right after connecting.
     # Groups pane is membership-driven (see ADDirectory.Users.Menu's
     # SelectionChanged handler) and starts empty with a prompt rather than
     # loading all domain groups.

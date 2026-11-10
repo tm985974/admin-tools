@@ -26,6 +26,10 @@ $script:LblCompCount  = $null
 
 #region -- Read-DirectoryComputers --------------------------------------------
 function Read-DirectoryComputers {
+    # v1.2.20: nothing in the app creates this list's grid ($script:CompGrid) or
+    # reads $script:AllComputers, yet every Users-tab Reload and environment change
+    # queried every computer in the OU (with a DNS lookup each) for it. Skip it.
+    if (-not $script:CompGrid) { return }
     if (-not $script:DirContext) { return }
     $ouDN = $script:DirContext.SelectedOUDN
     if (Get-Command Invoke-SetStatus -ErrorAction SilentlyContinue) { Invoke-SetStatus 'Loading computers...' }

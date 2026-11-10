@@ -47,6 +47,8 @@ function New-DirectoryTab {
 
         if (Get-Command Register-DirectoryTab -ErrorAction SilentlyContinue) {
             Register-DirectoryTab -Tab $tp -Context $ctx
+            # The user list loads on the first view (v1.2.20).
+            Register-ADTabFirstShow -Page $Page -Action ${function:Invoke-UsersFirstLoad}
         }
         if (Get-Command Register-GlobalOUTree -ErrorAction SilentlyContinue) {
             try { Register-GlobalOUTree -Container $treePanel -Context $ctx }

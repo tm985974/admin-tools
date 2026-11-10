@@ -336,10 +336,14 @@ function Get-DomainUsers {
 
 #region -- Get-DomainComputers ------------------------------------------------
 function Get-DomainComputers {
-    param([string]$SearchBase = '', [string]$Server = '', [switch]$IncludeDisabled)
+    # -NoIPv4 (v1.2.20): leave out IPv4Address. For that property Get-ADComputer
+    # resolves every computer's DNS name, one after another, before it returns;
+    # lists use Start-ADIPv4Fill to fill the addresses in the background instead.
+    param([string]$SearchBase = '', [string]$Server = '', [switch]$IncludeDisabled, [switch]$NoIPv4)
     $props = @('Name','Enabled','OperatingSystem','OperatingSystemVersion',
                'LastLogonDate','IPv4Address','DistinguishedName','Description',
                'whenCreated','whenChanged','DNSHostName')
+    if ($NoIPv4) { $props = @($props | Where-Object { $_ -ne 'IPv4Address' }) }
     if (Test-ADModule) {
         try {
             $params = @{

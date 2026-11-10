@@ -388,7 +388,7 @@ function Show-UserSessionsDialog {
 
         $osMap = @{}
         try {
-            $computers = Get-DomainComputers @srvParam
+            $computers = Get-DomainComputers @srvParam -NoIPv4   # names + OS only: no DNS lookup per computer (v1.2.20)
             foreach ($c in $computers) {
                 $osMap[[string]$c.Name] = if ($c.OperatingSystem) { [string]$c.OperatingSystem } else { 'Unknown' }
             }
