@@ -368,7 +368,7 @@ function Invoke-CreateUser {
         # Directory tab's cache isn't initialised. DistinguishedName is
         # approximated - see module header note.
         if (Get-Command Add-CachedUser -ErrorAction SilentlyContinue) {
-            $newOU = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $ouDN } else { '' }
+            $newOU = Get-OUFromDN -DN $ouDN
             Add-CachedUser -User ([PSCustomObject]@{
                 DisplayName       = $display
                 SamAccountName    = $sam

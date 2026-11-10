@@ -28,6 +28,8 @@ function New-GroupsTab {
 
         if (Get-Command Register-GroupsTab -ErrorAction SilentlyContinue) {
             Register-GroupsTab -Tab $tp -Context $ctx
+            # Load on the first view, not on keyboard focus (v1.2.20).
+            Register-ADTabFirstShow -Page $Page -Action ${function:Invoke-GroupsFirstLoad}
         } else {
             $l = New-Object System.Windows.Forms.Label; $l.Text = 'Register-GroupsTab not available.'; $l.Dock = 'Fill'; $l.Padding = '8,8,8,8'
             $tp.Controls.Add($l)

@@ -345,64 +345,75 @@ function Set-GridData {
         [string[]]$Columns = @(),
         [string]$DateFormat = 'yyyy-MM-dd'
     )
+    # v1.2.20 - same result, much less work (this fills every grid in the app):
+    #  * column auto-size is off while rows go in (with it on, every cell set made
+    #    the grid re-measure its columns; Users / Computers leave it on after the
+    #    first fill, so every Refresh and every filter keystroke paid for it),
+    #  * column types are found in one pass over the rows (it was a pipeline per
+    #    column, with a script block call per value),
+    #  * each row goes in with one Rows.Add(values) call (it was one call per cell).
     $Grid.SuspendLayout()
-    $Grid.Rows.Clear()
-    $Grid.Columns.Clear()
-    $list = @($Data)
-    if ($list.Count -eq 0) { $Grid.ResumeLayout(); return }
-    $cols = if ($Columns.Count -gt 0) { $Columns } else { $list[0].PSObject.Properties.Name }
+    $autoCols = $Grid.AutoSizeColumnsMode
+    $autoRows = $Grid.AutoSizeRowsMode
+    try {
+        $Grid.AutoSizeColumnsMode = [System.Windows.Forms.DataGridViewAutoSizeColumnsMode]::None
+        $Grid.AutoSizeRowsMode    = [System.Windows.Forms.DataGridViewAutoSizeRowsMode]::None
+        $Grid.Rows.Clear()
+        $Grid.Columns.Clear()
+        $list = @($Data)
+        if ($list.Count -eq 0) { return }
+        $cols = @(if ($Columns.Count -gt 0) { $Columns } else { $list[0].PSObject.Properties.Name })
+        $n = $cols.Count
 
-    # A value counts as "blank" the same way regardless of its type -
-    # avoids the ambiguous cross-type comparison ($intValue -eq '') that
-    # PowerShell does not always resolve the way you'd expect.
-    $isBlank = { param($v) ($null -eq $v) -or ($v -is [string] -and $v -eq '') }
-
-    # Determine each column's consistent type (if any) across every row.
-    $qualifyingTypes = @([int], [int32], [int64], [double], [decimal], [datetime])
-    $colType = @{}
-    foreach ($col in $cols) {
-        $vals = @($list | ForEach-Object { $_.$col } | Where-Object { -not (& $isBlank $_) })
-        if ($vals.Count -eq 0) {
-            $colType[$col] = $null
-            continue
-        }
-        $types = @($vals | ForEach-Object { $_.GetType() } | Select-Object -Unique)
-        if ($types.Count -eq 1 -and ($qualifyingTypes -contains $types[0])) {
-            $colType[$col] = $types[0]
-        } else {
-            $colType[$col] = $null
-        }
-    }
-
-    foreach ($col in $cols) {
-        $c            = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
-        $c.HeaderText = $col
-        $c.Name       = $col
-        $c.SortMode   = 'Automatic'
-        $t = $colType[$col]
-        if ($t) {
-            $c.ValueType = $t
-            if ($t -eq [datetime]) { $c.DefaultCellStyle.Format = $DateFormat }
-        }
-        $Grid.Columns.Add($c) | Out-Null
-    }
-
-    foreach ($item in $list) {
-        $rowIdx  = $Grid.Rows.Add()
-        $gridRow = $Grid.Rows[$rowIdx]
-        foreach ($col in $cols) {
-            $v = $item.$col
-            $t = $colType[$col]
-            if (& $isBlank $v) {
-                $gridRow.Cells[$col].Value = $null
-            } elseif ($t) {
-                $gridRow.Cells[$col].Value = $v
-            } else {
-                $gridRow.Cells[$col].Value = [string]$v
+        # A column gets a strict type only when every non-blank value in it, in
+        # every row, has the same qualifying type (see .DESCRIPTION). Blank =
+        # $null or an empty string, whatever the column's type.
+        $qualifyingTypes = @([int32], [int64], [double], [decimal], [datetime])
+        $colType = New-Object 'object[]' $n          # the one type seen so far, or $null
+        $mixed   = New-Object 'bool[]' $n
+        foreach ($item in $list) {
+            for ($i = 0; $i -lt $n; $i++) {
+                if ($mixed[$i]) { continue }
+                $v = $item.($cols[$i])
+                if ($null -eq $v -or ($v -is [string] -and $v -eq '')) { continue }
+                $t = $v.GetType()
+                if ($null -eq $colType[$i]) { $colType[$i] = $t }
+                elseif ($colType[$i] -ne $t) { $mixed[$i] = $true; $colType[$i] = $null }
             }
         }
+        for ($i = 0; $i -lt $n; $i++) {
+            if ($mixed[$i] -or -not ($qualifyingTypes -contains $colType[$i])) { $colType[$i] = $null }
+        }
+
+        for ($i = 0; $i -lt $n; $i++) {
+            $c            = New-Object System.Windows.Forms.DataGridViewTextBoxColumn
+            $c.HeaderText = $cols[$i]
+            $c.Name       = $cols[$i]
+            $c.SortMode   = 'Automatic'
+            $t = $colType[$i]
+            if ($t) {
+                $c.ValueType = $t
+                if ($t -eq [datetime]) { $c.DefaultCellStyle.Format = $DateFormat }
+            }
+            [void]$Grid.Columns.Add($c)
+        }
+
+        foreach ($item in $list) {
+            $vals = New-Object 'object[]' $n
+            for ($i = 0; $i -lt $n; $i++) {
+                $v = $item.($cols[$i])
+                if ($null -eq $v -or ($v -is [string] -and $v -eq '')) { $vals[$i] = $null }
+                elseif ($colType[$i]) { $vals[$i] = $v }
+                else { $vals[$i] = [string]$v }
+            }
+            [void]$Grid.Rows.Add($vals)
+        }
     }
-    $Grid.ResumeLayout()
+    finally {
+        $Grid.AutoSizeColumnsMode = $autoCols
+        $Grid.AutoSizeRowsMode    = $autoRows
+        $Grid.ResumeLayout()
+    }
 }
 #endregion
 

@@ -207,10 +207,13 @@ function Register-AuditTab {
 
     $btnRefreshAll.Add_Click({ & $renderDashboard }.GetNewClosure())
 
-    $loaded = $false
+    # v1.2.20: a hashtable, so the flag survives between handler calls (a plain
+    # variable assigned inside .GetNewClosure() is a copy that is lost on return,
+    # so the dashboard re-rendered on every visit).
+    $loaded = @{ Done = $false }
     $Tab.Add_Enter({
-        if (-not $loaded) {
-            $loaded = $true
+        if (-not $loaded.Done) {
+            $loaded.Done = $true
             & $renderDashboard
         }
     }.GetNewClosure())

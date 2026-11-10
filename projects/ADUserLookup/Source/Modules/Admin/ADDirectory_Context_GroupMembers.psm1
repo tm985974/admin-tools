@@ -349,10 +349,12 @@ function Show-GroupMembersDialog {
     # crashed with AccessViolationException, and forcing DroppedDown closed/
     # reopen from inside Add_DropDown fought WinForms' own state machine and
     # made the dropdown appear to never populate. Add_Enter avoids both.
-    $addUsersLoaded = $false
+    # v1.2.20: a hashtable, so the flag survives between handler calls (the list
+    # of every domain user was re-read each time the box got focus).
+    $addUsersLoaded = @{ Done = $false }
     $cmbAdd.Add_Enter({
-        if ($addUsersLoaded) { return }
-        $addUsersLoaded = $true
+        if ($addUsersLoaded.Done) { return }
+        $addUsersLoaded.Done = $true
         $srvParam = if ($dlgTargetDC) { @{ Server = $dlgTargetDC } } else { @{} }
         $items = [System.Collections.Generic.List[string]]::new()
         try {
@@ -366,7 +368,7 @@ function Show-GroupMembersDialog {
                 $userMap[$disp] = $sam
             }
         } catch {
-            $addUsersLoaded = $false
+            $addUsersLoaded.Done = $false
         }
         $cmbAdd.BeginUpdate()
         try {

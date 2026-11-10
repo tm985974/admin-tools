@@ -8,8 +8,16 @@
 #endregion
 
 #region -- AD module helpers --------------------------------------------------
+# v1.2.20: answered once per session. Get-Module -ListAvailable reads every
+# folder on PSModulePath (seconds on some machines, more when it includes a
+# network path) and every user / group / computer query asked again.
+$script:ADModuleAvailable = $null
 function Test-ADModule {
-    return [bool](Get-Module -ListAvailable -Name ActiveDirectory -ErrorAction SilentlyContinue)
+    if ($null -eq $script:ADModuleAvailable) {
+        $script:ADModuleAvailable = [bool](Get-Module -Name ActiveDirectory) -or
+            [bool](Get-Module -ListAvailable -Name ActiveDirectory -ErrorAction SilentlyContinue)
+    }
+    return $script:ADModuleAvailable
 }
 
 function Import-ADModuleSafe {

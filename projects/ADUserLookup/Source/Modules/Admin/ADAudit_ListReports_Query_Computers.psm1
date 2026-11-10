@@ -46,7 +46,7 @@ function Invoke-StaleComputersAudit {
                 LastLogon       = if ($c.LastLogonDate) { $c.LastLogonDate } else { $null }
                 DaysSinceLogon  = if ($c.LastLogonDate) { [math]::Round(((Get-Date) - $c.LastLogonDate).TotalDays) } else { $null }
                 OperatingSystem = if ($c.OperatingSystem) { $c.OperatingSystem } else { '-' }
-                OU              = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $c.DistinguishedName } else { '' }
+                OU              = Get-OUFromDN -DN $c.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {
@@ -86,7 +86,7 @@ function Invoke-DisabledComputersAudit {
                 Name            = $c.Name
                 OperatingSystem = if ($c.OperatingSystem) { $c.OperatingSystem } else { '-' }
                 LastChanged     = if ($c.whenChanged) { $c.whenChanged } else { $null }
-                OU              = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $c.DistinguishedName } else { '' }
+                OU              = Get-OUFromDN -DN $c.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {

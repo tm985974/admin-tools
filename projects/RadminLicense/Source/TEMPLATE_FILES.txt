@@ -1,4 +1,4 @@
-# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.1.0
+# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.1.1
 #
 # Every project carries these files UNCHANGED (same bytes as the template).
 # AppHost.cs has no project-specific lines: the project's names are in the
@@ -20,7 +20,7 @@
 # Paths are package paths: on disk each file is in Source\, except Build-App.cmd,
 # which is in the project folder itself (template 1.1 layout).
 #
-d0e171a9de395d5ab7a3b51f2956a201563410481501cdcf1c797f9c1ab15468  AppHost.cs
+0ad6f9457fb6969b8a1c9a912470c242e5f18252d0dff015b2095391c96fadaa  AppHost.cs
 2b6a35c4ca9aae7ef29bfba3107f1c44e47749b0c33d605e19befdfb7ad47014  Build-App.ps1
 9b462f5c941c24afb33c4537c9f53665f932ffec7a70131b131b9282abb5997a  Build-App.cs
 f218403b545f3cc6c2d448b26c00d9751955d92516ef409049a8931127c6af8b  Build-App.cmd

@@ -173,13 +173,25 @@ function Register-GroupsTab {
     # .GetNewClosure() block is unreliable in this codebase (see
     # ADDirectory.Register-DirectoryTab for the fuller explanation); this was
     # the actual cause of the Groups tab never populating.
-    $readDirectoryGroupsFn = ${function:Read-DirectoryGroups}
-    $groupsLoaded = $false
-    $Tab.Add_Enter({
-        if ($groupsLoaded) { return }
-        $groupsLoaded = $true
-        if ($readDirectoryGroupsFn) { & $readDirectoryGroupsFn }
-    }.GetNewClosure())
+    # v1.2.20: the load-once flag lives at module level (Invoke-GroupsFirstLoad).
+    # It used to be a variable assigned INSIDE this .GetNewClosure() block, which
+    # only sets a copy that is gone when the handler returns - so every focus
+    # change into the tab re-read every group from AD. UI_Groups also calls the
+    # same function on the tab's first view (Register-ADTabFirstShow), so the
+    # list loads without having to click into it.
+    $firstLoadFn = ${function:Invoke-GroupsFirstLoad}
+    $Tab.Add_Enter({ & $firstLoadFn }.GetNewClosure())
+}
+#endregion
+
+#region -- Invoke-GroupsFirstLoad ----------------------------------------------
+# Loads the Groups tab's list the first time it is needed; later calls do
+# nothing (Refresh and a domain change call Read-DirectoryGroups directly).
+$script:GroupsFirstLoaded = $false
+function Invoke-GroupsFirstLoad {
+    if ($script:GroupsFirstLoaded) { return }
+    $script:GroupsFirstLoaded = $true
+    Read-DirectoryGroups
 }
 #endregion
 

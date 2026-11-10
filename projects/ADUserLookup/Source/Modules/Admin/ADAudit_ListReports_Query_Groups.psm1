@@ -41,7 +41,7 @@ function Invoke-EmptyGroupsAudit {
                 Name          = $g.Name
                 GroupCategory = [string]$g.GroupCategory
                 GroupScope    = [string]$g.GroupScope
-                OU            = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $g.DistinguishedName } else { '' }
+                OU            = Get-OUFromDN -DN $g.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {

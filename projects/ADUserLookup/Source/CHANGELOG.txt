@@ -2,6 +2,30 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.20 (2026-11-10)  Groups / Computers load on first view; faster loading (+ engine v1.1.1)
+  Fixed   : Groups and Computers sometimes stayed empty on the first visit until you
+            clicked in the list: they loaded when keyboard focus entered the tab,
+            which does not always happen for a tab built in the background. They now
+            load the first time the tab is shown (Register-ADTabFirstShow, AD_Core).
+  Fixed   : "Load once" flags that never held (a variable set inside a
+            .GetNewClosure() handler is a copy, lost when the handler returns):
+              - Groups tab: every group was re-read from AD each time focus entered it
+              - Edit Members: the Add box re-read every domain user on each click
+              - Edit Groups: the copy-from-user box re-read every domain user on each click
+              - Audit: the dashboard re-rendered on every visit
+  Changed : Faster grids everywhere (Set-GridData, used by 43 lists): column auto-size
+            is off while rows are added (it re-measured columns on every cell, and the
+            Users / Computers grids keep it on after the first fill, so every Refresh
+            and filter keystroke paid for it), column types in one pass, one call per
+            row instead of one per cell. Same columns, types, sorting and display.
+  Changed : Test-ADModule is answered once per session: it scanned every folder on
+            PSModulePath (Get-Module -ListAvailable) before every user, group and
+            computer query.
+  Changed : Computer list and Audit / Bulk Import / Create User / OU tree loops no
+            longer look up Get-OUFromDN with Get-Command once per row.
+  Changed : AppTemplate engine v1.1.0 -> v1.1.1 (Update Template): 1 file(s) replaced, 0 added, 0 removed.
+  Note    : template v1.1.1  Session.log no longer rewritten on every line once full
+
 v1.2.19 (2026-11-10)  Engine synced v1.0.23 -> v1.1.0: Source\ folder layout
   Changed : AppTemplate engine v1.0.23 -> v1.1.0 (manual sync, contract change): 5 file(s) replaced.
   Changed : Project folder layout: only ADUserLookup.exe, ADUserLookupLite.exe and Build-App.cmd at the top;

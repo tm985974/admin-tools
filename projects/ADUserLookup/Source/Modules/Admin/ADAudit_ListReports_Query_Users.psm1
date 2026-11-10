@@ -82,7 +82,7 @@ function Invoke-StaleUsersAudit {
                 SamAccountName = $u.SamAccountName
                 LastLogon      = $u.LastLogonDate
                 DaysSinceLogon = $days
-                OU             = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $u.DistinguishedName } else { '' }
+                OU             = Get-OUFromDN -DN $u.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {
@@ -133,7 +133,7 @@ function Invoke-LockedOutUsersAudit {
                 SamAccountName = $l.SamAccountName
                 LockoutTime    = $lockoutTime
                 BadPwdCount    = $badPwd
-                OU             = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $dn } else { '' }
+                OU             = Get-OUFromDN -DN $dn
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {
@@ -189,7 +189,7 @@ function Invoke-PwExpiringUsersAudit {
                 SamAccountName    = $u.SamAccountName
                 PasswordExpiresOn = $expiry.ToString('yyyy-MM-dd HH:mm')
                 DaysRemaining     = [math]::Ceiling(($expiry - $now).TotalDays)
-                OU                = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $u.DistinguishedName } else { '' }
+                OU                = Get-OUFromDN -DN $u.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {
@@ -236,7 +236,7 @@ function Invoke-NeverLoggedInUsersAudit {
                 DisplayName    = $u.Name
                 SamAccountName = $u.SamAccountName
                 Created        = $u.whenCreated
-                OU             = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $u.DistinguishedName } else { '' }
+                OU             = Get-OUFromDN -DN $u.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {
@@ -285,7 +285,7 @@ function Invoke-ServiceAccountsAudit {
                 Enabled        = [string]$u.Enabled
                 SPNCount       = $u.ServicePrincipalName.Count
                 SPNs           = ($u.ServicePrincipalName -join ', ')
-                OU             = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $u.DistinguishedName } else { '' }
+                OU             = Get-OUFromDN -DN $u.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {
@@ -331,7 +331,7 @@ function Invoke-PwNeverExpiresAudit {
                 DisplayName     = $u.Name
                 SamAccountName  = $u.SamAccountName
                 PasswordLastSet = if ($u.PasswordLastSet) { $u.PasswordLastSet } else { 'Never set' }
-                OU              = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $u.DistinguishedName } else { '' }
+                OU              = Get-OUFromDN -DN $u.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {
@@ -373,7 +373,7 @@ function Invoke-DisabledWithGroupsAudit {
                 DisplayName    = $u.Name
                 SamAccountName = $u.SamAccountName
                 GroupCount     = $u.MemberOf.Count
-                OU             = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $u.DistinguishedName } else { '' }
+                OU             = Get-OUFromDN -DN $u.DistinguishedName
             })
         }
         if (Get-Command Set-Status -ErrorAction SilentlyContinue) {

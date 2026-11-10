@@ -45,6 +45,7 @@ function Read-ConnComputers {
     $srvParam = if ($script:CompCtx -and $script:CompCtx.TargetDC) { @{ Server = $script:CompCtx.TargetDC } } else { @{} }
     try {
         $raw = Get-DomainComputers @srvParam -IncludeDisabled
+        $hasOuFn = [bool](Get-Command Get-OUFromDN -ErrorAction SilentlyContinue)   # once, not per computer (v1.2.20)
         foreach ($c in $raw) {
             [void]$script:AllConnComputers.Add([PSCustomObject]@{
                 Name              = [string]$c.Name
@@ -55,7 +56,7 @@ function Read-ConnComputers {
                 IPv4Address       = [string]$c.IPv4Address
                 Created           = if ($c.whenCreated) { $c.whenCreated.ToString('yyyy-MM-dd') } else { '' }
                 Description       = [string]$c.Description
-                OU                = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN ([string]$c.DistinguishedName) } else { '' }
+                OU                = if ($hasOuFn) { Get-OUFromDN -DN ([string]$c.DistinguishedName) } else { '' }
                 DistinguishedName = [string]$c.DistinguishedName
             })
         }

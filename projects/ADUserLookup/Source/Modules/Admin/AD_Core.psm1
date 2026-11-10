@@ -328,6 +328,35 @@ function Get-ADSharedContext {
 # Tabs built in the background once connected (titles as in UI_Register-Tabs).
 $script:ADWarmTitles = @('Users', 'Groups', 'Account Management', 'Computers')
 
+# Run -Action once, the first time -Page is really on screen (v1.2.20).
+# The ported tabs load their data in $Tab.Add_Enter, i.e. when keyboard focus
+# moves into the tab. That is not reliable for a tab built in the background
+# (Invoke-LazyTabWarmup): if focus does not land inside it on the first visit,
+# nothing loads until you click into the list. This hooks the main tab strip
+# instead: the first time -Page is the selected tab (or now, if it already
+# is), -Action runs - after the click has been handled, so the tab paints first.
+function Register-ADTabFirstShow {
+    param([System.Windows.Forms.TabPage]$Page, [scriptblock]$Action)
+    $tabs = $Page.Parent
+    if (-not ($tabs -is [System.Windows.Forms.TabControl])) { return }
+    $state = @{ Done = $false }                       # a hashtable, so the flag survives between handler calls
+    $app = $script:ADApp
+    $run = {
+        if ($state.Done -or $tabs.SelectedTab -ne $Page) { return }
+        $state.Done = $true
+        try { & $Action }
+        catch { if ($app) { $app.Log('ERROR', 'Tabs', "$($Page.Text.Trim()) first load: $($_.Exception.Message)") } }
+    }.GetNewClosure()
+    $tabs.Add_SelectedIndexChanged({
+        if (-not $state.Done -and $tabs.SelectedTab -eq $Page) {
+            try { [void]$tabs.BeginInvoke([System.Windows.Forms.MethodInvoker]$run) } catch { }
+        }
+    }.GetNewClosure())
+    if ($tabs.SelectedTab -eq $Page -and $tabs.IsHandleCreated) {
+        try { [void]$tabs.BeginInvoke([System.Windows.Forms.MethodInvoker]$run) } catch { }
+    }
+}
+
 # The key the environment's AD settings (Settings\DomainDefaults.json) are
 # stored under: the environment's Domain field; else the connected domain;
 # else - when the environment names no server - the domain this machine is in.

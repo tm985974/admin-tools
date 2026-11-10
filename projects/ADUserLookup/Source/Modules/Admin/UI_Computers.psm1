@@ -23,5 +23,12 @@ function New-ComputersTab {
         $ctx = Get-ADSharedContext -App $App
         Set-ADTabCanvas -Context $ctx
         Register-ComputersTab -Tab $Page -Context $ctx
+        # Load on the first view, not on keyboard focus (v1.2.20). Skipped when
+        # the Enter handler got there first (the list is then already loaded).
+        Register-ADTabFirstShow -Page $Page -Action {
+            if ($script:ConnCompLoaded) { return }
+            Reset-ConnCompCards
+            Read-ConnComputers
+        }
     }
 }

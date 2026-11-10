@@ -199,9 +199,12 @@ namespace AppTemplate
                     long limit = (long)maxKb * 1024L;
                     if (maxKb > 0 && fi.Length > limit)
                     {
+                        // Trim to 90% of the cap, not to the cap itself: trimming to exactly
+                        // the cap left the file full, so EVERY later line read and rewrote
+                        // the whole log (10 MB by default; far slower on a network share).
                         string[] all = File.ReadAllLines(path);
-                        long size = fi.Length; int i = 0;
-                        while (i < all.Length && size > limit) { size -= Encoding.UTF8.GetByteCount(all[i]) + Environment.NewLine.Length; i++; }
+                        long size = fi.Length, target = limit / 10 * 9; int i = 0;
+                        while (i < all.Length && size > target) { size -= Encoding.UTF8.GetByteCount(all[i]) + Environment.NewLine.Length; i++; }
                         if (i > 0 && i < all.Length) File.WriteAllLines(path, all.Skip(i).ToArray(), new UTF8Encoding(false));
                     }
                 }

@@ -193,7 +193,7 @@ function Show-CreateGroupDialog {
                     -Detail "OU=$capturedOUDN Scope=Global Category=Security"
             }
             if ($addCachedGroupFn) {
-                $ouFriendly = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $capturedOUDN } else { '' }
+                $ouFriendly = Get-OUFromDN -DN $capturedOUDN
                 & $addCachedGroupFn -Group ([PSCustomObject]@{
                     Name              = $name
                     GroupType         = 'Security'

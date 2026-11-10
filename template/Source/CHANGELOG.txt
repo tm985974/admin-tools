@@ -2,6 +2,15 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.1.1 (2026-11-10)  Session.log no longer rewritten on every line once full
+  Fixed   : Once Session.log (or an environment's action log) reached its size cap,
+            every new line made the app read the whole file and write it back
+            trimmed to exactly the cap - so the file stayed full and the next line
+            did it again (10 MB by default, every line; much slower when the log
+            folder is on a network share). It now trims to 90% of the cap, so the
+            rewrite happens once per ~10% of new log text.
+  Note    : Engine-only: projects on 1.1.0 take it with Update Template.
+
 v1.1.0 (2026-11-10)  Project folder layout: only the EXEs and Build-App.cmd at the top
   Changed : A project folder now holds only three files at the top:
               <ExeName>.exe  <ExeName>Lite.exe  Build-App.cmd

@@ -405,10 +405,12 @@ function Show-EditUserGroupsDialog {
     $dlgDomainDN      = $Context.DomainDN
     $dlgTargetDC      = $Context.TargetDC
     $getDomainUsersFn = ${function:Get-DomainUsers}
-    $dupUsersLoaded   = $false
+    # v1.2.20: a hashtable, so the flag survives between handler calls (the list
+    # of every domain user was re-read each time the box got focus).
+    $dupUsersLoaded   = @{ Done = $false }
     $cmbDupUser.Add_Enter(({
-        if ($dupUsersLoaded) { return }
-        $dupUsersLoaded = $true
+        if ($dupUsersLoaded.Done) { return }
+        $dupUsersLoaded.Done = $true
         $srvParam = if ($dlgTargetDC) { @{ Server = $dlgTargetDC } } else { @{} }
         $items = [System.Collections.Generic.List[string]]::new()
         try {
@@ -422,7 +424,7 @@ function Show-EditUserGroupsDialog {
                 $dupUserMap[$disp] = $userSam
             }
         } catch {
-            $dupUsersLoaded = $false
+            $dupUsersLoaded.Done = $false
         }
         $cmbDupUser.BeginUpdate()
         try {

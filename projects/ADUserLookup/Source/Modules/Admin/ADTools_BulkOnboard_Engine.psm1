@@ -292,7 +292,7 @@ function Invoke-BulkOnboard {
             # No-op-safe: Add-CachedUser skips duplicates and no-ops if the
             # Directory tab's cache isn't initialised.
             if (Get-Command Add-CachedUser -ErrorAction SilentlyContinue) {
-                $newOU = if (Get-Command Get-OUFromDN -ErrorAction SilentlyContinue) { Get-OUFromDN -DN $ouDN } else { '' }
+                $newOU = Get-OUFromDN -DN $ouDN
                 Add-CachedUser -User ([PSCustomObject]@{
                     DisplayName       = $display
                     SamAccountName    = $logon
