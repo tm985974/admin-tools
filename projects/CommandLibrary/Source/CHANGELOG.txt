@@ -1,0 +1,148 @@
+# CHANGELOG.txt -- project version history (newest first)
+# Each update package carries this file with its new section on top, plus the
+# bumped VERSION.txt, so Version History and the archived EXEs line up.
+
+v1.3.4 (2026-11-10)  Engine synced v1.0.23 -> v1.1.0: Source\ folder layout
+  Changed : AppTemplate engine v1.0.23 -> v1.1.0 (manual sync, contract change): 5 file(s) replaced.
+  Changed : Project folder layout: only CommandLibrary.exe, CommandLibraryLite.exe and Build-App.cmd at the top;
+            the source moved to Source\, Build-App.exe goes to Build\.
+  Note    : template v1.1.0  Project folder layout: only the EXEs and Build-App.cmd at the top
+
+v1.3.3 (2026-11-09)  Standard command window for commands that change things; hover help
+  Changed : Running an entry that changes things shows the standard command window
+            (the code, Copy, Run / Cancel, logged) instead of a Yes/No box. The run
+            window already shows the command, so read-only entries run from there.
+  Added   : Config\ToolTips.json - hover help for every button, check box, radio
+            button and tab.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
+v1.3.2 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
+  Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
+  Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed
+  Note    : template v1.0.22  Command window shown before every action by default
+  Note    : template v1.0.21  Hover help on everything clickable; "show the exact command" engine
+
+v1.3.1 (2026-11-02)  Engine synced v1.0.16 -> v1.0.20 (manual: contract change)
+  Changed : Template-owned files replaced with AppTemplate 1.0.20 (AppHost.cs,
+            Build-App.ps1, Base engine modules); TEMPLATE_FILES.txt and
+            TEMPLATE_VERSION.txt copied. New from the template: Build-App.cs /
+            Build-App.cmd / Build-App.exe (build without PowerShell scripts),
+            Update Template, Build Lite, Update folder, "Open" menu, machine
+            facts on the Session.log start line, Base\Services_Filter.psm1
+            (wildcard list filters) and Base\Services_Requirements.psm1.
+  Added   : AppIdentity.json (contract from template 1.0.17): Command Library /
+            CommandLibrary / CommandLibraryData - the values of the old PROJECT
+            IDENTITY block, so the saved environments, library and logs stay.
+  Fixed   : Import read a project's name only from the PROJECT IDENTITY block
+            in AppHost.cs, which projects on template 1.0.17+ no longer have
+            (their zips were labelled with the file name). It now reads
+            AppIdentity.json first and falls back to AppHost.cs.
+  Note    : AppHost.cs did not match the 1.0.16 manifest; template 1.0.17
+            records that manifest's AppHost.cs hash as stale. Every other engine
+            file matched. Later 1.0.x engine updates go through Update Template.
+
+v1.3.0 (2026-10-28)  Know it will fail before you run it; fallbacks; tighter search
+  Added   : Status column - will each entry work on THIS computer: Ready,
+            Ready - via <fallback>, Not on a domain, Missing: <module / tool>,
+            Needs admin. Worked out in the background from the commands each
+            entry calls (no extra fields needed); Details shows what is missing
+            and the fix (e.g. the RSAT capability to add). "Runnable here only"
+            hides the red ones.
+  Added   : Target check before a run (on by default): the computers in target
+            fields (ComputerName, Server, DC ...) must resolve and answer on the
+            port the command uses (AD Web Services 9389, WinRM 5985, RPC 135,
+            SMB 445, LDAP 389) - reported in about a second instead of a timeout.
+            Remote runs skip computers that do not answer on WinRM and run on the
+            rest. "Check now" in the Run prompt tests without running.
+  Added   : Fallback methods (Methods field). The first method that can run here
+            is used; a read-only entry that fails for an environment reason
+            (not installed / unreachable / access denied) moves on to the next.
+            33 entries have one: AD lookups via LDAP without RSAT (users, groups,
+            locked accounts, domain, DCs, trusts, FSMO, GPOs, dsquery), Get-HotFix
+            via CIM/WinRM when RPC is blocked, nslookup for Resolve-DnsName,
+            ipconfig / netsh / route / arp / net for the NetTCPIP, DnsClient,
+            SmbShare and LocalAccounts cmdlets, net localgroup when orphaned SIDs
+            break Get-LocalGroupMember, and more.
+  Added   : [WHY] line when a run fails: Software, Connectivity, Rights, Auth,
+            Input or Policy, with what to do.
+  Changed : Search looks at the name and keywords (tags + command name) only,
+            by whole words ("ping" no longer finds "mapping"), best match first.
+            "Search descriptions too" replaces "Search code too".
+  Changed : Every entry renamed to 2-4 words (e.g. "Ping hosts", "Lockout
+            source", "DC list"), a one-line description (under 60 characters)
+            and 3-6 keywords. The previous longer description is kept in Notes.
+            The repeated "Fill in the fields..." how-to text is gone (the
+            Example section already shows the call).
+  Note    : Shipped entries have a higher Revision, so entries you have not
+            edited are updated on the next start; ones you edited are kept.
+
+v1.2.0 (2026-10-27)  Command entries - a syntax builder
+  Added   : Command entries (Kind = Command): a command line with {Field}
+            placeholders and [[ optional ]] parts, plus a param() block that
+            declares the fields. The Run prompt builds the exact line as you
+            type; Copy command or Run it. Marked "syntax" in the list.
+  Added   : 364 command entries: every command used inside the function
+            entries as its own entry (nltest, klist, gpupdate, icacls, subst,
+            w32tm, certutil, keytool, msiexec ...) plus a broad network,
+            computer management and troubleshooting set - 515 entries in all.
+  Added   : New... > Command (admin): template / fields / live preview editor,
+            "Add missing fields".
+  Changed : One category scheme for all entries (Network, DNS, Remote
+            management, Processes & services, Event logs, Disks & storage,
+            Registry, Kerberos & time, Windows Update & repair, Printing ...).
+  Changed : A command ending in "| Format-Table ..." runs with Select-Object
+            so Grid and Export CSV get columns; Results still shows the table.
+            Pre-formatted output in the Grid shows as text lines.
+  Changed : The list's third column is "Command".
+
+v1.1.0 (2026-10-27)  Starting library expanded from a full sweep of past chats
+  Added   : 122 more entries (151 in all), every one runnable with a prompt.
+            New categories: Files & drives (incl. Map a folder to a drive letter
+            with subst, optionally kept across reboots), Certificates, SCCM &
+            deployment, Installers & browsers, Industrial apps (Ignition, FlexLM /
+            FactoryTalk Activation), Local accounts & security, Quick syntax,
+            Utilities (password / passphrase generators, monitors, Citrix).
+            Active Directory, Group Policy, Kerberos, DNS / trust and service
+            troubleshooting entries added to the existing categories.
+  Changed : Import - firewall cmdlets (*-NetFirewall*) are recognised as the
+            NetSecurity module.
+  Note    : Existing libraries keep their edits and deletions; the new shipped
+            entries are added on the next start.
+
+v1.0.0 (2026-10-27)  Command Library - created from AppTemplate 1.0.16
+  Added   : Library tab - search (all words; optionally inside the code), category
+            filter, Details (description, how to use, where to run, requirements,
+            parameters, example) and Code for each entry.
+  Added   : Run... - a prompt built from the function's own param() block: text,
+            drop-downs (ValidateSet), check boxes (switch), one-per-line lists
+            (arrays), Set... (PSCredential), masked (SecureString). Values start
+            from the last run of that entry, then the active environment (a
+            parameter named Domain / Server / SearchBase takes its value). Live
+            preview of the exact command; WhatIf when the function supports it;
+            entries that change things ask first. Run here, or on a list of
+            computers (Invoke-Command), optionally with other credentials.
+  Added   : Runs happen in a fresh background runspace in this process - no .ps1
+            and no other PowerShell is ever started. A capturing host shows
+            WhatIf / Write-Host / Out-Host and turns Read-Host, Get-Credential and
+            -Confirm prompts into clear errors. Output: Results (console format),
+            Grid, Messages (errors, warnings, verbose, host); Stop, Copy, Export CSV.
+            Each run is written to the environment's action log (no credentials).
+  Added   : Import tab (admin) - scan another project's Extract / Archive zip, a
+            folder, or module files (parsed, never run). Each function gets its
+            helpers bundled and is marked Ready / Review / Blocked (UI, $App,
+            module $script: state, launching a .ps1 ...). Imported code is a
+            snapshot with project, version, file and hash; a later scan shows
+            Same / Changed, and "Update changed" refreshes code but keeps your text.
+  Added   : New / Edit / Delete (admin) - entry editor with Analyze (functions,
+            parameters, modules, "changes things") and Fill from help.
+  Added   : Starting library (Config\Library.json): 29 commands from past chats -
+            AD lockout / password expiry / users & groups across trusts / DCs,
+            GPO and SYSVOL search, gpresult, user rights, DC ports, trust, SRV and
+            PTR records, time skew, Netlogon debug, servers, GPMC, installed
+            software, Firefox, services, DCOM and 4625 events, logs, FlexLM,
+            environment info, Wake-on-LAN, scheduled task as a gMSA.
+  Changed : Environment fields: Domain, Domain controller (Server), Search base
+            replace Variable 1-4.
+  Removed : Template Tab 1-4 placeholders.

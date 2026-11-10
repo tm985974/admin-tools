@@ -5,6 +5,7 @@
 *.bak
 **/Archive/
 **/Update/
+**/Build/
 # Generated on every build / Extract
 **/Config/FunctionMap.txt
 **/Config/Environment.txt

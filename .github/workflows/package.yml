@@ -24,7 +24,7 @@ jobs:
           $failed = @()
           $folders = @(Get-Item template) + @(Get-ChildItem projects -Directory | Sort-Object Name)
           foreach ($f in $folders) {
-              $id = Get-Content (Join-Path $f.FullName 'AppIdentity.json') -Raw | ConvertFrom-Json
+              $id = Get-Content (Join-Path $f.FullName 'Source/AppIdentity.json') -Raw | ConvertFrom-Json
               $exe = Join-Path $out ($id.ExeName + '.exe')
               Write-Host "==== $($f.Name) -> $($id.ExeName).exe"
               & cmd.exe /c "`"$(Join-Path $f.FullName 'Build-App.cmd')`" -NoPause -Output `"$exe`""

@@ -31,18 +31,18 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'AdminTools.psm1') -Force
 
 $t = Get-TemplateRoot
-$tVersion = Get-TextFile (Join-Path $t 'VERSION.txt')
+$tVersion = Get-TextFile (Get-PackageFile $t 'VERSION.txt')
 $tManifest = @(Read-TemplateManifest $t)
 $bad = @(Test-ManifestFiles -Root $t -Manifest $tManifest)
 if ($bad.Count) { throw "template\TEMPLATE_FILES.txt does not match the template files ($($bad[0].File) $($bad[0].Problem)). Run tools\Update-TemplateManifest.ps1 first." }
-$tEntries = @(Get-ChangelogEntries (Join-Path $t 'CHANGELOG.txt'))
+$tEntries = @(Get-ChangelogEntries (Get-PackageFile $t 'CHANGELOG.txt'))
 $tTitle = ($tEntries | Where-Object { $_.Version -eq [version]$tVersion } | Select-Object -First 1).Title
 $today = (Get-Date).ToString('yyyy-MM-dd')
 $synced = 0
 
 foreach ($root in Get-ProjectRoots -Name $Project) {
     $name = Split-Path $root -Leaf
-    $pTv = Get-TextFile (Join-Path $root 'TEMPLATE_VERSION.txt')
+    $pTv = Get-TextFile (Get-PackageFile $root 'TEMPLATE_VERSION.txt')
     $from = [version]$pTv; $to = [version]$tVersion
 
     if ($from -ge $to) { Write-Host "${name}: already on template $pTv - skipped"; continue }
@@ -69,7 +69,7 @@ foreach ($root in Get-ProjectRoots -Name $Project) {
     $added = @($tManifest | Where-Object { -not $old.ContainsKey($_.File) } | ForEach-Object File)
     $removed = @($old.Keys | Where-Object { -not $new.ContainsKey($_) } | Sort-Object)
 
-    $pVersion = [version](Get-TextFile (Join-Path $root 'VERSION.txt'))
+    $pVersion = [version](Get-TextFile (Get-PackageFile $root 'VERSION.txt'))
     $next = "{0}.{1}.{2}" -f $pVersion.Major, $pVersion.Minor, ($pVersion.Build + 1)
     Write-Host ("{0}: template {1} -> {2}, v{3} -> v{4}: {5} replaced, {6} added, {7} removed" -f $name, $pTv, $tVersion, $pVersion, $next, $replaced.Count, $added.Count, $removed.Count)
     foreach ($f in $replaced) { Write-Host "    MODIFY $f" }
@@ -78,16 +78,16 @@ foreach ($root in Get-ProjectRoots -Name $Project) {
     if ($DryRun) { continue }
 
     foreach ($f in ($replaced + $added)) {
-        $dest = Join-Path $root $f
+        $dest = Get-PackageFile $root $f
         $dir = Split-Path $dest -Parent
         if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
-        Copy-Item -LiteralPath (Join-Path $t $f) -Destination $dest -Force
+        Copy-Item -LiteralPath (Get-PackageFile $t $f) -Destination $dest -Force
     }
-    foreach ($f in $removed) { $p = Join-Path $root $f; if (Test-Path $p) { Remove-Item -LiteralPath $p -Force } }
-    foreach ($f in 'TEMPLATE_FILES.txt', 'TEMPLATE_VERSION.txt') { Copy-Item -LiteralPath (Join-Path $t $f) -Destination (Join-Path $root $f) -Force }
+    foreach ($f in $removed) { $p = Get-PackageFile $root $f; if (Test-Path $p) { Remove-Item -LiteralPath $p -Force } }
+    foreach ($f in 'TEMPLATE_FILES.txt', 'TEMPLATE_VERSION.txt') { Copy-Item -LiteralPath (Get-PackageFile $t $f) -Destination (Get-PackageFile $root $f) -Force }
 
-    Write-Utf8NoBom -Path (Join-Path $root 'VERSION.txt') -Text "$next`n"
-    $clPath = Join-Path $root 'CHANGELOG.txt'
+    Write-Utf8NoBom -Path (Get-PackageFile $root 'VERSION.txt') -Text "$next`n"
+    $clPath = Get-PackageFile $root 'CHANGELOG.txt'
     $cl = [System.Collections.Generic.List[string]]([System.IO.File]::ReadAllLines($clPath))
     $at = 0; while ($at -lt $cl.Count -and $cl[$at] -notmatch '^v\d+\.\d+\.\d+\s') { $at++ }
     $entry = @(

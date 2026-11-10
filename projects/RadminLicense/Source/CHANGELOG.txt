@@ -1,0 +1,82 @@
+# CHANGELOG.txt -- project version history (newest first)
+# Each update package carries this file with its new section on top, plus the
+# bumped VERSION.txt, so Version History and the archived EXEs line up.
+
+v1.0.5 (2026-11-10)  Engine synced v1.0.23 -> v1.1.0: Source\ folder layout
+  Changed : AppTemplate engine v1.0.23 -> v1.1.0 (manual sync, contract change): 5 file(s) replaced.
+  Changed : Project folder layout: only RadminLicense.exe, RadminLicenseLite.exe and Build-App.cmd at the top;
+            the source moved to Source\, Build-App.exe goes to Build\.
+  Note    : template v1.1.0  Project folder layout: only the EXEs and Build-App.cmd at the top
+
+v1.0.4 (2026-11-09)  Command window for every action; hover help
+  Changed : Save request, Apply license (both buttons), Restart as administrator and
+            Open transfer folder show the command window first. Fleet: Check status,
+            Collect requests and Apply licenses show the Invoke-Command / rserver3.exe
+            steps for the machines in scope (Services_Radmin: Get-RadminCommandText).
+            The license key is never shown: it appears as a placeholder.
+  Changed : The command window replaces the "already licensed?", "wrong machine name?"
+            and "Collect / Apply for N machines?" boxes - one window, not two.
+  Added   : Config\ToolTips.json - hover help for every button, check box and tab.
+  Note    : Template rules (template\README.md): every action shows its code in the
+            command window first; every clickable control has hover help. Checked
+            on every push by tools\Test-Template.ps1.
+
+v1.0.3 (2026-11-05)  Engine synced v1.0.20 -> v1.0.23
+  Changed : AppTemplate engine v1.0.20 -> v1.0.23 (Update Template): 3 file(s) replaced, 2 added, 0 removed.
+  Note    : template v1.0.23  Update Template works: AppHost.cs hash check fixed
+  Note    : template v1.0.22  Command window shown before every action by default
+  Note    : template v1.0.21  Hover help on everything clickable; "show the exact command" engine
+
+v1.0.2  (2026-11-03)  Fleet: admin share + WMI where WinRM is off
+  Added   : Second way to reach a machine, for networks with WinRM (5985)
+            blocked: the core + options are copied to \\PC\C$\FAS\_rlm\<id>\,
+            WMI (Win32_Process.Create over DCOM, TCP 135/RPC) starts PowerShell
+            there with -EncodedCommand (not subject to the execution policy),
+            and the result is read back over the share. The job folder (which
+            holds the key or license) is deleted afterwards. Runs in background
+            runspaces, same parallel limit.
+  Added   : "Connect via" on the Fleet tab and Environment > Radmin: Auto (WinRM,
+            then the admin share when WinRM cannot connect), WinRM only, or
+            Admin share + WMI only. Auto remembers the route that worked per
+            machine (new Via column) and goes there first next time.
+  Changed : "The client cannot connect to the destination" is now reported as
+            "WinRM not reachable ..."; SMB/WMI errors name the step that failed
+            (open share / copy / start with WMI / wait) and RPC / access-denied
+            causes.
+
+v1.0.1  (2026-11-03)  Fix: Fleet results failed after every machine
+  Fixed   : Check status / Collect requests / Apply licenses logged "The
+            expression after '&' in a pipeline element produced an object that
+            was not valid" for every machine, and the grid row was not updated.
+            The per-machine result handler is a closure created inside another
+            closure; GetNewClosure copies only the current scope's variables, so
+            it saw the tab state ($st) as $null. $st is now made local before
+            the inner closures are created.
+
+v1.0.0  (2026-11-03)  Radmin License Manager - created from AppTemplate v1.0.20
+  Added   : Replaces RadminSaveRequest.ps1, RadminSaveLic.ps1 and
+            RadminLoadLicense.ps1 with one tool for the offline round trip
+            (request -> activate.famatech.com -> license).
+  Added   : This Machine tab - status of the PC the app runs on (Radmin found,
+            licensed, elevated), Save request, Apply license (auto-finds
+            <NAME>.license, or browse), Restart as administrator.
+  Added   : Fleet tab - machine list (add / paste / import txt or csv), Check
+            status, Collect requests (unlicensed only), Apply licenses (where a
+            .license is waiting). Remote machines over WinRM, in the background,
+            N at a time; this PC in-process. Optional credential. Wildcard filter.
+  Added   : Transfer folder layout: Requests\ (+ _requests.csv), Licenses\,
+            Done\, README-ACTIVATION.txt. Licensed machines move to Done\.
+            Per-PC override for USB drive letters.
+  Added   : Environment > Radmin page: license key, transfer folder, device
+            folder (C:\FAS), rserver3.exe path, licensed registry key,
+            save-request / use-license argument forms, timeout, parallelism.
+  Fixed   : (vs the old scripts) the license key is no longer hard-coded; the
+            two request scripts disagreed on /requestfile:"x" vs /requestfile"x"
+            - both forms are tried and the one that worked is reported;
+            success is verified (request file written / registry key present)
+            instead of assumed; $args (a PowerShell automatic variable) is no
+            longer overwritten; rserver3 calls time out instead of hanging.
+  Safety  : A license is only applied when its file name matches the target's
+            computer name; the key is only sent to a machine when it makes a
+            request; machines that are already licensed are skipped unless
+            "Also machines that are already licensed" is ticked.

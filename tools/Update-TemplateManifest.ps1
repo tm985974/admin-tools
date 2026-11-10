@@ -19,8 +19,8 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'AdminTools.psm1') -Force
 
 $t = Get-TemplateRoot
-$path = Join-Path $t 'TEMPLATE_FILES.txt'
-$version = Get-TextFile (Join-Path $t 'VERSION.txt')
+$path = Get-PackageFile $t 'TEMPLATE_FILES.txt'
+$version = Get-TextFile (Get-PackageFile $t 'VERSION.txt')
 $lines = [System.IO.File]::ReadAllLines($path)
 
 # Header = the comment block at the top (everything before the first hash line).
@@ -36,7 +36,7 @@ $out = @($header)
 $changed = 0
 $old = @{}; foreach ($e in (Read-TemplateManifest $t)) { $old[$e.File] = $e.Hash }
 foreach ($f in $files) {
-    $p = Join-Path $t $f
+    $p = Get-PackageFile $t $f
     if (-not (Test-Path $p)) { throw "template\$f is listed but does not exist" }
     $h = Get-NormalizedHash $p
     if ($old[$f] -ne $h) { $changed++; Write-Host "  updated $f" }

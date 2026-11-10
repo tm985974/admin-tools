@@ -30,14 +30,14 @@ Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $repo = Get-RepoRoot
 if ($Project -eq 'template') { $root = Get-TemplateRoot; $rel = 'template'; $tagPrefix = 'template' }
 else { $root = @(Get-ProjectRoots -Name $Project)[0]; $rel = "projects/$Project"; $tagPrefix = $Project }
-$id = [System.IO.File]::ReadAllText((Join-Path $root 'AppIdentity.json')) | ConvertFrom-Json
-$version = Get-TextFile (Join-Path $root 'VERSION.txt')
+$id = [System.IO.File]::ReadAllText((Get-PackageFile $root 'AppIdentity.json')) | ConvertFrom-Json
+$version = Get-TextFile (Get-PackageFile $root 'VERSION.txt')
 
 function Invoke-Git { $out = & git -C $repo @args; if ($LASTEXITCODE) { throw "git $args failed" }; $out }
 
 $changed = @(); $deleted = @()
 if ($Full) {
-    $changed = @(Invoke-Git ls-files -- $rel | ForEach-Object { $_.Substring($rel.Length + 1) })
+    $changed = @(Invoke-Git ls-files -- $rel | ForEach-Object { ConvertTo-PackagePath $_.Substring($rel.Length + 1) })
     $fromLabel = 'full'
 } else {
     if (-not $Since) {
@@ -48,10 +48,10 @@ if ($Full) {
     # Committed changes since the ref plus uncommitted ones in the working tree.
     foreach ($line in (Invoke-Git diff --name-status --no-renames $Since -- $rel)) {
         $parts = $line -split "`t"
-        $f = $parts[1].Substring($rel.Length + 1)
+        $f = ConvertTo-PackagePath $parts[1].Substring($rel.Length + 1)
         if ($parts[0] -eq 'D') { $deleted += $f } else { $changed += $f }
     }
-    foreach ($f in (Invoke-Git ls-files --others --exclude-standard -- $rel)) { $changed += $f.Substring($rel.Length + 1) }
+    foreach ($f in (Invoke-Git ls-files --others --exclude-standard -- $rel)) { $changed += (ConvertTo-PackagePath $f.Substring($rel.Length + 1)) }
 }
 $changed = @($changed | Sort-Object -Unique)
 if (-not $changed.Count -and -not $deleted.Count) { Write-Host "Nothing changed in $rel since $Since."; return }
@@ -75,7 +75,7 @@ $zip = [System.IO.Compression.ZipFile]::Open($zipPath, 'Create')
 try {
     foreach ($f in $changed) {
         # Forward slashes in entry names (Compress-Archive in PowerShell 5.1 writes backslashes).
-        [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Join-Path $root $f), $f, 'Optimal')
+        [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, (Get-PackageFile $root $f), $f, 'Optimal')
     }
     if ($directives.Count) {
         $entry = $zip.CreateEntry('UPDATE.txt')

@@ -12,16 +12,29 @@ projects/
   CCMClientTS/            CCM client troubleshooting
   CommandLibrary/         script / command library
   PDubPaste/              password paste tool
-  RadminLicense/          Radmin license management (OldScript/ = the original scripts)
+  RadminLicense/          Radmin license management (Source/OldScript/ = the original scripts)
   RSLinxDriverManager/    RSLinx driver manager
   SCCMAppManager/         SCCM application manager
 tools/                    repo tools (PowerShell 5.1+)
 .github/workflows/        automatic checks
 ```
 
-Each folder has the same layout as an Extract, so `Build-App.cmd` / `Build-App.exe` and the
-developer EXE work straight from the checkout. Each project's own `README.md` and
-`template/README.md` describe the engine in detail.
+Every project folder (and `template/`) has the same layout. Only the files you open sit at
+the top; the source is in `Source/`:
+
+```
+projects/ADUserLookup/
+  ADUserLookup.exe        developer build       (made by Build-App.cmd, not in git)
+  ADUserLookupLite.exe    sealed test build     (not in git)
+  Build-App.cmd           builds the two EXEs from Source/
+  Source/                 AppHost.cs, _AppLauncher.ps1, AppIdentity.json, VERSION.txt,
+                          CHANGELOG.txt, README.md, Config/, Modules/, Build-App.cs, ...
+  Build/  Archive/  Update/   made on your PC by the builder / developer EXE (not in git)
+```
+
+`Build-App.cmd` and the developer EXE work straight from the checkout. Each project's
+`Source/README.md` and `template/Source/README.md` describe the engine in detail. Inside the
+app (update zips, archives, `TEMPLATE_FILES.txt`) paths are relative to `Source/`.
 
 ## What lives where
 
@@ -37,8 +50,8 @@ passwords in the repo.
 
 ## Everyday work on a project
 
-1. Edit files in `projects/<Name>/`.
-2. Bump `VERSION.txt` and add a `CHANGELOG.txt` entry (newest first, `vX.Y.Z (date)  title`).
+1. Edit files in `projects/<Name>/Source/`.
+2. Bump `Source/VERSION.txt` and add a `Source/CHANGELOG.txt` entry (newest first, `vX.Y.Z (date)  title`).
 3. Build with `Build-App.cmd` (or the developer EXE's **Update** > Folder pointed at the project folder).
 4. Commit and tag the release:
 
@@ -60,8 +73,9 @@ powershell -ExecutionPolicy Bypass -File tools\New-UpdateZip.ps1 -Project ADUser
 Engine files are only ever changed in `template/`. A change made in a project is drift: the
 check fails, and the next sync would overwrite it.
 
-1. Edit the template-owned files in `template/`. Bump `template/VERSION.txt` **and**
-   `template/TEMPLATE_VERSION.txt`, and add a `CHANGELOG.txt` entry. Use `1.0.x` for engine-only
+1. Edit the template-owned files in `template/` (`template/Source/`, plus `template/Build-App.cmd`).
+   Bump `template/Source/VERSION.txt` **and** `template/Source/TEMPLATE_VERSION.txt`, and add a
+   `CHANGELOG.txt` entry. Use `1.0.x` for engine-only
    changes. Use a new major.minor, or a `Contract:` line in the entry, when projects must change too.
 2. Regenerate the manifest (never edit hashes by hand):
 
@@ -87,7 +101,7 @@ check fails, and the next sync would overwrite it.
 
 ## Template rules
 
-Every project follows the rules in `template/README.md` ("Template rules"):
+Every project follows the rules in `template/Source/README.md` ("Template rules"):
 
 1. **Every action shows its code first.** Anything that runs a command goes through the
    command window: the exact PowerShell, Copy, Run / Cancel, logged. Secrets never appear
@@ -99,7 +113,7 @@ confirmation shows up on the next push.
 
 ## Automatic checks (GitHub Actions)
 
-- **Template check** (every push): `tools/Test-Template.ps1`. It fails on a stale template
+- **Template check** (every push): `tools/Test-Template.ps1`. It fails on files at the top of a project folder other than Build-App.cmd and the sub folders, a stale template
   manifest, engine drift in any project, version / changelog mismatches, two projects
   sharing an ExeName or AppDataFolder, a PowerShell syntax error in any file, a missing
   `Config/ToolTips.json`, or a button / menu item / tab with no tooltip. It warns about
@@ -112,8 +126,8 @@ confirmation shows up on the next push.
 ## Starting a new project
 
 1. Copy `template/` to `projects/<ExeName>/`.
-2. Set `AppIdentity.json` (AppName, ExeName, AppDataFolder - unique per project).
-3. Set `VERSION.txt` to `1.0.0` and start `CHANGELOG.txt` with
+2. Set `Source/AppIdentity.json` (AppName, ExeName, AppDataFolder - unique per project).
+3. Set `Source/VERSION.txt` to `1.0.0` and start `Source/CHANGELOG.txt` with
    `v1.0.0 (date)  Created from AppTemplate v<x>`.
 4. Replace the template's example tabs in `Modules/Lite/`, `UI_Register-Tabs.psm1`,
-   `UI_Tab_Overview.psm1` and `Config/*.json` (see `template/README.md`, "Making it your own").
+   `UI_Tab_Overview.psm1` and `Config/*.json` (see `template/Source/README.md`, "Making it your own").

@@ -6,6 +6,24 @@ $script:RepoRoot = Split-Path -Parent $PSScriptRoot
 function Get-RepoRoot { $script:RepoRoot }
 function Get-TemplateRoot { Join-Path $script:RepoRoot 'template' }
 
+function Get-PackageFile {
+    # A package path (as in TEMPLATE_FILES.txt, update zips: AppHost.cs, Modules/Base/X.psm1,
+    # Build-App.cmd) -> the file on disk. Template 1.1 layout: Build-App.cmd is in the
+    # project folder, everything else in its Source folder.
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)][string]$Path)
+    if ($Path -eq 'Build-App.cmd') { return (Join-Path $Root 'Build-App.cmd') }
+    $src = Join-Path $Root 'Source'
+    if (Test-Path -LiteralPath $src -PathType Container) { return (Join-Path $src $Path) }
+    return (Join-Path $Root $Path)
+}
+
+function ConvertTo-PackagePath {
+    # A path inside a project folder (as git lists it) -> its package path: Source/X -> X.
+    param([Parameter(Mandatory)][string]$Path)
+    if ($Path -like 'Source/*') { return $Path.Substring(7) }
+    return $Path
+}
+
 function Get-ProjectRoots {
     param([string[]]$Name)
     $all = Get-ChildItem -Path (Join-Path $script:RepoRoot 'projects') -Directory | Sort-Object Name
@@ -39,7 +57,7 @@ function Get-NormalizedHash {
 function Read-TemplateManifest {
     # Returns an ordered list of @{ Hash; File } from a TEMPLATE_FILES.txt.
     param([Parameter(Mandatory)][string]$Root)
-    $path = Join-Path $Root 'TEMPLATE_FILES.txt'
+    $path = Get-PackageFile $Root 'TEMPLATE_FILES.txt'
     if (-not (Test-Path $path)) { throw "Missing $path" }
     foreach ($line in [System.IO.File]::ReadAllLines($path)) {
         $t = $line.Trim().TrimStart([char]0xFEFF)
@@ -53,7 +71,7 @@ function Test-ManifestFiles {
     # Compares the files under $Root with the manifest entries. Returns one object per problem.
     param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)]$Manifest)
     foreach ($e in $Manifest) {
-        $p = Join-Path $Root $e.File
+        $p = Get-PackageFile $Root $e.File
         if (-not (Test-Path $p)) { [pscustomobject]@{ File = $e.File; Problem = 'missing' }; continue }
         if ((Get-NormalizedHash $p) -ne $e.Hash) { [pscustomobject]@{ File = $e.File; Problem = 'changed' } }
     }

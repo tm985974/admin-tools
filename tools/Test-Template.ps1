@@ -32,18 +32,30 @@ function Warn([string]$m) { $script:warnings++; Write-Finding warning $m }
 # Files in Modules/Base that every project owns itself (see TEMPLATE_FILES.txt header).
 $projectOwnedBase = @('Modules/Base/UI_Register-Tabs.psm1', 'Modules/Base/UI_Tab_Overview.psm1')
 
+# Template 1.1 folder layout: at the top of a project only the EXEs, Build-App.cmd and
+# the sub folders. (Build\, Archive\, Update\ and the EXEs are local only - not in git.)
+$allowedTop = @('Build-App.cmd', 'Source', 'Build', 'Archive', 'Update')
+function Test-Layout([string]$Root, [string]$Label) {
+    if (-not (Test-Path (Join-Path $Root 'Source') -PathType Container)) { Err "${Label}: no Source folder (template 1.1 layout: the source lives in Source\)"; return }
+    foreach ($i in Get-ChildItem -LiteralPath $Root -Force) {
+        if ($allowedTop -contains $i.Name -or $i.Name -like '*.exe') { continue }
+        Err "${Label}: '$($i.Name)' is at the top of the project folder - only the EXEs, Build-App.cmd and Source\ / Build\ / Archive\ / Update\ belong there (move it into Source\)"
+    }
+}
+
 # ---- template ---------------------------------------------------------------
 $t = Get-TemplateRoot
 Write-Host "template"
-$tVersion = Get-TextFile (Join-Path $t 'VERSION.txt')
-$tTemplateVersion = Get-TextFile (Join-Path $t 'TEMPLATE_VERSION.txt')
+Test-Layout $t 'template'
+$tVersion = Get-TextFile (Get-PackageFile $t 'VERSION.txt')
+$tTemplateVersion = Get-TextFile (Get-PackageFile $t 'TEMPLATE_VERSION.txt')
 if ($tVersion -ne $tTemplateVersion) { Err "template: VERSION.txt ($tVersion) and TEMPLATE_VERSION.txt ($tTemplateVersion) differ" }
 
-$header = [System.IO.File]::ReadAllLines((Join-Path $t 'TEMPLATE_FILES.txt')) | Select-Object -First 3
+$header = [System.IO.File]::ReadAllLines((Get-PackageFile $t 'TEMPLATE_FILES.txt')) | Select-Object -First 3
 $hm = [regex]::Match(($header -join "`n"), 'AppTemplate v(\d+\.\d+\.\d+)')
 if ($hm.Success -and $hm.Groups[1].Value -ne $tVersion) { Err "template: TEMPLATE_FILES.txt header says v$($hm.Groups[1].Value), VERSION.txt says $tVersion" }
 
-$top = Get-ChangelogEntries (Join-Path $t 'CHANGELOG.txt') | Select-Object -First 1
+$top = Get-ChangelogEntries (Get-PackageFile $t 'CHANGELOG.txt') | Select-Object -First 1
 if (-not $top -or $top.Version -ne [version]$tVersion) { Err "template: newest CHANGELOG.txt entry is v$($top.Version), VERSION.txt says $tVersion" }
 
 $tManifest = @(Read-TemplateManifest $t)
@@ -51,7 +63,7 @@ foreach ($p in (Test-ManifestFiles -Root $t -Manifest $tManifest)) {
     Err "template: $($p.File) is $($p.Problem) compared with TEMPLATE_FILES.txt (stale manifest? run tools\Update-TemplateManifest.ps1)"
 }
 $listed = $tManifest | ForEach-Object File
-Get-ChildItem (Join-Path $t 'Modules/Base') -File | ForEach-Object {
+Get-ChildItem (Get-PackageFile $t 'Modules/Base') -File | ForEach-Object {
     $rel = 'Modules/Base/' + $_.Name
     if (($listed -notcontains $rel) -and ($projectOwnedBase -notcontains $rel)) {
         Warn "template: $rel is not in TEMPLATE_FILES.txt, so it will never reach the projects"
@@ -65,17 +77,18 @@ $rows = @(); $exeNames = @{}; $dataFolders = @{}
 foreach ($root in Get-ProjectRoots) {
     $name = Split-Path $root -Leaf
     $state = 'ok'
+    Test-Layout $root $name
     try {
-        $id = [System.IO.File]::ReadAllText((Join-Path $root 'AppIdentity.json')) | ConvertFrom-Json
+        $id = [System.IO.File]::ReadAllText((Get-PackageFile $root 'AppIdentity.json')) | ConvertFrom-Json
         foreach ($k in 'AppName', 'ExeName', 'AppDataFolder') { if (-not $id.$k) { throw "no $k" } }
         if ($id.ExeName -ne $name) { Warn "${name}: folder name differs from ExeName '$($id.ExeName)'" }
         if ($exeNames.ContainsKey($id.ExeName)) { Err "${name}: ExeName '$($id.ExeName)' is also used by $($exeNames[$id.ExeName])" } else { $exeNames[$id.ExeName] = $name }
         if ($dataFolders.ContainsKey($id.AppDataFolder)) { Err "${name}: AppDataFolder '$($id.AppDataFolder)' is also used by $($dataFolders[$id.AppDataFolder]) (they would share environments and logs)" } else { $dataFolders[$id.AppDataFolder] = $name }
     } catch { Err "${name}: AppIdentity.json is missing or invalid ($($_.Exception.Message))"; $state = 'error' }
 
-    $v = Get-TextFile (Join-Path $root 'VERSION.txt')
-    $tv = Get-TextFile (Join-Path $root 'TEMPLATE_VERSION.txt')
-    $top = Get-ChangelogEntries (Join-Path $root 'CHANGELOG.txt') | Select-Object -First 1
+    $v = Get-TextFile (Get-PackageFile $root 'VERSION.txt')
+    $tv = Get-TextFile (Get-PackageFile $root 'TEMPLATE_VERSION.txt')
+    $top = Get-ChangelogEntries (Get-PackageFile $root 'CHANGELOG.txt') | Select-Object -First 1
     if (-not $top -or $top.Version -ne [version]$v) { Err "${name}: newest CHANGELOG.txt entry is v$($top.Version), VERSION.txt says $v"; $state = 'error' }
 
     $m = @(Read-TemplateManifest $root)
@@ -117,7 +130,7 @@ Write-Host ("  {0} PowerShell files parsed, {1} syntax error(s)" -f $psFiles.Cou
 # Rule 2: actions that run a command go through the command window
 #         (Invoke-AppCommand / Confirm-AppCommand), not a Yes/No message box.
 $engineKeys = @{}
-$ttAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $t 'Modules/Base/Services_ToolTips.psm1'), [ref]$null, [ref]$null)
+$ttAst = [System.Management.Automation.Language.Parser]::ParseFile((Get-PackageFile $t 'Modules/Base/Services_ToolTips.psm1'), [ref]$null, [ref]$null)
 $ttAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.AssignmentStatementAst] -and $a.Left.Extent.Text -eq '$script:EngineToolTips' }, $true) | ForEach-Object {
     $_.FindAll({ param($a) $a -is [System.Management.Automation.Language.HashtableAst] }, $true) | ForEach-Object {
         foreach ($pair in $_.KeyValuePairs) { $engineKeys[(ConvertTo-ToolTipKey ([string]$pair.Item1.Value))] = $true }
@@ -126,7 +139,7 @@ $ttAst.FindAll({ param($a) $a -is [System.Management.Automation.Language.Assignm
 $clickTypes = 'Button|CheckBox|RadioButton|LinkLabel|ToolStripMenuItem|ToolStripButton'
 foreach ($root in Get-ProjectRoots) {
     $name = Split-Path $root -Leaf
-    $ttPath = Join-Path $root 'Config/ToolTips.json'
+    $ttPath = Get-PackageFile $root 'Config/ToolTips.json'
     $keys = @{}
     if (-not (Test-Path $ttPath)) { Err "${name}: Config/ToolTips.json is missing (template rule: every clickable control has hover help)"; continue }
     try {
@@ -136,7 +149,7 @@ foreach ($root in Get-ProjectRoots) {
     } catch { Err "${name}: Config/ToolTips.json is not valid JSON ($($_.Exception.Message))"; continue }
 
     $missing = New-Object System.Collections.Generic.List[string]
-    $files = @(Get-ChildItem (Join-Path $root 'Modules') -Recurse -File -Filter *.psm1 | Where-Object { -not ($_.Directory.Name -eq 'Base' -and (Test-Path (Join-Path $t ('Modules/Base/' + $_.Name))) -and $_.Name -notin 'UI_Register-Tabs.psm1', 'UI_Tab_Overview.psm1') })
+    $files = @(Get-ChildItem (Get-PackageFile $root 'Modules') -Recurse -File -Filter *.psm1 | Where-Object { -not ($_.Directory.Name -eq 'Base' -and (Test-Path (Get-PackageFile $t ('Modules/Base/' + $_.Name))) -and $_.Name -notin 'UI_Register-Tabs.psm1', 'UI_Tab_Overview.psm1') })
     foreach ($f in $files) {
         $rel = 'Modules/' + $f.Directory.Name + '/' + $f.Name
         $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
