@@ -107,7 +107,6 @@ namespace AppTemplate
         public string DataRootStatus { get; internal set; }  // Network | LocalFallback | LocalOnly
         public string Version        { get; internal set; }
         public string TemplateVersion { get; internal set; }   // TEMPLATE_VERSION.txt: the AppTemplate engine this build is on
-        public int    TemplateDrift   { get; internal set; }   // template-owned files that differ from TEMPLATE_FILES.txt (developer build)
         public string Tier           { get; internal set; }  // Developer | Admin | User
         public bool   Diagnostics    { get; internal set; }
         public bool   CanEditDefaults{ get; internal set; }
@@ -138,14 +137,17 @@ namespace AppTemplate
                 if (string.Equals(names[i], name, StringComparison.OrdinalIgnoreCase)) { Owner.SelectIndex(i); return true; }
             return false;
         }
-        // The runtime environment store (Environment tab: New / Save / Delete).
+        // The ONE file the environments are saved in (Environment tab: New / Save /
+        // Delete). Developer build: Source\Config\Environments.json - the set that
+        // is built into the Lite EXE. Lite EXE (admin password): per machine, in
+        // <LocalAppData>\<app>\Settings\Environments.json, over the built-in set.
         // PowerShell writes it, then calls ReloadEnvironments().
         public string EnvironmentStorePath { get { return MainForm.EnvironmentStorePath(); } }
+        public bool   EnvironmentsAreSource { get { return MainForm.EnvironmentsAreSource; } }
         public void   ReloadEnvironments() { if (Owner != null) Owner.ReloadEnvironmentList(); }
 
         // ---- editing (developer build only) ----
         public void SetActiveEnvField(string key, string value) { if (Owner != null) Owner.SetActiveField(key, value); }
-        public bool SaveDefaults()        { return Owner != null && Owner.SaveLooseDefaults(); }
 
         // ---- logging ----
         public void Log(string level, string source, string text) { AppHostLog.WriteSession(DataRoot, level, source, text, Diagnostics); }
@@ -332,7 +334,7 @@ namespace AppTemplate
     //  and the archive / Extract names; AppDataFolder = %LOCALAPPDATA%\<folder>.
     //  This file has no project-specific lines, so it is byte-identical in
     //  every project. Read from the plain AppIdentity.json resource (builds made
-    //  by Build-App.ps1, Update, Build Lite since template 1.0.17), else from
+    //  by Build-App.exe, Update, Build Lite since template 1.0.17), else from
     //  the developer package (a build compiled by an older Update engine).
     // =====================================================================
     static class ProjectIdentity
@@ -515,7 +517,6 @@ namespace AppTemplate
         // resource names
         const string PackageResource = "AppPackage.zip"; // developer build only
         const string SourceResource  = "core.dat";       // developer build only
-        const string BuildResource   = "Build-App.ps1";  // developer build only
         const string BuilderResource = "Build-App.cs";   // developer build only: source of Build-App.exe
         const string UpdateFolderName = "Update";        // beside the developer EXE: default place for update zips
         const string SourceFile      = "AppHost.cs";
@@ -533,7 +534,6 @@ namespace AppTemplate
 
         string _localRoot, _dataRoot, _dataRootStatus, _version, _activeName, _activeDefault;
         string _templateVersion = "";
-        List<string> _templateDrift = new List<string>();
         bool   _diagnostics;
         List<Dictionary<string, object>> _environments = new List<Dictionary<string, object>>();
 
@@ -556,17 +556,6 @@ namespace AppTemplate
 
             BuildUi();
             ResolveStartup();
-#if !SEALED
-            Shown += delegate { StartPostUpdateWork(); };
-            FormClosing += (s, e) =>
-            {
-                if (!_postWorkRunning) return;
-                var r = MessageBox.Show(this, "Still archiving this version / building " + ExeName + "Lite.exe / Build-App.exe.\n\n" +
-                    "Close anyway? It will be finished the next time the app starts.", AppName,
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (r != DialogResult.Yes) e.Cancel = true;
-            };
-#endif
         }
 
         // Size the window for TargetScreenWidth x TargetScreenHeight (see above).
@@ -600,17 +589,17 @@ namespace AppTemplate
             };
 #if !SEALED
             // Developer tooling -- present only in the developer build.
-            // Function Map and Environment are in every Extract and Archive\Zip zip
-            // (Config\FunctionMap.txt, Config\Environment.txt); the machine facts are
-            // also on the Session.log start line.
-            _devRow.Controls.Add(StyledButton("Update",          delegate { StartUpdate(); }));
-            _devRow.Controls.Add(StyledButton("Update Template", delegate { StartTemplateUpdate(); }));
+            // Everyday: Build Lite, Version History, Open. The zip-based tools from
+            // before git (Update, Update Template, Extract, Archive) are kept for
+            // manual use under More - nothing runs on its own.
             _devRow.Controls.Add(StyledButton("Build Lite",      delegate { BuildLiteNow(); }));
-            _devRow.Controls.Add(StyledButton("Extract",         delegate { ExtractEmbedded(); }));
             _devRow.Controls.Add(StyledButton("Version History", delegate { ShowVersionHistory(); }));
             Button open = null;
             open = StyledButton("Open \u25BE", delegate { ShowOpenMenu(open); });
             _devRow.Controls.Add(open);
+            Button more = null;
+            more = StyledButton("More \u25BE", delegate { ShowMoreMenu(more); });
+            _devRow.Controls.Add(more);
 #else
             // Sealed (runtime) build: no developer tooling.
             _devRow.Visible = false;
@@ -674,6 +663,9 @@ namespace AppTemplate
             try { if (!Directory.Exists(_localRoot)) Directory.CreateDirectory(_localRoot); } catch { }
 
             _diagnostics = ReadDiagnostics(_runFiles);
+#if !SEALED
+            MoveStrayEnvironments();
+#endif
             LoadEnvironments(_runFiles);
             WriteConfigMirror(_runFiles, _localRoot);
 
@@ -698,9 +690,7 @@ namespace AppTemplate
                 _ctx.Log("WARN", "Identity", ProjectIdentity.FileName + " " + ProjectIdentity.Source +
                          " - running as '" + AppName + "' (AppData folder " + AppDataFolder + "). Add " + ProjectIdentity.FileName + " to the project root and rebuild.");
 #if !SEALED
-            EnsureUpdateFolder(_ctx);
-            CheckTemplateDrift();
-            FillContext(env);          // status bar shows the drift count
+            if (_strayEnvNote != null) _ctx.Log("INFO", "Environment", _strayEnvNote);
 #endif
 
             BuildTabs();
@@ -776,26 +766,33 @@ namespace AppTemplate
             return Directory.Exists(src) ? src : exeDir;
         }
 
-        // Write the current environment definitions to a loose Config\Environments.json
-        // in the source folder (SourceDir; developer build only). The developer build reads this loose
-        // file first, so edits are live; Build-App.ps1 / Build Lite then embed it.
-        internal bool SaveLooseDefaults()
+#if !SEALED
+        // Template 1.1.x saved the developer's environments to Config\Environments.json
+        // BESIDE the EXE (a path from before the Source\ folder), where nothing read
+        // them. From 1.2 the developer build saves straight into Source\Config. On the
+        // first start, a leftover file there is moved into Source\Config (the file it
+        // replaces is kept as Environments.json.bak) and the empty folder removed.
+        string _strayEnvNote;
+        void MoveStrayEnvironments()
         {
-            if (_tier != "Developer") return false;
             try
             {
-                var root = new Dictionary<string, object>();
-                root["ActiveDefault"] = string.IsNullOrEmpty(_activeDefault) ? DefaultEnvName() : _activeDefault;
-                root["Environments"] = _environments.Cast<object>().ToList();
-                string json = IndentJson(new JavaScriptSerializer().Serialize(root));
-                string dir = Path.Combine(SourceDir(), "Config");
-                Directory.CreateDirectory(dir);
-                File.WriteAllText(Path.Combine(dir, "Environments.json"), json, new UTF8Encoding(false));
-                _ctx.Log("INFO", "Defaults", "Saved environment defaults to loose Config\\Environments.json.");
-                return true;
+                if (SourceDir().Equals(ExeDir(), StringComparison.OrdinalIgnoreCase)) return;   // pre-1.1 flat folder: same place
+                string strayDir = Path.Combine(ExeDir(), "Config"), stray = Path.Combine(strayDir, "Environments.json");
+                if (!File.Exists(stray)) return;
+                string dest = EnvironmentStorePath();
+                Directory.CreateDirectory(Path.GetDirectoryName(dest));
+                if (File.Exists(dest)) File.Copy(dest, dest + ".bak", true);
+                File.Copy(stray, dest, true);
+                File.Delete(stray);
+                if (Directory.GetFileSystemEntries(strayDir).Length == 0) Directory.Delete(strayDir);
+                _runFiles["Config/Environments.json"] = File.ReadAllText(dest, Encoding.UTF8);
+                _strayEnvNote = "Moved the environments saved beside the EXE (" + stray + ") into " + dest +
+                                " (the previous file is " + Path.GetFileName(dest) + ".bak). Commit it to keep them.";
             }
-            catch (Exception ex) { _ctx.Log("ERROR", "Defaults", ex.Message); return false; }
+            catch (Exception ex) { _strayEnvNote = "Could not move " + Path.Combine(ExeDir(), "Config", "Environments.json") + " into Source\\Config: " + ex.Message; }
         }
+#endif
 
         // ---------------- PowerShell-built tabs ----------------
         void BuildTabs()
@@ -893,25 +890,17 @@ namespace AppTemplate
             catch { }
         }
 
-        // "  (template 1.0.14)" for the status bar; "(template 1.0.14, 2 changed)" when
-        // template-owned files differ from the manifest (developer build).
+        // "  (template 1.0.14)" for the status bar.
         string TemplateLabel()
         {
             if (string.IsNullOrEmpty(_templateVersion)) return "";
-            return "  (template " + _templateVersion + (_templateDrift.Count > 0 ? ", " + _templateDrift.Count + " changed" : "") + ")";
+            return "  (template " + _templateVersion + ")";
         }
 
-        // Template drift check (developer build). TEMPLATE_FILES.txt lists every
-        // template-owned file with the SHA-256 it had in this template version
-        // (UTF-8 text, LF line endings, no BOM; AppHost.cs without its PROJECT
-        // IDENTITY block). Each listed file that is in the package is hashed the
-        // same way; any difference is a local change to an engine file - logged so
-        // it is moved into the template (or reverted) before the next template sync.
-        // AppHost.cs and Build-App.ps1 are not in the package: the developer build
-        // checks its embedded copies of them (EngineView). Every file, AppHost.cs
-        // included, is hashed whole: there is no identity block since 1.0.17 (the
-        // old strip matched its own search strings and broke every AppHost.cs
-        // check from 1.0.17 to 1.0.22). Pre-1.0.17 projects use a manual sync.
+        // Template manifest helpers, used by Update Template. TEMPLATE_FILES.txt lists
+        // every template-owned file with its SHA-256 (UTF-8 text, LF line endings, no
+        // BOM, whole file). Engine drift itself is checked on every push to GitHub
+        // (tools\Test-Template.ps1), not when the app starts (removed in 1.2).
         internal static string NormalizedHash(string path, string text)
         {
             string t = (text ?? "").Replace("\uFEFF", "").Replace("\r\n", "\n");
@@ -949,29 +938,6 @@ namespace AppTemplate
                 if (NormalizedHash(kv.Key, files[kv.Key]) != kv.Value) diff.Add(kv.Key);
             }
             return diff;
-        }
-
-        void CheckTemplateDrift()
-        {
-            _templateDrift.Clear();
-            try
-            {
-                if (!_runFiles.ContainsKey("TEMPLATE_FILES.txt")) return;
-#if !SEALED
-                var files = EngineView(_runFiles);      // + embedded AppHost.cs and Build-App.ps1
-#else
-                var files = _runFiles;
-#endif
-                int checkedCount;
-                _templateDrift.AddRange(ManifestDifferences(_runFiles["TEMPLATE_FILES.txt"], files, false, out checkedCount));
-                if (_ctx != null) _ctx.TemplateDrift = _templateDrift.Count;
-                if (_templateDrift.Count > 0)
-                    _ctx.Log("WARN", "Template", "Template-owned files changed in this project (move the change into the template, or revert): " +
-                             string.Join(", ", _templateDrift.ToArray()));
-                else
-                    _ctx.Log("INFO", "Template", "Template v" + _templateVersion + ": " + checkedCount + " template-owned files match.");
-            }
-            catch (Exception ex) { if (_ctx != null) _ctx.Log("WARN", "Template", "drift check failed: " + ex.Message); }
         }
 
         // Backs $App.SetStatus(). Colors match the source tool's status bar.
@@ -1064,16 +1030,28 @@ namespace AppTemplate
             try { File.WriteAllText(Path.Combine(_localRoot, "active.env"), name ?? "", new UTF8Encoding(false)); } catch { }
         }
 
-        // Environments: the RUNTIME store (<LocalAppData>\<app>\Settings\Environments.json,
-        // created and edited on the Environment tab) over the EMBEDDED set
-        // (Config/Environments.json). Embedded environments missing from the store
-        // are added - unless the store lists them under "Removed" (deleted on purpose).
+        // Environments are saved in ONE file per EXE (template 1.2):
+        //   Developer build: Source\Config\Environments.json - the project's own file,
+        //     edited on the Environment tab, committed to git, built into the Lite EXE.
+        //   Lite EXE: the built-in set, plus what an admin saves on this machine in
+        //     <LocalAppData>\<app>\Settings\Environments.json (a sealed EXE cannot
+        //     change itself). Built-in environments missing from that file are added -
+        //     unless it lists them under "Removed" (deleted on purpose).
         // MaxJsonLength is raised: message pictures make the file larger than the
         // serializer's 2 MB default, which would otherwise silently drop every environment.
+#if SEALED
+        internal const bool EnvironmentsAreSource = false;
         internal static string EnvironmentStorePath()
         {
             return Path.Combine(GetLocalAppDataRoot(), "Settings", "Environments.json");
         }
+#else
+        internal const bool EnvironmentsAreSource = true;
+        internal static string EnvironmentStorePath()
+        {
+            return Path.Combine(SourceDir(), "Config", "Environments.json");
+        }
+#endif
 
         void LoadEnvironments(Dictionary<string, string> files)
         {
@@ -1102,6 +1080,7 @@ namespace AppTemplate
                 LogEarly("ERROR", "Environment store " + store + " could not be read (using the embedded set): " + ex.Message);
             }
             if (!haveStore) { _environments.AddRange(embedded); _activeDefault = embDefault; return; }
+            if (EnvironmentsAreSource) return;            // developer build: the store IS the project's file
             foreach (var e in embedded)
             {
                 string n = NameOf(e);
@@ -1270,7 +1249,7 @@ namespace AppTemplate
         }
 
         // The full source of this build as a zip: the package (with loose config),
-        // AppHost.cs, Build-App.ps1, FunctionMap.txt and Environment.txt. No UI.
+        // AppHost.cs, Build-App.cs, FunctionMap.txt and Environment.txt. No UI.
         void WriteExtractZip(string zipPath) { WriteExtractZip(zipPath, true); }
 
         void WriteExtractZip(string zipPath, bool fullEnvironment)
@@ -1283,7 +1262,6 @@ namespace AppTemplate
             {
                 foreach (var kv in files) AddZipText(za, kv.Key, kv.Value);
                 string src = ReadEmbeddedSource(); if (src != null && !files.ContainsKey(SourceFile)) AddZipText(za, SourceFile, src);
-                string build = ReadEmbeddedText(BuildResource); if (build != null && !files.ContainsKey("Build-App.ps1")) AddZipText(za, "Build-App.ps1", build);
                 string builder = ReadEmbeddedText(BuilderResource); if (builder != null && !files.ContainsKey(BuilderResource)) AddZipText(za, BuilderResource, builder);
                 AddZipText(za, "Config/FunctionMap.txt", BuildFunctionMapText(files));
                 AddZipText(za, "Config/Environment.txt", BuildEnvironmentText(fullEnvironment));
@@ -1292,127 +1270,51 @@ namespace AppTemplate
             File.Move(tmp, zipPath);
         }
 
-        // ---------------- post-update archive (developer build) ----------------
-        // Every start, in the background, a few seconds after the window opens:
+        // ---------------- Archive this version (More menu; manual since 1.2) ----------------
         //   Archive\Exe\<ExeName>_v<ver>_t<template>.exe   copy of this developer EXE
         //   Archive\Zip\<ExeName>_v<ver>_t<template>.zip   full source (as Extract)
-        //   Build\Build-App.exe                             the builder, compiled from Build-App.cs
-        // (<ExeName>Lite.exe, the sealed build, is no longer made here: it needs the
-        //  user / admin passwords - Build Lite, Build-App.cmd or ToolBox ask for them.)
-        //                                                  (beside this EXE in a pre-1.1 flat folder)
-        // Work happens only when this EXE differs from the last run (i.e. after an
-        // Update or a Build-App rebuild); Build-App.exe only when Build-App.cs
-        // changed or the file is missing. Same version + template = same file name,
-        // so a rebuild of the same version overwrites; a new version or template adds
-        // a file. State: Archive\archive.state.
-
-        static string FileSha256(string path)
-        {
-            using (var sha = SHA256.Create())
-            using (var fs = File.OpenRead(path))
-            {
-                var h = sha.ComputeHash(fs); var sb = new StringBuilder();
-                foreach (byte x in h) sb.Append(x.ToString("x2")); return sb.ToString();
-            }
-        }
-
-        static Dictionary<string, string> ReadState(string path)
-        {
-            var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            try { if (File.Exists(path)) foreach (var l in File.ReadAllLines(path)) { int i = l.IndexOf('='); if (i > 0) d[l.Substring(0, i).Trim()] = l.Substring(i + 1).Trim(); } }
-            catch { }
-            return d;
-        }
-
-        static void WriteState(string path, Dictionary<string, string> d)
-        {
-            try { File.WriteAllLines(path, d.Select(kv => kv.Key + "=" + kv.Value).ToArray(), Encoding.ASCII); } catch { }
-        }
-
+        // Git keeps every version now; this is for a copy outside git when wanted.
         string ArchiveBaseName()
         {
             return ExeName + "_v" + _version + (string.IsNullOrEmpty(_templateVersion) ? "" : "_t" + _templateVersion);
         }
 
-        volatile bool _postWorkRunning;
-
-        void StartPostUpdateWork()
+        void ArchiveNow()
         {
-            _postWorkRunning = true;
-            ThreadPool.QueueUserWorkItem(delegate
+            try
             {
-                try { PostUpdateWork(); }
-                catch (Exception ex)
-                {
-                    try { _ctx.Log("WARN", "Archive", "post-update work failed: " + ex.ToString()); } catch { }
-                    ShowStatusMessage("Archive step failed (see Session.log).", "warn");
-                }
-                finally { _postWorkRunning = false; }
-            });
+                Cursor = Cursors.WaitCursor;
+                string arch = Path.Combine(ExeDir(), "Archive"), name = ArchiveBaseName();
+                string exeCopy = Path.Combine(arch, "Exe", name + ".exe"), zipCopy = Path.Combine(arch, "Zip", name + ".zip");
+                Directory.CreateDirectory(Path.GetDirectoryName(exeCopy)); Directory.CreateDirectory(Path.GetDirectoryName(zipCopy));
+                File.Copy(Application.ExecutablePath, exeCopy, true);
+                WriteExtractZip(zipCopy, false);
+                _ctx.Log("INFO", "Archive", "v" + _version + " -> " + exeCopy + " and " + zipCopy);
+                ShowStatusMessage("Archived v" + _version + " in " + arch, "ok");
+            }
+            catch (Exception ex) { Err("Archive", ex); }
+            finally { Cursor = Cursors.Default; }
         }
 
-        // Each step is independent (one failing never skips the others) and is
-        // recorded in Archive\archive.state as soon as it is done, so a closed app
-        // resumes on the next start instead of starting over.
-        void PostUpdateWork()
+        // ---- More \u25BE : the zip-based tools from before git, for manual use ----
+        void ShowMoreMenu(Control anchor)
         {
-            Thread.Sleep(3000);                                    // let the first tab finish loading
-            string exe = Application.ExecutablePath, dir = Path.GetDirectoryName(exe);
-            string arch = Path.Combine(dir, "Archive"), exeDir = Path.Combine(arch, "Exe"), zipDir = Path.Combine(arch, "Zip");
-            Directory.CreateDirectory(exeDir); Directory.CreateDirectory(zipDir);
-            string statePath = Path.Combine(arch, "archive.state");
-            var st = ReadState(statePath);
-            string hash = FileSha256(exe), name = ArchiveBaseName();
-            string exeCopy = Path.Combine(exeDir, name + ".exe"), zipCopy = Path.Combine(zipDir, name + ".zip");
-            string builderExe = BuilderExePath();
-            string builderSrc = ReadBuilderSource();
-            string builderHash = builderSrc == null ? null : NormalizedHash(BuilderResource, builderSrc);
-            string val;
-            bool exeDone  = st.TryGetValue("ExeHash", out val)  && val == hash && File.Exists(exeCopy);
-            bool zipDone  = st.TryGetValue("ZipHash", out val)  && val == hash && File.Exists(zipCopy);
-            bool buildDone = builderSrc == null || (st.TryGetValue("BuilderHash", out val) && val == builderHash && File.Exists(builderExe));
-            if (exeDone && zipDone && buildDone) { _ctx.Log("INFO", "Archive", "v" + _version + ": archive and Build-App.exe are current."); return; }
-
-            _ctx.Log("INFO", "Archive", "v" + _version + ": starting (exe " + (exeDone ? "done" : "to do") + ", zip " + (zipDone ? "done" : "to do") +
-                                        ", builder " + (buildDone ? "done" : "to do") + ").");
-            var failed = new List<string>();
-            var sw = Stopwatch.StartNew();
-
-            if (!exeDone)
-            {
-                ShowStatusMessage("Archiving v" + _version + " (1/3: EXE) - keep the app open ...", "info");
-                try { File.Copy(exe, exeCopy, true); st["ExeHash"] = hash; WriteState(statePath, st); _ctx.Log("INFO", "Archive", "EXE -> " + exeCopy + " (" + sw.ElapsedMilliseconds + " ms)"); }
-                catch (Exception ex) { failed.Add("EXE copy"); _ctx.Log("WARN", "Archive", "EXE copy failed: " + ex.ToString()); }
-            }
-            if (!zipDone)
-            {
-                ShowStatusMessage("Archiving v" + _version + " (2/3: source zip) - keep the app open ...", "info");
-                sw.Restart();
-                try { WriteExtractZip(zipCopy, false); st["ZipHash"] = hash; WriteState(statePath, st); _ctx.Log("INFO", "Archive", "source -> " + zipCopy + " (" + sw.ElapsedMilliseconds + " ms)"); }
-                catch (Exception ex) { failed.Add("source zip"); _ctx.Log("WARN", "Archive", "source zip failed: " + ex.ToString()); }
-            }
-            if (!buildDone)
-            {
-                ShowStatusMessage("Building Build-App.exe (3/3) - keep the app open ...", "info");
-                sw.Restart();
-                string err;
-                try { Directory.CreateDirectory(Path.GetDirectoryName(builderExe)); err = BuildBuilderTo(builderSrc, builderExe); }
-                catch (Exception ex) { err = ex.ToString(); }
-                if (err == null) { st["BuilderHash"] = builderHash; WriteState(statePath, st); _ctx.Log("INFO", "Archive", "Build-App.exe -> " + builderExe + " (" + sw.ElapsedMilliseconds + " ms)"); }
-                else { failed.Add("Build-App.exe"); _ctx.Log("WARN", "Archive", "Build-App.exe not built: " + err); }
-            }
-
-            if (failed.Count > 0)
-                ShowStatusMessage("Not done: " + string.Join(", ", failed.ToArray()) + " (see Session.log) - retried on the next start.", "warn");
-            else
-                ShowStatusMessage("Archived v" + _version + ". Build Lite makes " + ExeName + "Lite.exe, the sealed build to hand out.", "ok");
+            var menu = new ContextMenuStrip { Font = Font };
+            menu.Items.Add("Update from a zip or folder...", null, delegate { StartUpdate(); });
+            menu.Items.Add("Update Template from a template zip...", null, delegate { StartTemplateUpdate(); });
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add("Extract source zip (AppData\\Extract)", null, delegate { ExtractEmbedded(); });
+            menu.Items.Add("Archive this version (Archive\\Exe, Archive\\Zip)", null, delegate { ArchiveNow(); });
+            menu.Closed += delegate { BeginInvoke((MethodInvoker)delegate { menu.Dispose(); }); };
+            if (anchor != null) menu.Show(anchor, new Point(0, anchor.Height));
+            else menu.Show(Cursor.Position);
         }
 
         // ---- Open \u25BE : the folders a developer needs ----
         void ShowOpenMenu(Control anchor)
         {
             var menu = new ContextMenuStrip { Font = Font };
-            AddOpenItem(menu, "App folder  (Archive, Update, Lite EXE)", ExeDir());
+            AddOpenItem(menu, "App folder  (Lite EXE, Build-App.cmd)", ExeDir());
             if (!SourceDir().Equals(ExeDir(), StringComparison.OrdinalIgnoreCase)) AddOpenItem(menu, "Source folder  (Config, Modules, VERSION, CHANGELOG)", SourceDir());
             AddOpenItem(menu, "Logs  (" + (_dataRootStatus == "Network" ? "shared" : "local") + ")", Path.Combine(_dataRoot ?? GetLocalAppDataRoot(), "Logs"));
             AddOpenItem(menu, "AppData  (Settings, Extract)", GetLocalAppDataRoot());
@@ -1436,18 +1338,10 @@ namespace AppTemplate
 
         static string ExeDir() { return Path.GetDirectoryName(Application.ExecutablePath); }
 
-        // Build-App.exe: Build\ in the 1.1 layout, beside this EXE in a pre-1.1 flat folder.
-        static string BuilderExePath()
-        {
-            return Directory.Exists(Path.Combine(ExeDir(), "Source"))
-                ? Path.Combine(ExeDir(), "Build", "Build-App.exe")
-                : Path.Combine(ExeDir(), "Build-App.exe");
-        }
         static string LitePath() { return Path.Combine(ExeDir(), ExeName + "Lite.exe"); }
 
         // ---- Update folder: <EXE folder>\Update, the default place for update zips ----
-        // Made on every developer start and every compile (Update, Update Template,
-        // Build Lite, Build-App.exe). The Update / Update Template pickers open there.
+        // Made when Update / Update Template is used; their pickers open there.
         internal static string UpdateFolderPath() { return Path.Combine(ExeDir(), UpdateFolderName); }
 
         static void EnsureUpdateFolder(AppContext ctx)
@@ -1469,9 +1363,9 @@ namespace AppTemplate
             return ExeDir();
         }
 
-        // ---- Build-App.cs: source of Build-App.exe (the builder that needs no PowerShell) ----
-        // Embedded as its own resource; a build made by an older Update engine has
-        // it in the package instead.
+        // ---- Build-App.cs: source of Build-App.exe (Build-App.cmd compiles it) ----
+        // Embedded as its own resource so Update / Extract carry the whole source; a
+        // build made by an older Update engine has it in the package instead.
         static string ReadBuilderSource()
         {
             string s = ReadEmbeddedText(BuilderResource);
@@ -1485,38 +1379,11 @@ namespace AppTemplate
             catch { return null; }
         }
 
-        // Compile Build-App.cs to outExe (a console EXE). Null = success, else the error.
-        static string BuildBuilderTo(string source, string outExe)
-        {
-            if (string.IsNullOrEmpty(source)) return "No Build-App.cs in this build.";
-            EnsureUpdateFolder(null);
-            string csc = FindCsc(); if (csc == null) return "csc.exe not found.";
-            string temp = Path.Combine(Path.GetTempPath(), "AppBuilder_" + Guid.NewGuid().ToString("N").Substring(0, 12));
-            Directory.CreateDirectory(temp);
-            try
-            {
-                string cs = Path.Combine(temp, BuilderResource); File.WriteAllText(cs, source, new UTF8Encoding(false));
-                string tmpExe = Path.Combine(temp, "Build-App.exe");
-                var rsp = new List<string> { "/nologo", "/target:exe", "/optimize+", "/out:\"" + tmpExe + "\"",
-                    "/reference:System.IO.Compression.dll", "/reference:System.IO.Compression.FileSystem.dll",
-                    "/reference:System.Web.Extensions.dll", "\"" + cs + "\"" };
-                string rspPath = Path.Combine(temp, "build.rsp"); File.WriteAllLines(rspPath, rsp, Encoding.ASCII);
-                string err;
-                if (!RunCsc(csc, rspPath, out err) || !File.Exists(tmpExe)) return string.IsNullOrEmpty(err) ? "csc produced no EXE." : err;
-                try { File.Copy(tmpExe, outExe, true); }
-                catch (IOException ex) { return "Could not write " + outExe + " (is it running?): " + ex.Message; }
-                return null;
-            }
-            catch (Exception ex) { return ex.Message; }
-            finally { try { Directory.Delete(temp, true); } catch { } }
-        }
-
         // ---- Build Lite: <ExeName>Lite.exe beside this EXE - the SEALED build to hand
         //      out (source left out, modules sealed per tier). Asks for the user and
         //      admin passwords every time (template 1.1.2: no built-in test passwords).
         void BuildLiteNow()
         {
-            if (_postWorkRunning) { MessageBox.Show(this, "The background archive is still running. Try again in a moment.", "Build Lite"); return; }
             string userPw, adminPw;
             if (!PromptTwoPasswords(out userPw, out adminPw)) return;
             string lite = LitePath();
@@ -1534,25 +1401,10 @@ namespace AppTemplate
                 MessageBox.Show(this, ExeName + "Lite.exe was not built:\n\n" + err, "Build Lite", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-            RecordLiteBuilt();
             _ctx.Log("INFO", "BuildLite", ExeName + "Lite.exe -> " + lite + " (" + sw.ElapsedMilliseconds + " ms)");
             ShowStatusMessage(ExeName + "Lite.exe built - the sealed build to hand out.", "ok");
             MessageBox.Show(this, "Built " + lite + "\n\nSource left out; modules sealed per tier.\nGive users the USER password; keep the ADMIN password private.",
                 "Build Lite", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        // The Lite EXE now matches this developer EXE: the next start does not rebuild it.
-        static void RecordLiteBuilt()
-        {
-            try
-            {
-                string arch = Path.Combine(ExeDir(), "Archive"); Directory.CreateDirectory(arch);
-                string statePath = Path.Combine(arch, "archive.state");
-                var st = ReadState(statePath);
-                st["LiteHash"] = FileSha256(Application.ExecutablePath);
-                WriteState(statePath, st);
-            }
-            catch { }
         }
 
         // ---- headless:  <ExeName>Dev.exe --build-lite ["out.exe"] ----
@@ -1568,12 +1420,10 @@ namespace AppTemplate
                 string adminPw = Environment.GetEnvironmentVariable("APPTEMPLATE_LITE_ADMIN");
                 if (string.IsNullOrEmpty(userPw) || string.IsNullOrEmpty(adminPw)) { WriteStdErr("No Lite passwords given (APPTEMPLATE_LITE_USER / APPTEMPLATE_LITE_ADMIN)."); return 3; }
                 if (userPw == adminPw) { WriteStdErr("The user and admin passwords must differ."); return 3; }
-                EnsureUpdateFolder(null);
                 if (string.IsNullOrEmpty(outExe)) outExe = LitePath();
                 string version = VersionOf(LoadPackage());
                 string err = BuildSealedTo(userPw, adminPw, outExe, version);
                 if (err != null) { WriteStdErr(err); return 1; }
-                if (string.Equals(Path.GetFullPath(outExe), Path.GetFullPath(LitePath()), StringComparison.OrdinalIgnoreCase)) RecordLiteBuilt();
                 return 0;
             }
             catch (Exception ex) { WriteStdErr(ex.ToString()); return 2; }
@@ -1638,7 +1488,7 @@ namespace AppTemplate
             sb.AppendLine("Process / OS      : " + SystemFacts.Bitness());
             sb.AppendLine("App version       : v" + _version);
             sb.AppendLine("Template version  : " + (_templateVersion == "" ? "unknown" : "v" + _templateVersion) +
-                          (_templateDrift.Count > 0 ? "  (changed: " + string.Join(", ", _templateDrift.ToArray()) + ")" : ""));
+                          "");
             sb.AppendLine("Resolved data root: " + _dataRoot + "  (" + _dataRootStatus + ")");
             sb.AppendLine();
             try { using (PowerShell ps = PowerShell.Create()) { ps.AddScript("$PSVersionTable | Out-String"); foreach (var r in ps.Invoke()) sb.AppendLine(r.ToString()); } }
@@ -1792,13 +1642,12 @@ namespace AppTemplate
             return ProjectIdentity.CurrentJson();
         }
 
-        // A file set plus this build's embedded AppHost.cs, Build-App.ps1 and
-        // Build-App.cs (not in the package): every engine file of the running project.
+        // A file set plus this build's embedded AppHost.cs and Build-App.cs (not in
+        // the package): every engine file of the running project.
         static Dictionary<string, string> EngineView(Dictionary<string, string> files)
         {
             var d = new Dictionary<string, string>(files, StringComparer.OrdinalIgnoreCase);
             string src = ReadEmbeddedSource(); if (src != null) d[SourceFile] = src;
-            string build = ReadEmbeddedText(BuildResource); if (build != null) d["Build-App.ps1"] = build;
             string builder = ReadEmbeddedText(BuilderResource); if (builder != null) d[BuilderResource] = builder;
             return d;
         }
@@ -2115,7 +1964,7 @@ namespace AppTemplate
                     foreach (var kv in result)
                     {
                         if (kv.Key.Equals(SourceFile, StringComparison.OrdinalIgnoreCase)) continue;
-                        if (kv.Key.Equals("Build-App.ps1", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (kv.Key.Equals("Build-App.ps1", StringComparison.OrdinalIgnoreCase)) continue;   // removed in 1.2
                         if (kv.Key.Equals(BuilderResource, StringComparison.OrdinalIgnoreCase)) continue;   // own resource
                         if (kv.Key.Equals("UPDATE.txt", StringComparison.OrdinalIgnoreCase)) continue;
                         if (kv.Key.StartsWith("Config/FunctionMap", StringComparison.OrdinalIgnoreCase)) continue;
@@ -2125,8 +1974,6 @@ namespace AppTemplate
                 string csPath   = Path.Combine(temp, SourceFile); File.WriteAllText(csPath, result[SourceFile], new UTF8Encoding(false));
                 string corePath = Path.Combine(temp, "core.dat"); File.WriteAllBytes(corePath, PackSource(result[SourceFile]));
                 string verPath  = Path.Combine(temp, "AssemblyVersionInfo.cs"); File.WriteAllText(verPath, BuildVersionInfoSource(newVersion), Encoding.ASCII);
-                string buildPs1 = result.ContainsKey("Build-App.ps1") ? result["Build-App.ps1"] : ReadEmbeddedText(BuildResource);
-                string buildPath = Path.Combine(temp, "Build-App.ps1"); if (buildPs1 != null) File.WriteAllText(buildPath, buildPs1, new UTF8Encoding(false));
                 string idPath   = Path.Combine(temp, ProjectIdentity.FileName);
                 File.WriteAllText(idPath, IdentityJsonOf(result), new UTF8Encoding(false));
                 string builderCs = result.ContainsKey(BuilderResource) ? result[BuilderResource] : ReadBuilderSource();
@@ -2139,7 +1986,6 @@ namespace AppTemplate
                 foreach (var r in ParseReferences(result[SourceFile])) rsp.Add("/reference:\"" + r + "\"");
                 rsp.Add("/resource:\"" + zipPath + "\",AppPackage.zip");
                 rsp.Add("/resource:\"" + corePath + "\",core.dat");
-                if (buildPs1 != null) rsp.Add("/resource:\"" + buildPath + "\",Build-App.ps1");
                 if (builderCs != null) rsp.Add("/resource:\"" + builderPath + "\"," + BuilderResource);
                 rsp.Add("/resource:\"" + idPath + "\"," + ProjectIdentity.FileName);
                 rsp.Add("\"" + csPath + "\""); rsp.Add("\"" + verPath + "\"");
@@ -2157,7 +2003,7 @@ namespace AppTemplate
         {
             string cur = Application.ExecutablePath, dir = Path.GetDirectoryName(cur);
             string archive = Path.Combine(dir, "Archive", "Exe"); Directory.CreateDirectory(archive);
-            string archived = Path.Combine(archive, ArchiveBaseName() + ".exe");      // same name the post-update archive uses
+            string archived = Path.Combine(archive, ArchiveBaseName() + ".exe");      // same name Archive this version uses
 
             // Stage the freshly built EXE BESIDE the current one, so it survives the
             // caller's temp-dir cleanup (which runs the instant this method returns).
@@ -2186,7 +2032,6 @@ namespace AppTemplate
         // --build-lite mode. version = the EXE's version.
         static string BuildSealedTo(string userPw, string adminPw, string outExe, string version)
         {
-            EnsureUpdateFolder(null);
             string csc = FindCsc(); if (csc == null) return "csc.exe not found.";
             string sma = FindSma(); if (sma == null) return "System.Management.Automation.dll not found.";
             string source = ReadEmbeddedSource(); if (source == null) return "No embedded source (already sealed?).";

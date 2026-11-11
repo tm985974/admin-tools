@@ -52,8 +52,8 @@ function New-OverviewTab {
 
     Add-Section 'Environments'
     Add-Bullet 'An environment is one saved set of settings (a site, a customer, a domain ...). The app ships with Config\Environments.json.'
-    Add-Bullet 'Admin password / developer build: New, edit and Save on the Environment tab (saved per machine in Settings\Environments.json). User password: pick only.'
-    Add-Bullet 'Developer build: Save also stages them in Config\Environments.json, so the next build ships them.'
+    Add-Bullet 'Developer build: New, edit and Save on the Environment tab write Source\Config\Environments.json - the set the next Build Lite ships. Commit it.'
+    Add-Bullet 'Lite EXE, admin password: changes are saved on that machine (Settings\Environments.json in AppData). User password: pick only.'
     Add-Bullet 'If the picked environment names a reachable shared path, logs and data go there - otherwise local AppData.'
 
     Add-Section 'Module tiers'
@@ -76,19 +76,15 @@ function New-OverviewTab {
     Add-Bullet 'Every start logs the machine: Windows, PowerShell and .NET versions, 32/64-bit. Session.log is the one file to ask for.'
     Add-Bullet 'Written to the resolved data root; never packed back into the EXE.'
 
-    Add-Section 'Build and update (developer build)'
-    Add-Bullet 'Build-App.exe (or Build-App.cmd, which compiles it) - first build or recovery; needs no PowerShell scripts. Builds the developer EXE and its Lite EXE.'
-    Add-Bullet 'Update folder beside the EXE - drop update zips there; Update and Update Template open it.'
-    Add-Bullet 'Update - apply a zip or a folder, preview the changes, recompile.'
-    Add-Bullet 'Update Template - pick the template''s source zip: the engine files move to the newer template (checked and previewed first), project files stay.'
+    Add-Section 'Build (developer build)'
+    Add-Bullet 'Build-App.cmd - builds <ExeName>Dev.exe and, with the passwords you type, <ExeName>Lite.exe. Needs no PowerShell scripts.'
     Add-Bullet 'Build Lite - make <ExeName>Lite.exe, the sealed build to hand out (asks for the user and admin passwords).'
-    Add-Bullet 'Build Lite - rebuild <ExeName>Lite.exe now (test passwords: admin a, user u).'
-    Add-Bullet 'Extract - write the whole project out now (with FunctionMap.txt and Environment.txt) for hand-off.'
-    Add-Bullet 'Open - the app folder (Archive, Update, Lite EXE), the Logs in use, or AppData (Settings, Extract).'
+    Add-Bullet 'Open - the app folder, the Source folder, the Logs in use, or AppData (Settings, Extract).'
+    Add-Bullet 'More - the zip tools from before git, for manual use: Update from a zip or folder, Update Template, Extract, Archive this version.'
 
     Add-Section 'Make it your own'
     Add-Bullet 'New project: set AppName, ExeName and AppDataFolder in AppIdentity.json; AppHost.cs and the builder read it.'
-    Add-Bullet 'Template-owned files stay identical in every project (TEMPLATE_FILES.txt); the status bar shows the template version and any changed engine files.'
+    Add-Bullet 'Template-owned files stay identical in every project (TEMPLATE_FILES.txt); the check on every push to GitHub catches any change. The status bar shows the template version.'
     Add-Bullet 'See README.md for the full checklist.'
 
     # Dock order: Fill first (back), then the Top bands.

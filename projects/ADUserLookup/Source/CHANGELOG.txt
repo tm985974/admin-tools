@@ -2,6 +2,18 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.22 (2026-11-11)  Engine synced v1.1.2 -> v1.2.0: environments in one place, More menu
+  Changed : AppTemplate engine v1.1.2 -> v1.2.0 (Update Template): 7 file(s) replaced, 0 added, 1 removed (Build-App.ps1).
+  Changed : README.md: the copy of the engine guide is gone (see template/Source/README.md);
+            this tool's own notes are kept.
+  Changed : Session.log has one writer: Write-SessionLog (status bar, User Actions,
+            Bulk Onboard, start-up lines) now goes through the host's logger, so
+            one line format and one size cap (Environment > Logging). The AD
+            logger's own Logging.json reading and Session.log trimming are gone;
+            per-domain action logs (Logs\<DOMAIN>.log) are unchanged.
+  Changed : Overview: Build section (Build-App.cmd, Build Lite, More).
+  Note    : template v1.2.0  One place for environments; zip tools under More; Build-App.cmd only
+
 v1.2.21 (2026-11-11)  Engine synced v1.1.1 -> v1.1.2: ADUserLookupDev.exe / ADUserLookupLite.exe
   Changed : AppTemplate engine v1.1.1 -> v1.1.2 (Update Template): 5 file(s) replaced, 0 added, 0 removed.
   Changed : Overview: Build Lite is the sealed build (Build Sealed is gone).

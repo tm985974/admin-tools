@@ -54,7 +54,7 @@ passwords in the repo.
 
 1. Edit files in `projects/<Name>/Source/`.
 2. Bump `Source/VERSION.txt` and add a `Source/CHANGELOG.txt` entry (newest first, `vX.Y.Z (date)  title`).
-3. Build with `Build-App.cmd` (or the developer EXE's **Update** > Folder pointed at the project folder).
+3. Build with `Build-App.cmd` (or ToolBox's Developer tab).
 4. Commit and tag the release:
 
    ```
@@ -63,8 +63,12 @@ passwords in the repo.
    git push --follow-tags
    ```
 
+Environments edited in a developer EXE are saved straight into
+`Source/Config/Environments.json`: commit that file like any other change.
+
 To update a developer EXE on a machine without git, make an update zip from what changed
-since the last tag and use it with the **Update** button as before:
+since the last tag and use it with **More > Update from a zip or folder** (or download the
+repository zip and use ToolBox's Update tab):
 
 ```
 powershell -ExecutionPolicy Bypass -File tools\New-UpdateZip.ps1 -Project ADUserLookup
@@ -77,7 +81,7 @@ check fails, and the next sync would overwrite it.
 
 1. Edit the template-owned files in `template/` (`template/Source/`, plus `template/Build-App.cmd`).
    Bump `template/Source/VERSION.txt` **and** `template/Source/TEMPLATE_VERSION.txt`, and add a
-   `CHANGELOG.txt` entry. Use `1.0.x` for engine-only
+   `CHANGELOG.txt` entry. Use a patch number (`1.2.x`) for engine-only
    changes. Use a new major.minor, or a `Contract:` line in the entry, when projects must change too.
 2. Regenerate the manifest (never edit hashes by hand):
 
@@ -93,7 +97,7 @@ check fails, and the next sync would overwrite it.
    powershell -ExecutionPolicy Bypass -File tools\Sync-Template.ps1
    ```
 
-   This is what the developer EXE's **Update Template** does, for all projects at once. It
+   This is what the developer EXE's **More > Update Template** does, for all projects at once. It
    skips (with the reason) projects with local engine edits and contract changes.
 4. Check, rebuild the projects you use, then commit the template and the syncs together and tag:
 

@@ -12,8 +12,9 @@
 # The folder lives under the resolved data root, so it follows the active
 # environment (shared network path when reachable, else local AppData). On
 # first use, any embedded Config\*.json not already present is COPIED in as the
-# starting value (Environments.json excepted - the host owns it). After that the
-# saved copy wins; ship a changed default by deleting the saved file.
+# starting value. After that the saved copy wins; ship a changed default by
+# deleting the saved file. Not copied: the files only the engine reads from the
+# built-in set (Environments, EnvironmentFields, SharedScope, ToolTips).
 
 function Get-AppSettingsDir {
     [CmdletBinding()]
@@ -29,7 +30,7 @@ function Get-AppSettingsDir {
     $mirror = Join-Path ([string]$App.LocalAppData) 'Config'
     if (Test-Path -LiteralPath $mirror) {
         foreach ($f in @(Get-ChildItem -LiteralPath $mirror -Filter '*.json' -File -ErrorAction SilentlyContinue)) {
-            if ($f.Name -ieq 'Environments.json') { continue }
+            if (@('Environments.json', 'EnvironmentFields.json', 'SharedScope.json', 'ToolTips.json') -contains $f.Name) { continue }
             $dest = Join-Path $dir $f.Name
             if (-not (Test-Path -LiteralPath $dest)) {
                 try { Copy-Item -LiteralPath $f.FullName -Destination $dest -ErrorAction Stop } catch { }

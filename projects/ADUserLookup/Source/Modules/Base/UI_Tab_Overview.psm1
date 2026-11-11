@@ -64,21 +64,16 @@ function New-OverviewTab {
 
     Add-Section 'Logging'
     Add-Bullet 'Per-environment Logs\<ENV>.log plus a shared Session.log.'
-    Add-Bullet 'Admin actions: per-domain Logs\<DOMAIN>.log (Tools > Operation Log), as in the original tool.'
+    Add-Bullet 'Admin actions: per-domain Logs\<DOMAIN>.log (Tools > Operation Log), as in the original tool. Status and AD messages go to Session.log.'
     Add-Bullet 'Settings you save (environment settings, word lists) live in <data root>\Settings and survive restarts.'
     Add-Bullet 'Machine/UTC stamped and size-capped (FIFO).'
     Add-Bullet 'Written to the resolved data root; never packed back into the EXE.'
 
-    Add-Section 'Build and update (developer build)'
-    Add-Bullet 'Build-App.ps1 - first build or recovery.'
-    Add-Bullet 'Update - apply a zip or a folder, preview the changes, recompile.'
+    Add-Section 'Build (developer build)'
+    Add-Bullet 'Build-App.cmd - builds ADUserLookupDev.exe and, with the passwords you type, ADUserLookupLite.exe.'
     Add-Bullet 'Build Lite - make ADUserLookupLite.exe, the sealed build to hand out (asks for the user and admin passwords).'
-    Add-Bullet 'Extract - write the whole project out (with FunctionMap.txt and Environment.txt) for hand-off.'
-
-    Add-Section 'Make it your own'
-    Add-Bullet 'New project: change only the PROJECT IDENTITY block in AppHost.cs (AppName, ExeName, AppDataFolder); Build-App.ps1 reads it.'
-    Add-Bullet 'Template-owned files stay identical in every project (TEMPLATE_FILES.txt); the status bar shows the template version and any changed engine files.'
-    Add-Bullet 'See README.md for the full checklist.'
+    Add-Bullet 'More - the zip tools from before git (Update, Update Template, Extract, Archive), for manual use.'
+    Add-Bullet 'The engine is AppTemplate: see template\Source\README.md in the admin-tools repository.'
 
     # Dock order: Fill first (back), then the Top bands.
     $Page.Controls.Add($panel)

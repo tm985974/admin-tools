@@ -45,18 +45,16 @@
 
 $script:EngineToolTips = [ordered]@{
     # developer buttons (developer build only)
-    'Update'          = 'Developer build: apply an update - a zip or folder of changed source files. Shows the changes first, then recompiles this EXE and restarts it (the previous EXE is archived).'
-    'Update Template' = 'Developer build: move this project''s engine files to a newer AppTemplate version (pick the template''s Archive\Zip zip). Project files are not touched.'
     'Build Lite'      = 'Developer build: make <ExeName>Lite.exe, the sealed build to hand out. Asks for a user and an admin password; the modules are encrypted with them and the source is left out.'
-    'Extract'         = 'Developer build: write the full source of this build (plus Config\FunctionMap.txt and Config\Environment.txt) to AppData\Extract.'
     'Version History' = 'Show every version of this app with its CHANGELOG notes.'
-    'Open'            = 'Open a folder: the app folder (Archive, Update, Lite EXE), the Source folder, the Logs folder in use, or AppData (Settings, Extract).'
+    'Open'            = 'Open a folder: the app folder (Lite EXE, Build-App.cmd), the Source folder, the Logs folder in use, or AppData (Settings, Extract).'
+    'More'            = 'The zip-based tools from before git, for when you need them: Update from a zip or folder, Update Template from a template zip, Extract the source to a zip, Archive this version.'
 
     # Environment tab (template)
     'Environment'                                              = 'Pick, create and edit environments (one per domain / site). Editing needs the admin password.'
     'Environment > General'                                    = 'Name, log & data path, list and logging options, and when commands are shown before running.'
     'Environment > New'                                        = 'Create a new environment, optionally as a copy of the selected one (its domain and server are not copied).'
-    'Environment > Delete'                                     = 'Delete the selected environment and all of its settings from this machine.'
+    'Environment > Delete'                                     = 'Delete the selected environment and all of its settings (developer build: from Source\Config\Environments.json; Lite: from this machine).'
     'Environment > Save'                                       = 'Save every page of the selected environment (and the app-wide logging and command settings).'
     'Environment > Filter as I type'                           = 'On: lists re-filter on every keystroke. Off: they filter when you press Enter (better for very large lists).'
     'Environment > Diagnostic / troubleshooting logging'       = 'Write extra troubleshooting detail (including the code of every command run) to Session.log. Leave off unless investigating.'

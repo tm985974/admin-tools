@@ -3,7 +3,11 @@
 # The saved environments: one record per environment, holding EVERY setting of
 # that environment (General + whatever pages the project adds).
 #
-#   <LocalAppData>\<app>\Settings\Environments.json   ($App.EnvironmentStorePath)
+# ONE file per EXE ($App.EnvironmentStorePath), template 1.2:
+#   Developer build  Source\Config\Environments.json  - the project's own file:
+#                    edited here, committed to git, built into the Lite EXE.
+#   Lite EXE         <LocalAppData>\<app>\Settings\Environments.json - what an
+#                    admin saves on this machine, over the built-in set.
 #   {
 #     "ActiveDefault": "<Name>",
 #     "Environments":  [ { "Name": "...", "Label": "...", "SharedPath": "...", ... }, ... ],
@@ -11,14 +15,12 @@
 #     ...              (other top-level keys are kept, e.g. one-time import markers)
 #   }
 #
-# Created the first time something is saved. Until then - and for any embedded
-# environment not in it - the EMBEDDED set (Config\Environments.json in the EXE)
-# is used. The host (AppHost.cs) merges the two the same way.
-#
-# Per machine on purpose: the store decides the data root, so it cannot live on
-# the shared path. In a DEVELOPER build every save also writes the set to
-# Config\Environments.json beside the EXE, so the next Update / Build Lite
-# embeds it and a new machine starts with the same environments.
+# Lite EXE: created the first time an admin saves. Until then - and for any
+# built-in environment not in it - the built-in set is used ("Removed" lists the
+# built-in ones deleted on purpose). The host (AppHost.cs) merges the two the same
+# way. Per machine on purpose: the store decides the data root, so it cannot live
+# on the shared path. Developer build ($App.EnvironmentsAreSource): the file IS the
+# set - nothing is merged, nothing is copied anywhere else.
 #
 #   Read-AppEnvironmentStore    -App           -> @{ ActiveDefault; Environments (ArrayList of [ordered]); Removed (ArrayList); Extra ([ordered]); Exists }
 #   Write-AppEnvironmentStore   -App -Store    -> saves, keeps Environments.json.bak, reloads the host
@@ -90,7 +92,9 @@ function Read-AppEnvironmentStore {
         }
     }
 
-    # the embedded set (the host mirrors it to <LocalAppData>\Config each launch)
+    # Lite EXE: add the built-in set (the host mirrors it to <LocalAppData>\Config
+    # each launch). Developer build: the store is the project's file - nothing to add.
+    if ($App.EnvironmentsAreSource -and $store.Exists) { return $store }
     $emb = $null
     try { $emb = Read-EnvJsonFile -Path (Join-Path (Join-Path ([string]$App.LocalAppData) 'Config') 'Environments.json') } catch { }
     if ($emb) {
@@ -118,7 +122,7 @@ function Write-AppEnvironmentStore {
     $root = [ordered]@{}
     $root['ActiveDefault'] = [string]$Store.ActiveDefault
     $root['Environments']  = [object[]]$Store.Environments.ToArray()
-    $root['Removed']       = [object[]]$Store.Removed.ToArray()
+    if (-not $App.EnvironmentsAreSource) { $root['Removed'] = [object[]]$Store.Removed.ToArray() }
     foreach ($k in @($Store.Extra.Keys)) { if (-not $root.Contains($k)) { $root[$k] = $Store.Extra[$k] } }
     $text = ConvertTo-Json -InputObject $root -Depth 20
 
@@ -128,15 +132,6 @@ function Write-AppEnvironmentStore {
     Move-Item -LiteralPath $tmp -Destination $path -Force
     $script:EnvStoreCache = @{ Path = ''; Stamp = [datetime]::MinValue; Json = $null }
 
-    # Developer build: stage the set for embedding (next Update / Build Lite).
-    if ([string]$App.Tier -eq 'Developer' -and $App.ExePath) {
-        try {
-            $cfg = Join-Path (Split-Path -Parent ([string]$App.ExePath)) 'Config'
-            if (-not (Test-Path -LiteralPath $cfg)) { New-Item -ItemType Directory -Path $cfg -Force | Out-Null }
-            $emb = [ordered]@{ ActiveDefault = [string]$Store.ActiveDefault; Environments = [object[]]$Store.Environments.ToArray() }
-            [System.IO.File]::WriteAllText((Join-Path $cfg 'Environments.json'), (ConvertTo-Json -InputObject $emb -Depth 20), (New-Object System.Text.UTF8Encoding($false)))
-        } catch { if ($App) { $App.Log('WARN', 'Environment', "could not stage Config\Environments.json for embedding: $($_.Exception.Message)") } }
-    }
     if (-not $NoReload) { try { $App.ReloadEnvironments() } catch { } }
 }
 
@@ -198,7 +193,7 @@ function Remove-AppEnvironmentRecord {
     $keep = New-Object System.Collections.ArrayList
     foreach ($r in $store.Environments) { if ([string]$r['Name'] -ine $Name) { [void]$keep.Add($r) } }
     $store.Environments = $keep
-    if (-not ($store.Removed -contains $Name)) { [void]$store.Removed.Add($Name) }
+    if (-not $App.EnvironmentsAreSource -and -not ($store.Removed -contains $Name)) { [void]$store.Removed.Add($Name) }
     if ($store.ActiveDefault -ieq $Name) { $store.ActiveDefault = [string]$keep[0]['Name'] }
     Write-AppEnvironmentStore -App $App -Store $store
 }

@@ -110,7 +110,7 @@ function New-EnvironmentTab {
     $note = New-Object System.Windows.Forms.Label
     $note.Location = New-Object System.Drawing.Point(12, 10); $note.Size = New-Object System.Drawing.Size(900, 30); $note.ForeColor = $App.Theme.Muted
     $note.Text = if (-not $st.Editable) { 'Read-only. Environments are created and edited with the admin password.' }
-                 elseif ([string]$App.Tier -eq 'Developer') { 'Values for the environment selected above, on every page. Save keeps them on this machine (Settings\Environments.json) and stages them in Config\Environments.json for the next build.' }
+                 elseif ($App.EnvironmentsAreSource) { 'Values for the environment selected above, on every page. Save writes them to Source\Config\Environments.json - the set built into the Lite EXE (commit it to keep it).' }
                  else { 'Values for the environment selected above, on every page. Save keeps them on this machine (Settings\Environments.json).' }
     $tpGen.Controls.Add($note)
 

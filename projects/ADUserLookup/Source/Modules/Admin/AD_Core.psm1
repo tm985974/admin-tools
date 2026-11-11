@@ -10,8 +10,8 @@
 #   * paths      $script:RootDir / ExportsDir / LogsDir / ConfigDir
 #                (ConfigDir = <data root>\Settings - persistent; the host's
 #                 Config\ mirror is rewritten every launch, see Get-AppSettingsDir)
-#   * logging    hands start-up to Services_ADLogging (the original logging
-#                module: per-domain action logs, Session.log, Activity Log panes)
+#   * logging    hands start-up to Services_ADLogging (per-domain action
+#                logs, Activity Log panes; Session.log lines go through $App.Log)
 #   * helpers    Set-Status (-> $App.SetStatus + Session.log), Set-Selected*,
 #                Update-DomainBar, Update-ContextMailDefaults, Write-ModuleDebugLog
 #   * $Context   ONE shared context object for every AD tab (Get-ADSharedContext)

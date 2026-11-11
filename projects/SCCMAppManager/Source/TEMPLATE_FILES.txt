@@ -1,4 +1,4 @@
-# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.1.2
+# TEMPLATE_FILES.txt -- files owned by AppTemplate v1.2.0
 #
 # Every project carries these files UNCHANGED (same bytes as the template).
 # AppHost.cs has no project-specific lines: the project's names are in the
@@ -12,30 +12,28 @@
 #   VERSION.txt,
 #   CHANGELOG.txt, README.md.
 #
-# The developer build checks every listed file on every start (AppHost.cs,
-# Build-App.ps1 and Build-App.cs through its embedded copies) and logs any difference in
-# Session.log ("Template-owned files changed ..."). Update Template refuses to
-# run while any listed file differs.
+# The check on every push (tools/Test-Template.ps1) fails when a project's copy
+# of a listed file differs. Update Template (More menu) refuses to run while any
+# listed file differs.
 # Hash: SHA-256 of the UTF-8 text with LF line endings and no BOM.
 # Paths are package paths: on disk each file is in Source\, except Build-App.cmd,
 # which is in the project folder itself (template 1.1 layout).
 #
-3a1fe1a7b5be670d17b700bba6f7c104251bfe69e3ed651c7cbc94af6531d643  AppHost.cs
-5eb17c3b606232dd42d9c9a365ddc2b51c3035454e5dad6b5e21389ee73cf047  Build-App.ps1
-0e7b690e0845dae54a95c8e6f42d6d2b72ce0f4047c418fe0aac9976837b5901  Build-App.cs
-f218403b545f3cc6c2d448b26c00d9751955d92516ef409049a8931127c6af8b  Build-App.cmd
+216e54044ad3e622424f8fb875af4fba39fd01469249be1234a21f625c552412  AppHost.cs
+8a47bee470943e3cbdc8ba8bc40f94b9618f40072950c9c75cd42f42d6dcf9bd  Build-App.cs
+629186be25f8a34958ea173da8538422f70f0550c4de2bf780b1e1d45fb6f569  Build-App.cmd
 216d37a12a0c7af9d6d77f3da6f9622112600f09a03c98d45594fbdbe2c7f904  _AppLauncher.ps1
 23bfed0ee452dec4864a6267346442c7e1a2186e5a3d6573f1c66bb4a7ab6fb8  Config/Logging.json
 57fb965d0ae578cd764eaaa2e04e8bd3ba45fa9ae04085ed9195293c09d1ce53  Modules/Base/Services_Commands.psm1
 010a207cc2cff05c6159324cf633f641d2c55f1d2244bfc42fcda48d16eefcbf  Modules/Base/Services_Environment.psm1
-933daea1824cf5b2f79894eb54ca3b0ede61e63f80d245ebd24bc7148bf4745c  Modules/Base/Services_EnvironmentStore.psm1
+42d61c25f0528c83a353e879c67725c44db44f92c8deec139cc01ffa209910df  Modules/Base/Services_EnvironmentStore.psm1
 e660b8a8a4817bb68e6aee75febf3f211360a53f587fe6f1545bb73533dc1b10  Modules/Base/Services_Filter.psm1
 027feda44dd81184f98e4e3c43e4f2d15221cfe398e8b360e427a5e8d3495e41  Modules/Base/Services_Logging.psm1
 e3f6e39423f1951f7b544ae4481dd3d7d6e70a38fb7c716954318d3d8f87a850  Modules/Base/Services_Requirements.psm1
-343d4bf2af8a02062a8483dcfe6c1a9b1560949c7bfa6644bbf341bdeafbfdf3  Modules/Base/Services_Settings.psm1
+d4569c95d6e1835b69cc76ab2aa4e99c0f9659b3deaf395c50e4471eb9682bae  Modules/Base/Services_Settings.psm1
 eb1654f73a9f356f0393adfb87e1b45b718d39ffee1bd92a3a29c8cdf6be677f  Modules/Base/Services_Theme.psm1
-1111d4198237d3ce694e0976e80e7c9397930df1c255b4950a42edb479cb622c  Modules/Base/Services_ToolTips.psm1
+5e1f63f18fce4bf547ef665f435030aba3c057d7ee79e2c6f5ce9f94964fdff0  Modules/Base/Services_ToolTips.psm1
 ef9888ea769e0a2929f086822e2303c8460f5e3a07aeaabd03ab158b1b91c011  Modules/Base/UI_EmbeddedTabPage.psm1
 f550b376ca9512340cf3f09d4dd44f9d287b4a3f6a5d17e506a22467a253e36f  Modules/Base/UI_Layout.psm1
 1cbfe7737e4bed3e282fee8dd895d337fd5a5ac3916dba2b709aa2803404c380  Modules/Base/UI_LazyTab.psm1
-d9f86a62e9b7c56debfd3d47c0b4d38d29d3fd26513978df44cb0fa665aaadc1  Modules/Base/UI_Tab_Environment.psm1
+5cd27147c816f79685ecb3aff55192d4ed43bab69bbe11f94b0f93120454fa65  Modules/Base/UI_Tab_Environment.psm1

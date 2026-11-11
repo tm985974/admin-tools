@@ -2,7 +2,7 @@
 rem Build-App.cmd -- AppTemplate builder for machines where PowerShell scripts
 rem may not run. Compiles Source\Build-App.cs into Build\Build-App.exe with the
 rem .NET Framework's csc.exe, then runs it: it builds the developer EXE and its
-rem Lite test EXE beside this file, from the Source folder.
+rem Lite EXE (asks for its passwords) beside this file, from the Source folder.
 rem Arguments are passed on to Build-App.exe:  -Output path  -NoLite  -NoPause
 rem Template-owned: identical in every project. (A pre-1.1 flat folder, with
 rem Build-App.cs beside this file, still builds.)

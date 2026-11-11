@@ -4,17 +4,15 @@
 #   Log files (Logs\ under the app root, normally AppData):
 #     <DOMAIN>.log  One per domain. Application actions written by
 #                   Write-OperationLog (who did what, to what, result).
-#     Session.log   Shared by all domains. Status, information and session
-#                   messages (Write-SessionLog): the status bar (Set-Status),
-#                   the User Actions and Bulk Onboard panels, and startup.
-#                   [DIAG] lines (troubleshooting detail) are written only
-#                   when diagnostic logging is enabled; [ERR] and [WARN]
-#                   lines are always written.
+#     Session.log   Shared by all domains, written ONLY by the host ($App.Log):
+#                   Write-SessionLog forwards status, User Actions / Bulk
+#                   Onboard messages and startup lines to it, so there is one
+#                   writer, one line format and one size cap (Environment >
+#                   General > Logging). [DIAG] lines only with diagnostics on.
 #
 #   Line format (one entry per line; embedded line breaks become " | "):
 #     [yyyy-MM-dd HH:mm:ss +hh:mm] [MACHINE] ...
 #     Domain log : [ts] [MACHINE] [ACTION: a] [Admin: u] [Domain: d] [Target: t] [Result: r] detail
-#     Session log: [ts] [MACHINE] [LEVEL] [Source] text
 #   The UTC offset and machine name make entries from different machines
 #   merge into the correct time order (the EXE merges logs it carries into
 #   these files when it opens - see ADUserLookup.cs "Portable logs").
@@ -22,16 +20,14 @@
 #   Size limits (FIFO): when a file grows past its limit, the oldest lines
 #   are dropped until it is back to 90% of the limit.
 #     Domain logs : per domain, LogMaxKB in DomainDefaults.json (default 5120)
-#     Session.log : SessionLogMaxKB in Config\Logging.json  (default 10240)
-#   Config\Logging.json also holds DiagnosticsEnabled (default false). Both
-#   global settings are edited on Tools > Domain Defaults (Logging section).
+#     Session.log : trimmed by the host (Session log max on the Logging page).
 #
 #   Initialize-LogStore (called once by _AD-Admin.ps1 after modules load):
 #     - converts the old daily AD-Admin-yyyy-MM-dd.log files into the
 #       per-domain files (each line goes to the domain it names, merged in
 #       time order) and deletes them;
 #     - deletes the old per-launch ModuleLoad_*.log files;
-#     - applies the size limits to every log.
+#     - applies the size limits to every domain log.
 #
 #   Activity Log panels (unchanged behaviour): Add-ActivityLogLine appends a
 #   colored line to every registered RichTextBox - the Directory tab's
@@ -55,7 +51,6 @@ $script:ActivityLogTargets     = [System.Collections.Generic.List[System.Windows
 $script:LogSettingsCache       = $null
 $script:DomainLogMaxCache      = @{}
 $script:DefaultDomainLogMaxKB  = 5120
-$script:DefaultSessionLogMaxKB = 10240
 $script:LogMinKB               = 64
 $script:LogMaxAllowedKB        = 1048576
 
@@ -68,16 +63,6 @@ function Get-LogDirectory {
         try { New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop | Out-Null } catch { }
     }
     return $dir
-}
-
-function Get-LoggingSettingsPath {
-    $dir = if ($script:ConfigDir) { $script:ConfigDir }
-           elseif ($script:RootDir) { Join-Path $script:RootDir 'Config' }
-           else { Join-Path $PWD.Path 'Config' }
-    if (-not (Test-Path $dir)) {
-        try { New-Item -ItemType Directory -Path $dir -Force -ErrorAction Stop | Out-Null } catch { }
-    }
-    return (Join-Path $dir 'Logging.json')
 }
 
 # Parses a KB size, clamped to 64 KB .. 1 GB. Unparseable -> $Default.
@@ -255,70 +240,10 @@ function Convert-LegacyLogs {
 }
 #endregion
 
-#region -- Logging settings (Config\Logging.json) -------------------------------
-function Get-LoggingSettings {
-    <#
-    .SYNOPSIS
-        Returns the global logging settings: DiagnosticsEnabled (bool,
-        default $false) and SessionLogMaxKB (int, default 10240). Cached;
-        Set-LoggingSettings and Reset-LogSettingsCache refresh it. Never throws.
-    #>
-    if ($script:LogSettingsCache) { return $script:LogSettingsCache }
-    $s = [PSCustomObject]@{
-        DiagnosticsEnabled = $false
-        SessionLogMaxKB    = $script:DefaultSessionLogMaxKB
-    }
-    $path = Get-LoggingSettingsPath
-    if (Test-Path $path) {
-        try {
-            $raw = Get-Content -Path $path -Raw -Encoding UTF8 -ErrorAction Stop
-            $obj = $raw | ConvertFrom-Json -ErrorAction Stop
-            if ($obj) {
-                if ($obj.PSObject.Properties.Match('DiagnosticsEnabled').Count -gt 0) {
-                    $s.DiagnosticsEnabled = ([string]$obj.DiagnosticsEnabled -eq 'True')
-                }
-                if ($obj.PSObject.Properties.Match('SessionLogMaxKB').Count -gt 0) {
-                    $s.SessionLogMaxKB = ConvertTo-LogMaxKB $obj.SessionLogMaxKB $script:DefaultSessionLogMaxKB
-                }
-            }
-        } catch { }
-    }
-    $script:LogSettingsCache = $s
-    return $s
-}
-
-function Set-LoggingSettings {
-    <#
-    .SYNOPSIS
-        Saves the global logging settings to Config\Logging.json.
-    .OUTPUTS
-        PSCustomObject with Success (bool) and Message (string).
-    #>
-    param(
-        [bool]$DiagnosticsEnabled,
-        [int]$SessionLogMaxKB
-    )
-    $obj = [ordered]@{
-        DiagnosticsEnabled = $DiagnosticsEnabled
-        SessionLogMaxKB    = (ConvertTo-LogMaxKB $SessionLogMaxKB $script:DefaultSessionLogMaxKB)
-    }
-    try {
-        (ConvertTo-Json -InputObject $obj -Depth 3) |
-            Out-File -FilePath (Get-LoggingSettingsPath) -Encoding UTF8 -ErrorAction Stop
-        Reset-LogSettingsCache
-        return [PSCustomObject]@{ Success = $true; Message = 'Logging settings saved.' }
-    } catch {
-        return [PSCustomObject]@{ Success = $false; Message = "Logging settings not saved: $($_.Exception.Message)" }
-    }
-}
-
+#region -- Reset-LogSettingsCache ---------------------------------------------
 function Reset-LogSettingsCache {
-    <#
-    .SYNOPSIS
-        Clears the cached global settings and per-domain size limits so the
-        next write re-reads them. Called after Domain Defaults are saved.
-    #>
-    $script:LogSettingsCache  = $null
+    # Clears the cached per-domain size limits so the next write re-reads them.
+    # Called after Domain Defaults are saved and when the data root changes.
     $script:DomainLogMaxCache = @{}
 }
 #endregion
@@ -336,13 +261,9 @@ function Initialize-LogStore {
         if ($n -gt 0) {
             Write-SessionLog -Text "Converted $n entries from the old daily AD-Admin-*.log files into per-domain logs." -Level 'INFO' -Source 'Logging'
         }
-        $settings = Get-LoggingSettings
         foreach ($f in @(Get-ChildItem -Path (Get-LogDirectory) -Filter '*.log' -File -ErrorAction SilentlyContinue)) {
-            if ($f.Name -ieq 'Session.log') {
-                Limit-LogFile -Path $f.FullName -MaxKB $settings.SessionLogMaxKB
-            } else {
-                Limit-LogFile -Path $f.FullName -MaxKB (Get-DomainLogMaxKB $f.BaseName)
-            }
+            if ($f.Name -ieq 'Session.log') { continue }            # the host trims Session.log
+            Limit-LogFile -Path $f.FullName -MaxKB (Get-DomainLogMaxKB $f.BaseName)
         }
     } catch { }
 }
@@ -352,16 +273,15 @@ function Initialize-LogStore {
 function Write-SessionLog {
     <#
     .SYNOPSIS
-        Appends one entry to Logs\Session.log.
-    .PARAMETER Text
-        Message text. Blank text is ignored; line breaks become " | ".
+        One entry in Logs\Session.log, through the host's logger ($App.Log) -
+        the same writer, format and size cap as every other Session.log line.
     .PARAMETER Level
         ok / warn / err (or fail) / diag / anything else = info. DIAG entries
-        are written only when diagnostic logging is enabled.
+        are written only when diagnostic logging is on (the host decides).
     .PARAMETER Source
         Short origin tag, e.g. Status, UserActions, BulkOnboard, Startup.
     .PARAMETER Timestamp
-        Time to record (defaults to now) - used for buffered startup lines.
+        Accepted for old callers; the host stamps the time it is written.
     #>
     param(
         [string]$Text,
@@ -369,21 +289,17 @@ function Write-SessionLog {
         [string]$Source = '',
         $Timestamp      = $null
     )
-    if (-not $Text -or -not $Text.Trim()) { return }
+    if (-not $Text -or -not $Text.Trim() -or -not $script:ADApp) { return }
     try {
         $lvl = switch -Regex (([string]$Level).ToLowerInvariant()) {
-            '^(ok|success)$'      { 'OK';   break }
-            '^(warn|warning)$'    { 'WARN'; break }
-            '^(err|error|fail)$'  { 'ERR';  break }
-            '^diag$'              { 'DIAG'; break }
+            '^(ok|success)$'      { 'OK';    break }
+            '^(warn|warning)$'    { 'WARN';  break }
+            '^(err|error|fail)$'  { 'ERROR'; break }
+            '^diag$'              { 'DIAG';  break }
             default               { 'INFO' }
         }
-        $settings = Get-LoggingSettings
-        if ($lvl -eq 'DIAG' -and -not $settings.DiagnosticsEnabled) { return }
-        $when = if ($null -ne $Timestamp) { [datetime]$Timestamp } else { Get-Date }
-        $src  = if ($Source) { " [$Source]" } else { '' }
-        $line = "[$(Format-LogTimestamp $when)] [$env:COMPUTERNAME] [$lvl]$src $(ConvertTo-SingleLogLine $Text)"
-        Add-LogLine -Path (Join-Path (Get-LogDirectory) 'Session.log') -Line $line -MaxKB $settings.SessionLogMaxKB
+        $src = if ($Source) { $Source } else { 'AD' }
+        $script:ADApp.Log($lvl, $src, (ConvertTo-SingleLogLine $Text))
     } catch { }
 }
 #endregion
@@ -554,8 +470,6 @@ Export-ModuleMember -Function `
     Write-OperationLog, `
     Get-OperationLog, `
     Write-SessionLog, `
-    Get-LoggingSettings, `
-    Set-LoggingSettings, `
     Reset-LogSettingsCache, `
     Initialize-LogStore, `
     Add-ActivityLogLine, `

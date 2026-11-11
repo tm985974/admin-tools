@@ -11,7 +11,7 @@
         "Developer > Build selected": "Run Build-App.cmd for the selected tools, one at a time: <Name>Dev.exe, and <Name>Lite.exe with the passwords asked once. Running tools are skipped.",
         "Developer > Build all": "Run Build-App.cmd for every tool, one at a time: <Name>Dev.exe, and <Name>Lite.exe with the passwords asked once. Running tools are skipped.",
         "Developer > Stop": "Let the tool being built finish and skip the rest.",
-        "Developer > Launch developer EXE": "Start the selected tool's developer build, <Name>Dev.exe (Update, Build Lite, Extract, Version History).",
+        "Developer > Launch developer EXE": "Start the selected tool's developer build, <Name>Dev.exe (Build Lite, Version History, Open, More).",
         "Developer > Open folder": "Open the selected tool's folder in Explorer.",
         "Developer > Refresh": "Read the versions and build times again.",
         "Update > Open zip": "Pick a zip of the admin-tools repository downloaded from GitHub. It is unpacked into AppData and compared - nothing changes yet.",

@@ -2,6 +2,11 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.2 (2026-11-11)  Engine synced v1.1.2 -> v1.2.0: environments in one place, More menu
+  Changed : AppTemplate engine v1.1.2 -> v1.2.0 (Update Template): 7 file(s) replaced, 0 added, 1 removed (Build-App.ps1).
+  Changed : Developer > Launch developer EXE tooltip: Build Lite, Version History, Open, More.
+  Note    : template v1.2.0  One place for environments; zip tools under More; Build-App.cmd only
+
 v1.0.1 (2026-11-11)  Engine synced v1.1.1 -> v1.1.2: ToolBoxDev.exe / ToolBoxLite.exe
   Changed : AppTemplate engine v1.1.1 -> v1.1.2 (Update Template): 5 file(s) replaced, 0 added, 0 removed.
   Changed : Tools launches each tool's <Name>Lite.exe (the sealed build); the Sealed

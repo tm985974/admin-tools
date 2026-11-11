@@ -2,6 +2,12 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.13 (2026-11-11)  Engine synced v1.1.2 -> v1.2.0: environments in one place, More menu
+  Changed : AppTemplate engine v1.1.2 -> v1.2.0 (Update Template): 7 file(s) replaced, 0 added, 1 removed (Build-App.ps1).
+  Changed : README.md: the copy of the engine guide is gone (see template/Source/README.md);
+            this tool's own notes are kept.
+  Note    : template v1.2.0  One place for environments; zip tools under More; Build-App.cmd only
+
 v1.0.12 (2026-11-11)  Engine synced v1.1.1 -> v1.1.2: SCCMAppManagerDev.exe / SCCMAppManagerLite.exe
   Changed : AppTemplate engine v1.1.1 -> v1.1.2 (Update Template): 5 file(s) replaced, 0 added, 0 removed.
   Note    : template v1.1.2  Dev and Lite EXEs; one Build Lite button, passwords always asked

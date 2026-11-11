@@ -16,16 +16,15 @@ renamed when you start a real project.
 | Embedded C# source (`core.dat`) | yes | **no — omitted** |
 | Module package | plaintext, all tiers | **two AES-256 bundles, per-tier** |
 | Password to run | none | **yes — at launch** |
-| Dev tooling (Update / Update Template / Build Lite / Extract / Version History / Open ▾) | yes | no |
+| Dev tooling (Build Lite / Version History / Open ▾ / More ▾) | yes | no |
 | Requirement checks + machine facts in Session.log | yes | yes |
 | Tabs (Overview, Tab 1-4, Environment) | yes | yes |
-| Create / edit environments (Environment tab) | yes | admin password only (user password: pick only) |
+| Create / edit environments (Environment tab) | yes, saved in `Source\Config\Environments.json` | admin password only, saved on that machine (user password: pick only) |
 | Admin-tier tabs/modules | yes (all tiers loaded) | only with the admin password |
 
 **Never hand out the developer build** — it contains your source. Hand out only
 `<ExeName>Lite.exe`, the sealed build. Its passwords are asked every time it is
-built (template 1.1.2: there are no built-in test passwords; for testing, use
-simple ones).
+built (there are no built-in test passwords; for testing, use simple ones).
 
 ---
 
@@ -73,38 +72,31 @@ sub folders:
   Build-App.cmd          builds the two EXEs from Source\
   Source\                the source: AppHost.cs, _AppLauncher.ps1, AppIdentity.json,
                          VERSION.txt, CHANGELOG.txt, TEMPLATE_*.txt, README.md,
-                         Config\, Modules\, Build-App.cs, Build-App.ps1
-  Build\                 Build-App.exe (written by Build-App.cmd and the developer EXE)
-  Archive\  Update\      made by the developer EXE (see below)
+                         Config\, Modules\, Build-App.cs
+  Build\                 Build-App.exe (compiled by Build-App.cmd each time)
+  Archive\  Update\      only if you use More > Archive / Update (see below)
 ```
 
-Paths inside the app do not change: update zips, `Archive\Zip` zips, Extract and
+Paths inside the app do not change: update zips, Extract zips and
 `TEMPLATE_FILES.txt` use paths inside `Source\` (`AppHost.cs`, `Config/...`,
-`Modules/...`), plus `Build-App.cmd`. Update and Update Template also accept a whole
-project folder, or a zip of one (its `Source\` is read). A pre-1.1 flat folder (the
-source at the top, no `Source\`) still builds and runs.
+`Modules/...`), plus `Build-App.cmd`. A pre-1.1 flat folder (the source at the top,
+no `Source\`) still builds and runs.
 
-## First build (on Windows)
+## Building (on Windows)
 
-In the project folder, run one of these - they all do the same build:
+Double-click `Build-App.cmd` in the project folder - the one way to build (template
+1.2 removed `Build-App.ps1`). It compiles `Source\Build-App.cs` into
+`Build\Build-App.exe` with the machine's `csc.exe` and runs it:
 
-| Builder | When |
-|---|---|
-| `Build-App.cmd` | double-click. Compiles `Source\Build-App.cs` into `Build\Build-App.exe` with the machine's `csc.exe`, then runs it. |
-| `Build\Build-App.exe` | double-click. The developer EXE writes it after every update, so a machine that has one never needs the script. |
-| `Source\Build-App.ps1` | where PowerShell scripts may run. Same as the `.cmd`. |
+1. builds `<ExeName>Dev.exe`, the developer build;
+2. asks for the Lite user and admin passwords, each twice (press Enter at the first
+   prompt to skip), and builds `<ExeName>Lite.exe`, the sealed build.
 
-To build from an Extract (a zip of `Source\` contents), unzip it into a `Source`
-folder, put `Build-App.cmd` beside that folder (it is in the zip too) and run it.
-
-It makes the `Update` folder if missing, builds `AppTemplateDev.exe` (the
-DEVELOPER build) and then `AppTemplateLite.exe` (the sealed build): it asks for
-the user and admin passwords, each twice - press Enter at the first prompt to
-skip the Lite EXE. Options: `Build-App.exe -Output <path\Name.exe> -NoLite
--NoPause`. `Build-App.exe -All <projects folder>` builds every project in the
-folder and asks for the passwords once (the repository's `Build-All.cmd` uses it).
-A caller can pass the passwords in the environment variables
-`APPTEMPLATE_LITE_USER` / `APPTEMPLATE_LITE_ADMIN` (ToolBox does, for Build all).
+Options (passed on to `Build-App.exe`): `-Output <path\Name.exe> -NoLite -NoPause`.
+`Build-App.exe -All <projects folder>` builds every project in the folder and asks
+for the passwords once (the repository's `Build-All.cmd` uses it). A caller can pass
+the passwords in the environment variables `APPTEMPLATE_LITE_USER` /
+`APPTEMPLATE_LITE_ADMIN` (ToolBox does, for Build all).
 
 Requirements: .NET Framework 4.x (`csc.exe`) and Windows PowerShell 5.1
 installed (its DLL is referenced; no script runs). If AV quarantines the fresh
@@ -112,9 +104,9 @@ EXE, exclude the output folder from real-time scanning.
 
 ### Make the distributable
 
-1. Run `Build-App.cmd` and type the passwords, or click **Build Lite** in the
-   developer `AppTemplateDev.exe`.
-2. Either writes `AppTemplateLite.exe` in the project folder.
+1. Run `Build-App.cmd` and type the passwords, or click **Build Lite** in
+   `<ExeName>Dev.exe`.
+2. Either writes `<ExeName>Lite.exe` in the project folder.
 3. Hand that EXE out. Give operators the user password; keep the admin password.
 
 ---
@@ -136,6 +128,22 @@ EXE, exclude the output folder from real-time scanning.
   with `Register-EnvironmentSection`. Save writes every page at once; leaving
   an environment with unsaved changes asks first. Editable with the admin
   password and in the developer build; read-only with the user password.
+
+## Environments: where they are saved
+
+One file per EXE (template 1.2):
+
+| EXE | Saved in | Notes |
+|---|---|---|
+| `<ExeName>Dev.exe` | `Source\Config\Environments.json` | The project's own file: New / Save / Delete on the Environment tab write it directly. Commit it; the next Build Lite ships it. |
+| `<ExeName>Lite.exe`, admin password | `%LOCALAPPDATA%\<AppDataFolder>\Settings\Environments.json` | Per machine (a sealed EXE cannot change itself), over the built-in set. Built-in environments deleted here are listed under `Removed`. |
+| `<ExeName>Lite.exe`, user password | - | Pick only. |
+
+Before 1.2 the developer build kept its own copy in AppData and also wrote a
+`Config\Environments.json` beside the EXE. On its first start, the 1.2 developer
+build moves a leftover `<Project>\Config\Environments.json` into
+`Source\Config\` (keeping the replaced file as `Environments.json.bak`) and
+removes the empty folder; review the change with git and commit it.
 
 ## Look and feel
 
@@ -161,7 +169,7 @@ The registrar builds a tab only if its function is present, so admin tabs simply
 don't appear in a user-tier session.
 
 One function per module keeps the **Function Map** (function → module)
-meaningful. It is `Config\FunctionMap.txt` in every Extract and `Archive\Zip`
+meaningful. It is `Config\FunctionMap.txt` in every Extract and Archive
 zip, beside `Config\Environment.txt` (the machine facts; Extract adds the
 installed-module list).
 
@@ -272,63 +280,48 @@ when two modules define the same function, or two module files share a name.
 
 ---
 
-## Day-to-day: the Update button (developer build)
+## Everyday work
 
-The developer EXE keeps an `Update` folder beside itself (made on every start
-and every compile): drop update zips there; the Update and Update Template
-pickers open in it. **Build Lite** makes `<ExeName>Lite.exe`, the sealed build
-(it asks for the passwords). **Open ▾** opens the app folder (Archive, Update,
-Lite EXE), the Source folder, the Logs folder in use, or AppData (Settings,
-Extract).
+The source lives in git (the admin-tools repository). Edit `Source\`, bump
+`VERSION.txt` and add a `CHANGELOG.txt` entry, build with `Build-App.cmd` (or
+ToolBox), commit. Engine changes are made in `template\` and synced to every
+project with `tools\Sync-Template.ps1` (see the repository README).
 
-1. Change files in the project's `Source\` folder.
-2. Zip **only the changed files**, with paths from inside `Source\`
-   (`Modules/Admin/X.psm1`, `VERSION.txt`, `CHANGELOG.txt` ...). Include
-   `VERSION.txt` and `CHANGELOG.txt` so the title and Version History move on.
-   Optional `UPDATE.txt` directives:
-   - `Delete: Modules/Admin/Old.psm1` — remove a file (one line per file).
-   - `Mode: Partial` — merge even if `_AppLauncher.ps1` is in the zip (without
-     it, a zip containing `_AppLauncher.ps1` is treated as a FULL package and
-     replaces everything). `Mode: Full` forces a full replace.
-   A zip whose entries all sit under one folder (`MyApp/...`) is read as if
-   zipped from inside that folder.
-3. In the dev EXE: **Update** → choose a **zip file** or a **folder** (an
-   unzipped update or Extract) → review the preview (ADD / MODIFY / DELETE) →
-   **Apply**. The developer EXE recompiles itself and archives the old one.
-   Then **Build Lite** again for an updated sealed EXE.
+The developer toolbar: **Build Lite**, **Version History**, **Open ▾** (the app
+folder, the Source folder, the Logs folder in use, AppData) and **More ▾**.
 
-Bump `VERSION.txt` for anything you want tracked in titles/history.
+## The zip tools: More ▾ (developer build, manual)
 
-An update that has no `AppIdentity.json` keeps the project's identity; one that
-would change it asks first (a new AppDataFolder starts without the saved
-environments and logs).
+From before git; kept for when you need them. Nothing here runs on its own.
 
-## Moving a project to a newer template: Update Template (developer build)
+- **Update from a zip or folder...** - apply changed source files and recompile
+  this EXE. Zip only the changed files with paths from inside `Source\`
+  (`Modules/Admin/X.psm1`, `VERSION.txt`, `CHANGELOG.txt` ...). Optional `UPDATE.txt`
+  lines: `Delete: <path>` removes a file; `Mode: Partial` / `Mode: Full` (a zip
+  holding `_AppLauncher.ps1` is a full replace unless it says `Partial`). A zip
+  whose entries all sit under one folder is read as if zipped from inside it; a
+  whole project folder (or a zip of one) works too. You see a preview (ADD /
+  MODIFY / DELETE) before **Apply**; the old EXE goes to `Archive\Exe`. An update
+  without `AppIdentity.json` keeps the project's identity; one that would change
+  it asks first. The picker opens in the `Update` folder beside the EXE.
+- **Update Template from a template zip...** - move this project's engine files to
+  a newer AppTemplate (a zip of the template's source: its Extract or Archive zip).
+  Only the files the template's `TEMPLATE_FILES.txt` lists change (engine files it
+  no longer lists are deleted); `VERSION.txt` gets the next patch number and
+  `CHANGELOG.txt` an `Engine synced vA -> vB` entry; then the EXE recompiles.
+  Refused (nothing changes) when the zip is not template source or does not match
+  its own manifest, is not newer, changes the contract (new major.minor, or a
+  `Contract:` note), or this project's engine files differ from its manifest.
+- **Extract source zip** - the full source of this build, plus
+  `Config\FunctionMap.txt` and `Config\Environment.txt` (machine facts and the
+  installed-module list), to `AppData\Extract`.
+- **Archive this version** - `Archive\Exe\<ExeName>_v<ver>_t<template>.exe` (a copy
+  of this EXE) and `Archive\Zip\<ExeName>_v<ver>_t<template>.zip` (its source).
+  Git keeps every version, so this is only for a copy outside git. (Before 1.2
+  this ran automatically on every start after a change.)
 
-1. In the **template's** developer EXE, the newest `Archive\Zip\AppTemplate_v<ver>_t<ver>.zip`
-   is the template source (written automatically after every template update).
-2. In the **project's** developer EXE: **Update Template** → choose that zip →
-   review the summary and the preview → **Apply**.
-
-Only the files the template's `TEMPLATE_FILES.txt` lists are replaced
-(engine files the template no longer lists are deleted); `TEMPLATE_FILES.txt`
-and `TEMPLATE_VERSION.txt` are copied. `VERSION.txt` gets the next patch number
-and `CHANGELOG.txt` an `Engine synced vA -> vB` entry; then the EXE recompiles
-and restarts as with Update. Project files are never touched.
-
-It refuses (and changes nothing) when:
-
-- the zip is not template source, or does not match its own `TEMPLATE_FILES.txt`;
-- the zip is not newer than the project's template version;
-- the step changes the contract: a new major or minor template version, or a
-  `Contract:` note in a template CHANGELOG entry newer than the project's
-  version. Those are manual syncs (project files must be adapted);
-- the project's engine files differ from its own `TEMPLATE_FILES.txt` (local
-  engine edits, which the sync would overwrite). Move them into the template
-  or revert them first.
-
-Versioning: `1.0.x` releases are engine-only and go through Update Template; a
-new major.minor marks a contract change.
+Versioning: `1.x.y` patch releases are engine-only; a new major.minor marks a
+contract change.
 
 ---
 
@@ -420,44 +413,20 @@ extra DLLs.
 ## Template version and drift
 
 - `TEMPLATE_VERSION.txt` - the AppTemplate version this project's engine is
-  on. Shown in the status bar (e.g. `v1.2.9  (template 1.0.15)`), the Version
+  on. Shown in the status bar (e.g. `v1.2.9  (template 1.2.0)`), the Version
   History title, Environment.txt, FunctionMap.txt, and logged at every start.
 - `TEMPLATE_FILES.txt` - every template-owned file with its SHA-256 for that
-  version. The developer build checks them on every start; a changed
-  template-owned file shows as `(template 1.0.14, N changed)` in the status
-  bar and is listed in Session.log. That change belongs in the template (or
-  should be reverted) - it would be overwritten by the next template sync.
-- Template-owned files are byte-identical in every project, `AppHost.cs`
-  included (the project's names live in `AppIdentity.json`). The check covers
-  every listed file; `AppHost.cs`, `Build-App.ps1` and `Build-App.cs` through
-  the copies embedded in the developer EXE.
-- To bring a project up to a newer template, use **Update Template** (above).
-  A contract change (new major.minor, or a `Contract:` note) is a manual sync:
-  replace the template-owned files, adapt project files as the CHANGELOG
-  says, and update both TEMPLATE_* files.
+  version. Template-owned files are byte-identical in every project, `AppHost.cs`
+  included (the project's names live in `AppIdentity.json`).
+- Drift (a changed engine file in a project) is caught by the check on every push
+  to GitHub (`tools\Test-Template.ps1`). Before 1.2 the developer EXE also checked
+  on every start; that duplicate is gone. Update Template still refuses to run over
+  local engine edits.
+- A contract change (new major.minor, or a `Contract:` note) is a manual sync:
+  replace the template-owned files, adapt project files as the CHANGELOG says, and
+  update both TEMPLATE_* files.
 
 ---
-
-## After every update (developer build, automatic)
-
-A few seconds after the developer EXE starts, if it changed since the last
-run (an Update or a Build-App rebuild), it writes - in the background, status
-bar shows progress - in its project folder:
-
-```
-<ExeName>Dev.exe                             developer build (this one)
-Build\Build-App.exe                          the builder (from Build-App.cs; rebuilt when that changes)
-Update\                                      default place for update zips
-Archive\Exe\<ExeName>_v<ver>_t<template>.exe  copy of each version's developer EXE (rollback)
-Archive\Zip\<ExeName>_v<ver>_t<template>.zip  full source of each version
-Archive\archive.state                        what was archived / built last
-```
-
-Same version + template = same name, so a rebuild of the same version
-overwrites; a new version or template adds a file. `<ExeName>Lite.exe` is not
-made here (it needs the passwords): use **Build Lite** after an update. The Lite
-EXE shares the developer build's AppData (environments, logs). Each step is saved as it finishes, so closing the app mid-way (it asks first)
-resumes on the next start; Session.log lines are tagged `[Archive]`.
 
 ## Troubleshooting a user's machine
 
@@ -477,14 +446,15 @@ errors with their full detail.
 
 ```
 %LOCALAPPDATA%\AppTemplateData\
-  Config\          read-only mirror of the embedded config (refreshed each launch)
+  Config\          read-only mirror of the built-in config (refreshed each launch)
   Logs\            Session.log + <ENV>.log   (or on the shared path if reachable)
-  Settings\        Environments.json (the saved environments, per machine) and
-                   settings modules save at runtime (Get-AppSettingsDir); persistent
-  Extract\         Extract output
+  Settings\        settings modules save at runtime (Get-AppSettingsDir); persistent.
+                   Lite EXE: also Environments.json (what an admin saved here)
+  Extract\         More > Extract output
   active.env       the environment you last picked on this machine (just a name)
 ```
 
-The only things ever written on a runtime machine are the **picked environment**
-and the **logs/data** under the resolved root. The EXE is written only by the
-developer actions (first build, Update, Build Lite).
+The only things ever written on a runtime machine are the **picked environment**,
+the **logs/data** under the resolved root and, with the admin password, the
+**environments** saved there. The EXEs are written only by `Build-App.cmd`, Build
+Lite and More > Update.

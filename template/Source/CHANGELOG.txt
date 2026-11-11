@@ -2,6 +2,35 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.0 (2026-11-11)  One place for environments; zip tools under More; Build-App.cmd only
+  Changed : Environments are saved in ONE file per EXE. Developer build:
+            Source\Config\Environments.json itself (New / Save / Delete write it;
+            commit it; the next Build Lite ships it) - no AppData copy, no staging.
+            Lite EXE with the admin password: per machine in AppData\Settings (a
+            sealed EXE cannot change itself), as before. $App.EnvironmentsAreSource
+            tells module code which one it is.
+  Fixed   : 1.1.x wrote the developer's environments to Config\Environments.json
+            BESIDE the EXE (a path from before the Source\ folder), where nothing
+            read them. The first 1.2 start moves that file into Source\Config
+            (the replaced file is kept as Environments.json.bak) and removes the
+            empty folder.
+  Changed : Developer toolbar: Build Lite, Version History, Open, More. More holds
+            the zip tools from before git, for manual use: Update from a zip or
+            folder, Update Template, Extract, Archive this version.
+  Removed : The automatic work after every start (Archive\Exe + Archive\Zip copies,
+            Build\Build-App.exe, Archive\archive.state): git keeps every version and
+            Build-App.cmd compiles its own builder. Use More > Archive when wanted.
+  Removed : The template drift check on every start (and the "N changed" count in
+            the status bar): the check on every push to GitHub does it. Update
+            Template still refuses to run over local engine edits.
+  Removed : Build-App.ps1 - Build-App.cmd is the one way to build. Builds no longer
+            create the Update folder (only More > Update does).
+  Changed : Get-AppSettingsDir no longer copies the engine-only config files
+            (EnvironmentFields, SharedScope, ToolTips) into Settings.
+  Removed : $App.SaveDefaults() and $App.TemplateDrift (unused).
+  Note    : All projects synced in the repository. A project's Archive\ folder can
+            be deleted if the old copies are not needed.
+
 v1.1.2 (2026-11-11)  Dev and Lite EXEs; one Build Lite button, passwords always asked
   Changed : The developer build is now <ExeName>Dev.exe (no password; never hand it
             out - it holds the source). <ExeName>Lite.exe is the sealed build to hand

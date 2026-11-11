@@ -5,24 +5,21 @@
 //   <ExeName>Dev.exe  <ExeName>Lite.exe  Build-App.cmd
 //   (Dev = developer build, no password; Lite = sealed build to hand out)
 //   Source\   the source (AppHost.cs, _AppLauncher.ps1, AppIdentity.json, VERSION.txt,
-//             Config\, Modules\, Build-App.cs, Build-App.ps1, ...)
-//   Build\    Build-App.exe            Archive\, Update\   made by the developer EXE
+//             Config\, Modules\, Build-App.cs, ...)
+//   Build\    Build-App.exe (made by Build-App.cmd)
+//   Archive\, Update\   only if you use More > Archive / Update in the developer EXE
 // A pre-1.1 flat folder (source at the top) still builds.
 //
-// How you get Build-App.exe (in Build\):
-//   - the developer EXE writes it after every update (from the copy of this file
-//     it embeds), or
-//   - double-click Build-App.cmd: it compiles this file with the machine's
-//     csc.exe and runs it, or
-//   - Source\Build-App.ps1 does the same where PowerShell scripts may run.
+// How you run it: double-click Build-App.cmd (the one way to build since template
+// 1.2). It compiles this file with the machine's csc.exe into Build\Build-App.exe
+// and runs it; Build-All.cmd at the top of the repository does the same with -All.
 //
 // What it does (it finds the project from its own folder, or -Root: the project
 // folder, its Source\ or its Build\ folder all work):
 //   1. checks the source layout and reads AppIdentity.json and VERSION.txt
-//   2. makes the Update folder (default place for update zips) if missing
-//   3. packs the source into AppPackage.zip, packs AppHost.cs into core.dat
-//   4. compiles the DEVELOPER build  <ExeName>Dev.exe  with csc.exe
-//   5. runs  <ExeName>Dev.exe --build-lite  to make  <ExeName>Lite.exe, the SEALED
+//   2. packs the source into AppPackage.zip, packs AppHost.cs into core.dat
+//   3. compiles the DEVELOPER build  <ExeName>Dev.exe  with csc.exe
+//   4. runs  <ExeName>Dev.exe --build-lite  to make  <ExeName>Lite.exe, the SEALED
 //      build to hand out, with the user / admin passwords (template 1.1.2: no
 //      built-in test passwords). The passwords come from the environment
 //      variables APPTEMPLATE_LITE_USER / APPTEMPLATE_LITE_ADMIN (ToolBox sets them
@@ -37,9 +34,9 @@
 // Packing rules match the developer EXE's Update engine (paths inside Source\, plus
 // Build-App.cmd from the project folder): top-level text files,
 // Config\*, Modules\<Base|Lite|Admin>\*.psm1|txt|md; never Archive\, Update\ or
-// dot-folders; AppHost.cs, Build-App.ps1, Build-App.cs, UPDATE.txt and the
-// generated Config\FunctionMap.txt / Config\Environment.txt are not packed
-// (the first three are embedded as resources of their own).
+// dot-folders; AppHost.cs and Build-App.cs (embedded as resources of their own),
+// UPDATE.txt, a leftover Build-App.ps1 (removed in 1.2) and the generated
+// Config\FunctionMap.txt / Config\Environment.txt are not packed.
 
 using System;
 using System.Collections.Generic;
@@ -221,9 +218,6 @@ static class BuildApp
         Say("Source        : " + root, ConsoleColor.Yellow);
         Say("Output target : " + output, ConsoleColor.Yellow);
 
-        string update = Path.Combine(project, "Update");
-        if (!Directory.Exists(update)) { Directory.CreateDirectory(update); Console.WriteLine("  Created " + update + " (default place for update zips)"); }
-
         Console.WriteLine();
         Say("Locating build tools...", ConsoleColor.Cyan);
         string csc = FindCsc(); if (csc == null) throw new Exception("csc.exe not found under %WINDIR%\\Microsoft.NET. .NET Framework 4.x is required.");
@@ -305,7 +299,7 @@ static class BuildApp
             foreach (var r in extraRefs) rsp.Add("/reference:\"" + r + "\"");
             rsp.Add("/resource:\"" + zipPath + "\",AppPackage.zip");
             rsp.Add("/resource:\"" + core + "\",core.dat");
-            foreach (var res in new[] { "Build-App.ps1", "Build-App.cs" })
+            foreach (var res in new[] { "Build-App.cs" })
             {
                 string p = Path.Combine(root, res);
                 if (!File.Exists(p)) continue;
