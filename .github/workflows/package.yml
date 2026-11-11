@@ -2,7 +2,7 @@
 # build; the Dev EXEs are kept as a downloadable artifact for 3 days (Actions > Package > the run > Artifacts).
 # Run by hand (Actions > Package > Run workflow), or by a push that changes this file.
 # The developer EXEs contain the source: the repository is private, and the artifact
-# expires. Never hand a developer or Lite EXE to users - use Build Sealed.
+# expires. Never hand a developer EXE to users - hand out <Name>Lite.exe (Build Lite).
 name: Package
 
 on:
