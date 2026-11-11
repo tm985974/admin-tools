@@ -15,7 +15,9 @@ projects/
   RadminLicense/          Radmin license management (Source/OldScript/ = the original scripts)
   RSLinxDriverManager/    RSLinx driver manager
   SCCMAppManager/         SCCM application manager
+  ToolBox/                runs, builds and updates all of the above (Tools / Developer / Update tabs)
 tools/                    repo tools (PowerShell 5.1+)
+Build-All.cmd             builds every tool in projects\ (runs each Build-App.cmd)
 .github/workflows/        automatic checks
 ```
 

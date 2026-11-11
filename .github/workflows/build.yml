@@ -25,6 +25,7 @@ jobs:
           - projects\RadminLicense
           - projects\RSLinxDriverManager
           - projects\SCCMAppManager
+          - projects\ToolBox
     steps:
       - uses: actions/checkout@v4
       - name: Build developer EXE (no Lite)

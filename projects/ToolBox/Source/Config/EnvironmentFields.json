@@ -1,0 +1,8 @@
+{
+    "Fields": [
+        { "Key": "Label",          "Caption": "Environment name" },
+        { "Key": "SharedPath",     "Caption": "Log & data path (UNC, optional)" },
+        { "Key": "ProjectsFolder", "Caption": "Projects folder (blank = the folder ToolBox is in)" },
+        { "Key": "SealedFolder",   "Caption": "Sealed EXE folder (optional)" }
+    ]
+}

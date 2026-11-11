@@ -11,3 +11,5 @@
 **/Config/Environment.txt
 # Output of tools/New-UpdateZip.ps1
 /out/
+# Old source kept by ToolBox > Update > Apply update
+/_Backup/

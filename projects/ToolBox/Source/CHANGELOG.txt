@@ -1,0 +1,15 @@
+# CHANGELOG.txt -- project version history (newest first)
+# Each update package carries this file with its new section on top, plus the
+# bumped VERSION.txt, so Version History and the archived EXEs line up.
+
+v1.0.0 (2026-11-11)  Created from AppTemplate v1.1.1
+  Added   : Tools tab - every tool in the projects folder with its version; Launch
+            starts the sealed EXE when the environment's Sealed EXE folder has one,
+            else the Lite (test) EXE.
+  Added   : Developer tab - source version vs built version for every tool, and
+            whether it needs a build; Build selected / Build all run each tool's
+            Build-App.cmd here, one after another, with the output in the log pane
+            (local builds work where downloaded EXEs are blocked).
+  Added   : Update tab - Update from zip: open a zip downloaded from GitHub, see
+            which tools change, apply it (the replaced Source folders are kept in
+            _Backup) and build everything. Pull (git) when the folder is a git clone.
