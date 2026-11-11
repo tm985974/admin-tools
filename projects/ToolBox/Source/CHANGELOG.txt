@@ -2,6 +2,14 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.1 (2026-11-11)  Engine synced v1.1.1 -> v1.1.2: ToolBoxDev.exe / ToolBoxLite.exe
+  Changed : AppTemplate engine v1.1.1 -> v1.1.2 (Update Template): 5 file(s) replaced, 0 added, 0 removed.
+  Changed : Tools launches each tool's <Name>Lite.exe (the sealed build); the Sealed
+            EXE folder setting is gone. Developer reads <Name>Dev.exe.
+  Changed : Build selected / Build all / Update > Build all ask once for the Lite
+            passwords (or "developer builds only") and pass them to every build.
+  Note    : template v1.1.2  Dev and Lite EXEs; one Build Lite button, passwords always asked
+
 v1.0.0 (2026-11-11)  Created from AppTemplate v1.1.1
   Added   : Tools tab - every tool in the projects folder with its version; Launch
             starts the sealed EXE when the environment's Sealed EXE folder has one,

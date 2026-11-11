@@ -72,7 +72,7 @@ function New-OverviewTab {
     Add-Section 'Build and update (developer build)'
     Add-Bullet 'Build-App.ps1 - first build or recovery.'
     Add-Bullet 'Update - apply a zip or a folder, preview the changes, recompile.'
-    Add-Bullet 'Build Sealed - mint the distributable with user/admin passwords.'
+    Add-Bullet 'Build Lite - make ADUserLookupLite.exe, the sealed build to hand out (asks for the user and admin passwords).'
     Add-Bullet 'Extract - write the whole project out (with FunctionMap.txt and Environment.txt) for hand-off.'
 
     Add-Section 'Make it your own'

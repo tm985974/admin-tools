@@ -10,20 +10,22 @@ renamed when you start a real project.
 
 ## Two builds from one source
 
-| | **Developer build** (default) | **Sealed build** (the distributable) |
+| | **Developer build** `<ExeName>Dev.exe` | **Sealed build** `<ExeName>Lite.exe` (the one to hand out) |
 |---|---|---|
-| How you get it | `Build-App.exe` / `Build-App.cmd` | **Build Sealed** button in the dev build |
+| How you get it | `Build-App.cmd` | `Build-App.cmd` (it asks for the passwords), or **Build Lite** in the developer build |
 | Embedded C# source (`core.dat`) | yes | **no — omitted** |
 | Module package | plaintext, all tiers | **two AES-256 bundles, per-tier** |
 | Password to run | none | **yes — at launch** |
-| Dev tooling (Update / Update Template / Build Sealed / Build Lite / Extract / Version History / Open ▾) | yes | no |
+| Dev tooling (Update / Update Template / Build Lite / Extract / Version History / Open ▾) | yes | no |
 | Requirement checks + machine facts in Session.log | yes | yes |
 | Tabs (Overview, Tab 1-4, Environment) | yes | yes |
 | Create / edit environments (Environment tab) | yes | admin password only (user password: pick only) |
 | Admin-tier tabs/modules | yes (all tiers loaded) | only with the admin password |
 
-**Never distribute the developer build** — it contains your source. Distribute
-only the sealed EXE produced by Build Sealed.
+**Never hand out the developer build** — it contains your source. Hand out only
+`<ExeName>Lite.exe`, the sealed build. Its passwords are asked every time it is
+built (template 1.1.2: there are no built-in test passwords; for testing, use
+simple ones).
 
 ---
 
@@ -55,7 +57,7 @@ holder cannot read the admin modules (different key).
   boundary; it's made expensive, not impossible. **Use strong passwords** — the
   admin password especially. PBKDF2 iterations (310k by default) slow each guess.
 
-Use distinct user and admin passwords (Build Sealed enforces this).
+Use distinct user and admin passwords (Build Lite enforces this).
 
 ---
 
@@ -66,8 +68,8 @@ sub folders:
 
 ```
 <Project>\
-  <ExeName>.exe          developer build
-  <ExeName>Lite.exe      sealed test build (admin "a", user "u")
+  <ExeName>Dev.exe       developer build (no password)
+  <ExeName>Lite.exe      sealed build to hand out (user / admin password)
   Build-App.cmd          builds the two EXEs from Source\
   Source\                the source: AppHost.cs, _AppLauncher.ps1, AppIdentity.json,
                          VERSION.txt, CHANGELOG.txt, TEMPLATE_*.txt, README.md,
@@ -95,10 +97,14 @@ In the project folder, run one of these - they all do the same build:
 To build from an Extract (a zip of `Source\` contents), unzip it into a `Source`
 folder, put `Build-App.cmd` beside that folder (it is in the zip too) and run it.
 
-It makes the `Update` folder if missing, builds `AppTemplate.exe` (the
-DEVELOPER build) and then `AppTemplateLite.exe` (sealed test build: admin
-password `a`, user password `u`). Options: `Build-App.exe -Output <path\Name.exe>
--NoLite -NoPause`.
+It makes the `Update` folder if missing, builds `AppTemplateDev.exe` (the
+DEVELOPER build) and then `AppTemplateLite.exe` (the sealed build): it asks for
+the user and admin passwords, each twice - press Enter at the first prompt to
+skip the Lite EXE. Options: `Build-App.exe -Output <path\Name.exe> -NoLite
+-NoPause`. `Build-App.exe -All <projects folder>` builds every project in the
+folder and asks for the passwords once (the repository's `Build-All.cmd` uses it).
+A caller can pass the passwords in the environment variables
+`APPTEMPLATE_LITE_USER` / `APPTEMPLATE_LITE_ADMIN` (ToolBox does, for Build all).
 
 Requirements: .NET Framework 4.x (`csc.exe`) and Windows PowerShell 5.1
 installed (its DLL is referenced; no script runs). If AV quarantines the fresh
@@ -106,10 +112,10 @@ EXE, exclude the output folder from real-time scanning.
 
 ### Make the distributable
 
-1. Run the developer `AppTemplate.exe`.
-2. Click **Build Sealed**, set a **user** password and an **admin** password.
-3. It writes the sealed distributable to `…\AppTemplateData\Extract\AppTemplate.exe`.
-4. Hand that EXE out. Give operators the user password; keep the admin password.
+1. Run `Build-App.cmd` and type the passwords, or click **Build Lite** in the
+   developer `AppTemplateDev.exe`.
+2. Either writes `AppTemplateLite.exe` in the project folder.
+3. Hand that EXE out. Give operators the user password; keep the admin password.
 
 ---
 
@@ -270,10 +276,10 @@ when two modules define the same function, or two module files share a name.
 
 The developer EXE keeps an `Update` folder beside itself (made on every start
 and every compile): drop update zips there; the Update and Update Template
-pickers open in it. **Build Lite** rebuilds `<ExeName>Lite.exe` on demand (e.g.
-after saving environments in the developer EXE). **Open ▾** opens the app
-folder (Archive, Update, Lite EXE), the Logs folder in use, or AppData
-(Settings, Extract, Build Sealed output).
+pickers open in it. **Build Lite** makes `<ExeName>Lite.exe`, the sealed build
+(it asks for the passwords). **Open ▾** opens the app folder (Archive, Update,
+Lite EXE), the Source folder, the Logs folder in use, or AppData (Settings,
+Extract).
 
 1. Change files in the project's `Source\` folder.
 2. Zip **only the changed files**, with paths from inside `Source\`
@@ -289,7 +295,7 @@ folder (Archive, Update, Lite EXE), the Logs folder in use, or AppData
 3. In the dev EXE: **Update** → choose a **zip file** or a **folder** (an
    unzipped update or Extract) → review the preview (ADD / MODIFY / DELETE) →
    **Apply**. The developer EXE recompiles itself and archives the old one.
-   Then run **Build Sealed** again to mint an updated distributable.
+   Then **Build Lite** again for an updated sealed EXE.
 
 Bump `VERSION.txt` for anything you want tracked in titles/history.
 
@@ -439,21 +445,18 @@ run (an Update or a Build-App rebuild), it writes - in the background, status
 bar shows progress - in its project folder:
 
 ```
-<ExeName>.exe                                developer build (this one)
-<ExeName>Lite.exe                            sealed TEST build - admin password "a", user password "u"
+<ExeName>Dev.exe                             developer build (this one)
 Build\Build-App.exe                          the builder (from Build-App.cs; rebuilt when that changes)
 Update\                                      default place for update zips
 Archive\Exe\<ExeName>_v<ver>_t<template>.exe  copy of each version's developer EXE (rollback)
-Archive\Zip\<ExeName>_v<ver>_t<template>.zip  full source of each version (upload this to Claude)
+Archive\Zip\<ExeName>_v<ver>_t<template>.zip  full source of each version
 Archive\archive.state                        what was archived / built last
 ```
 
 Same version + template = same name, so a rebuild of the same version
-overwrites; a new version or template adds a file. The Lite EXE shares the
-developer build's AppData (environments, logs) - handy for testing; for a real
-distributable use **Build Sealed** with real passwords. If `<ExeName>Lite.exe`
-is running it cannot be replaced; that is logged and retried on the next start.
-Each step is saved as it finishes, so closing the app mid-way (it asks first)
+overwrites; a new version or template adds a file. `<ExeName>Lite.exe` is not
+made here (it needs the passwords): use **Build Lite** after an update. The Lite
+EXE shares the developer build's AppData (environments, logs). Each step is saved as it finishes, so closing the app mid-way (it asks first)
 resumes on the next start; Session.log lines are tagged `[Archive]`.
 
 ## Troubleshooting a user's machine
@@ -478,10 +481,10 @@ errors with their full detail.
   Logs\            Session.log + <ENV>.log   (or on the shared path if reachable)
   Settings\        Environments.json (the saved environments, per machine) and
                    settings modules save at runtime (Get-AppSettingsDir); persistent
-  Extract\         Extract and Build Sealed outputs
+  Extract\         Extract output
   active.env       the environment you last picked on this machine (just a name)
 ```
 
 The only things ever written on a runtime machine are the **picked environment**
 and the **logs/data** under the resolved root. The EXE is written only by the
-developer actions (first build, Update, Build Sealed).
+developer actions (first build, Update, Build Lite).

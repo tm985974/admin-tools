@@ -2,24 +2,23 @@
     "_note": "Hover help for this project's buttons, menu items and tabs (project-owned). Key = the control's text, optionally preceded by where it is: tab / sub-tab / group box titles (outermost first) or a dialog's title, joined with ' > '. The most specific match wins; '&', a trailing '...' and case are ignored. An empty text = no tooltip on purpose. Engine controls (developer buttons, Environment tab, OK / Cancel / Close ...) already have entries in Base\\Services_ToolTips.psm1; an entry here overrides them. The developer build lists every control still missing one in <data root>\\Logs\\ToolTips_missing.txt.",
     "ToolTips": {
         "Overview": "What ToolBox does and the usual update routine.",
-        "Tools": "Every tool in the projects folder: launch the sealed EXE, or the Lite test build.",
+        "Tools": "Every tool's Lite EXE - the sealed build, which asks for the user or admin password.",
         "Developer": "Source version vs built EXE for every tool; build them here.",
         "Update": "Bring the tools' source up to date from a GitHub zip (or git pull), then build.",
-
-        "Tools > Launch": "Start the selected tool: its sealed EXE when the Sealed EXE folder has one, else its Lite (test) EXE. Double-click a row does the same.",
-        "Tools > Open folder": "Open the folder of the EXE the selected tool runs from.",
+        "Tools > Launch": "Start the selected tool's Lite EXE (the sealed build; it asks for the user or admin password). Double-click a row does the same.",
+        "Tools > Open folder": "Open the selected tool's folder in Explorer.",
         "Tools > Refresh": "Look at the projects folder again (new tools, new builds).",
-
-        "Developer > Build selected": "Run Build-App.cmd for the selected tools, one at a time. Running tools are skipped.",
-        "Developer > Build all": "Run Build-App.cmd for every tool, one at a time: each makes its developer EXE and Lite EXE here. Running tools are skipped.",
+        "Developer > Build selected": "Run Build-App.cmd for the selected tools, one at a time: <Name>Dev.exe, and <Name>Lite.exe with the passwords asked once. Running tools are skipped.",
+        "Developer > Build all": "Run Build-App.cmd for every tool, one at a time: <Name>Dev.exe, and <Name>Lite.exe with the passwords asked once. Running tools are skipped.",
         "Developer > Stop": "Let the tool being built finish and skip the rest.",
-        "Developer > Launch developer EXE": "Start the selected tool's developer build (Update, Build Sealed, Extract, Version History).",
+        "Developer > Launch developer EXE": "Start the selected tool's developer build, <Name>Dev.exe (Update, Build Lite, Extract, Version History).",
         "Developer > Open folder": "Open the selected tool's folder in Explorer.",
         "Developer > Refresh": "Read the versions and build times again.",
-
         "Update > Open zip": "Pick a zip of the admin-tools repository downloaded from GitHub. It is unpacked into AppData and compared - nothing changes yet.",
         "Update > Apply update": "Replace each tool's source with the zip's (the old source is kept in _Backup), then build all if ticked.",
-        "Update > Build all after the update": "On: as soon as the update is applied, the Developer tab builds every tool.",
-        "Update > Pull (git)": "This folder is a git clone: get the latest source from GitHub (git pull). Then Build all on the Developer tab."
+        "Update > Build all after the update": "On: as soon as the update is applied, every tool is built (the Lite passwords are asked first, once).",
+        "Update > Pull (git)": "This folder is a git clone: get the latest source from GitHub (git pull). Then Build all on the Developer tab.",
+        "Build > Also build the Lite EXEs (the sealed builds to hand out)": "On: each build also makes <Name>Lite.exe, sealed with the passwords below. Off: developer builds only.",
+        "Build > Build": "Start the builds with these passwords."
     }
 }

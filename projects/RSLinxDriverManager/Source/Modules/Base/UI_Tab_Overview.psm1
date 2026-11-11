@@ -66,7 +66,7 @@ function New-OverviewTab {
     Add-Bullet 'Log & data path: logs, backups fallback and the VLAN lookup table. Session.log is the file to send when something goes wrong.'
 
     Add-Section 'Build and update (developer build)'
-    Add-Bullet 'Built on AppTemplate - see README.md. Build-App.exe / Build-App.cmd builds the developer EXE; Build Sealed makes the password-protected EXE to hand out. Never distribute the developer build.'
+    Add-Bullet 'Built on AppTemplate - see README.md. Build-App.cmd builds RSLinxDriverManagerDev.exe (the developer build - never hand it out) and RSLinxDriverManagerLite.exe (the sealed build to hand out; it asks for the passwords).'
 
     # Dock order: Fill first (back), then the Top bands.
     $Page.Controls.Add($panel)

@@ -2,6 +2,25 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.1.2 (2026-11-11)  Dev and Lite EXEs; one Build Lite button, passwords always asked
+  Changed : The developer build is now <ExeName>Dev.exe (no password; never hand it
+            out - it holds the source). <ExeName>Lite.exe is the sealed build to hand
+            out. A project folder: <ExeName>Dev.exe, <ExeName>Lite.exe, Build-App.cmd.
+  Changed : One button, Build Lite, makes <ExeName>Lite.exe beside the developer EXE.
+            It asks for the user and admin passwords every time, each typed twice
+            (different from each other). The separate Build Sealed button (which wrote
+            to AppData\Extract) is gone.
+  Removed : The built-in test passwords (admin "a", user "u") and the automatic Lite
+            build after every update / start - a sealed build now always needs the
+            passwords you choose (simple ones are fine for testing).
+  Changed : Build-App.cmd asks for the Lite passwords (blank = no Lite EXE this time).
+            Build-App.exe -All <projects folder> builds every project and asks once
+            (the repository's Build-All.cmd uses it). A caller can pass the passwords
+            in APPTEMPLATE_LITE_USER / APPTEMPLATE_LITE_ADMIN (set for the child
+            process only; ToolBox does this for Build all).
+  Note    : Engine-only: projects on 1.1.x take it with Update Template. After the
+            first build, delete the old <ExeName>.exe (now <ExeName>Dev.exe).
+
 v1.1.1 (2026-11-10)  Session.log no longer rewritten on every line once full
   Fixed   : Once Session.log (or an environment's action log) reached its size cap,
             every new line made the app read the whole file and write it back

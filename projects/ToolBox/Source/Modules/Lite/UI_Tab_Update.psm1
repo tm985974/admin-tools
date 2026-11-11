@@ -28,6 +28,7 @@ function New-TbUpdateTab {
     $refreshAll  = ${function:Invoke-TbRefresh}
     $invoke      = ${function:Invoke-AppCommand}
     $settingsDir = ${function:Get-AppSettingsDir}
+    $askPw       = ${function:Show-TbLitePasswordDialog}
     $state = @{ Info = $null; Zip = '' }
 
     $hdr = New-TbHeader -App $App -Text 'Update - new source for the tools, then build'
@@ -87,6 +88,11 @@ function New-TbUpdateTab {
     $btnApply.Add_Click({
         if (-not $state.Info) { return }
         if (& $isBuilding) { $App.SetStatus('Wait for the build to finish first.', 'warn'); return }
+        $pw = $null
+        if ($chkBuild.Checked) {                       # ask before anything changes, so Cancel leaves everything as it was
+            $pw = & $askPw -App $App -Count @($state.Info.Tools).Count
+            if (-not $pw) { return }
+        }
         $f = & $getFolders -App $App
         if (-not $f.Repo) { $App.SetStatus('The projects folder is not admin-tools\projects - set Projects folder on the Environment tab.', 'err'); return }
         $sum = "Replace each tool's Source folder (and Build-App.cmd, template\, tools\, Build-All.cmd) with the zip's. " +
@@ -106,8 +112,10 @@ function New-TbUpdateTab {
         $App.SetStatus('Update applied.', 'ok')
         if ($chkBuild.Checked) {
             foreach ($tp in $Page.Parent.TabPages) { if ($tp.Text.Trim() -eq 'Developer') { $Page.Parent.SelectedTab = $tp; break } }
-            & $startBuild -App $App -Projects (@(& $getProjects -App $App))
+            if ($pw.Lite) { & $startBuild -App $App -Projects (@(& $getProjects -App $App)) -LiteUser $pw.User -LiteAdmin $pw.Admin }
+            else { & $startBuild -App $App -Projects (@(& $getProjects -App $App)) }
         }
+        $pw = $null
     }.GetNewClosure())
 
     $btnPull.Add_Click({

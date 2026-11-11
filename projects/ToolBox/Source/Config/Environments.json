@@ -7,10 +7,9 @@
             "SharedPath": "",
             "IsDefault": true,
             "ProjectsFolder": "",
-            "SealedFolder": "",
             "FilterAsYouType": true,
             "LogMaxKB": 5120,
-            "Notes": "Projects folder: blank = the folder that holds ToolBox's own folder (admin-tools\\projects). Sealed EXE folder: where you keep the sealed EXEs made with Build Sealed (named <ExeName>.exe); the Tools tab launches those instead of the Lite test builds."
+            "Notes": "Projects folder: blank = the folder that holds ToolBox's own folder (admin-tools\\projects)."
         }
     ]
 }

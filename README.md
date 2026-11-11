@@ -17,7 +17,7 @@ projects/
   SCCMAppManager/         SCCM application manager
   ToolBox/                runs, builds and updates all of the above (Tools / Developer / Update tabs)
 tools/                    repo tools (PowerShell 5.1+)
-Build-All.cmd             builds every tool in projects\ (runs each Build-App.cmd)
+Build-All.cmd             builds every tool in projects\ (asks the Lite passwords once)
 .github/workflows/        automatic checks
 ```
 
@@ -26,8 +26,8 @@ the top; the source is in `Source/`:
 
 ```
 projects/ADUserLookup/
-  ADUserLookup.exe        developer build       (made by Build-App.cmd, not in git)
-  ADUserLookupLite.exe    sealed test build     (not in git)
+  ADUserLookupDev.exe     developer build, no password - never hand it out   (not in git)
+  ADUserLookupLite.exe    sealed build to hand out (user / admin password)    (not in git)
   Build-App.cmd           builds the two EXEs from Source/
   Source/                 AppHost.cs, _AppLauncher.ps1, AppIdentity.json, VERSION.txt,
                           CHANGELOG.txt, README.md, Config/, Modules/, Build-App.cs, ...
@@ -45,7 +45,7 @@ app (update zips, archives, `TEMPLATE_FILES.txt`) paths are relative to `Source/
 | Source (current) | this repo, `main` |
 | Every past version | git history; tags like `ADUserLookup/v1.2.17`, `template/v1.0.23` |
 | Developer EXE, Lite EXE, `Archive\`, `Update\` | on your machine only (ignored by git) |
-| Sealed distributable | build it with **Build Sealed**; attach to a GitHub Release if you want a copy here |
+| Sealed distributable | `<Name>Lite.exe`, made by `Build-App.cmd` or **Build Lite** (asks for the passwords); attach to a GitHub Release if you want a copy here |
 
 Never commit or upload a developer EXE: it contains the source. Never put the sealed
 passwords in the repo.

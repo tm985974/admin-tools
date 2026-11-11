@@ -2,6 +2,11 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.2.21 (2026-11-11)  Engine synced v1.1.1 -> v1.1.2: ADUserLookupDev.exe / ADUserLookupLite.exe
+  Changed : AppTemplate engine v1.1.1 -> v1.1.2 (Update Template): 5 file(s) replaced, 0 added, 0 removed.
+  Changed : Overview: Build Lite is the sealed build (Build Sealed is gone).
+  Note    : template v1.1.2  Dev and Lite EXEs; one Build Lite button, passwords always asked
+
 v1.2.20 (2026-11-10)  Lists load when first shown; IPs fill in the background; faster grids (+ engine v1.1.1)
   Fixed   : Groups and Computers sometimes stayed empty on the first visit until you
             clicked in the list: they loaded when keyboard focus entered the tab,

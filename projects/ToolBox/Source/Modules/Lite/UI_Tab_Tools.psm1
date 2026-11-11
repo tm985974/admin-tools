@@ -1,9 +1,8 @@
 # UI_Tab_Tools.psm1   (LITE TIER)
 #
-# Tools tab: every tool in the projects folder and the EXE to run it with.
-# Launch uses the tool's SEALED EXE when the environment's "Sealed EXE folder"
-# holds <ExeName>.exe, else its Lite EXE (the sealed TEST build Build-App makes:
-# admin password "a", user password "u"). Double-click a row = Launch.
+# Tools tab: every tool in the projects folder and its Lite EXE - the sealed
+# build (asks for the user or admin password at launch). Double-click = Launch.
+# The developer builds (<ExeName>Dev.exe) are on the Developer tab.
 
 function New-TbToolsTab {
     [CmdletBinding()]
@@ -19,7 +18,7 @@ function New-TbToolsTab {
     $invoke      = ${function:Invoke-AppCommand}
     $fmt         = ${function:Format-AppCommandValue}
 
-    $hdr = New-TbHeader -App $App -Text 'Tools - run the tools built in this folder'
+    $hdr = New-TbHeader -App $App -Text 'Tools - run the sealed (Lite) builds'
     $where = New-Object System.Windows.Forms.Label
     $where.Dock = 'Top'; $where.Height = 22; $where.ForeColor = $App.Theme.Muted; $where.AutoSize = $false
 
@@ -30,24 +29,25 @@ function New-TbToolsTab {
     $btnRefresh = $App.Theme.MakeButton('Refresh')
     $bar.Controls.AddRange(@($btnLaunch, $btnFolder, $btnRefresh))
 
-    $grid = New-TbGrid -App $App -Columns @('Tool', 'Version', 'Runs as', 'Built', 'EXE')
-    $grid.Columns['Tool'].FillWeight = 22; $grid.Columns['Version'].FillWeight = 10; $grid.Columns['Runs as'].FillWeight = 12
-    $grid.Columns['Built'].FillWeight = 14; $grid.Columns['EXE'].FillWeight = 42
+    $grid = New-TbGrid -App $App -Columns @('Tool', 'Version', 'State', 'Built', 'EXE')
+    $grid.Columns['Tool'].FillWeight = 22; $grid.Columns['Version'].FillWeight = 10; $grid.Columns['State'].FillWeight = 16
+    $grid.Columns['Built'].FillWeight = 14; $grid.Columns['EXE'].FillWeight = 38
 
     $refresh = {
         $keep = @(& $selection -Grid $grid | ForEach-Object { $_.Name })
         $f = & $getFolders -App $App
-        $where.Text = "Projects folder: $($f.Projects)" + $(if ($f.Sealed) { "     Sealed EXE folder: $($f.Sealed)" } else { '     (no Sealed EXE folder set: Launch uses the Lite test builds)' })
+        $where.Text = "Projects folder: $($f.Projects)     Each tool's <Name>Lite.exe asks for the user or admin password when it starts."
         $grid.SuspendLayout()
         try {
             $grid.Rows.Clear()
             foreach ($p in @(& $getProjects -App $App)) {
                 if ($p.IsSelf) { continue }
-                $l = $p.Launch
-                $i = $grid.Rows.Add($p.AppName, $(if ($l) { $l.Version } else { '' }), $(if ($p.LaunchKind) { $p.LaunchKind } else { 'Not built' }),
-                                    $(if ($l) { & $fmtTime $l.Time } else { '' }), $(if ($l) { $l.Path } else { "Build it on the Developer tab ($($p.Folder))" }))
+                $l = $p.Lite
+                $state = switch ($p.LiteState) { 'current' { 'Ready' } 'older' { "Older than v$($p.Dev.Version) - rebuild" } default { 'Not built' } }
+                $i = $grid.Rows.Add($p.AppName, $(if ($l.Exists) { $l.Version } else { '' }), $state,
+                                    $(if ($l.Exists) { & $fmtTime $l.Time } else { '' }), $(if ($l.Exists) { $l.Path } else { "Build it on the Developer tab ($($p.Folder))" }))
                 $row = $grid.Rows[$i]; $row.Tag = $p
-                if (-not $l) { $row.DefaultCellStyle.ForeColor = $App.Theme.Muted }
+                if (-not $l.Exists) { $row.DefaultCellStyle.ForeColor = $App.Theme.Muted }
                 if ($keep -contains $p.Name) { $row.Selected = $true }
             }
         } finally { $grid.ResumeLayout() }
@@ -56,10 +56,10 @@ function New-TbToolsTab {
     $launch = {
         $p = @(& $selection -Grid $grid) | Select-Object -First 1
         if (-not $p) { $App.SetStatus('Select a tool first.', 'warn'); return }
-        if (-not $p.Launch) { $App.SetStatus("$($p.AppName) is not built yet - build it on the Developer tab.", 'warn'); return }
-        $exe = $p.Launch.Path
+        if (-not $p.Lite.Exists) { $App.SetStatus("$($p.AppName) has no Lite EXE yet - build it on the Developer tab (with passwords).", 'warn'); return }
+        $exe = $p.Lite.Path
         $r = & $invoke -App $App -Title "Launch $($p.AppName)" -Kind Read -RunLabel 'Launch' `
-            -Summary "Start $($p.AppName) v$($p.Launch.Version) ($($p.LaunchKind))." `
+            -Summary "Start $($p.AppName) v$($p.Lite.Version) (the sealed build: it asks for the user or admin password)." `
             -Code ('Start-Process -FilePath ' + (& $fmt $exe) + ' -WorkingDirectory ' + (& $fmt (Split-Path -Parent $exe)))
         if ($r.Errors.Count) { $App.SetStatus("Not started: $($r.Errors[0])", 'err') }
         elseif ($r.Ran) { $App.SetStatus("$($p.AppName) started.", 'ok') }
@@ -70,7 +70,7 @@ function New-TbToolsTab {
     $btnFolder.Add_Click({
         $p = @(& $selection -Grid $grid) | Select-Object -First 1
         if (-not $p) { $App.SetStatus('Select a tool first.', 'warn'); return }
-        & $openFolder -App $App -Path $(if ($p.Launch) { Split-Path -Parent $p.Launch.Path } else { $p.Folder })
+        & $openFolder -App $App -Path $p.Folder
     }.GetNewClosure())
     $btnRefresh.Add_Click($refresh)
     Register-TbView -Refresh $refresh

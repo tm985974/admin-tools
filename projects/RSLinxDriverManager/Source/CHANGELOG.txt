@@ -2,6 +2,11 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v1.0.7 (2026-11-11)  Engine synced v1.1.1 -> v1.1.2: RSLinxDriverManagerDev.exe / RSLinxDriverManagerLite.exe
+  Changed : AppTemplate engine v1.1.1 -> v1.1.2 (Update Template): 5 file(s) replaced, 0 added, 0 removed.
+  Changed : Overview: the Dev / Lite EXEs (Build Sealed is gone).
+  Note    : template v1.1.2  Dev and Lite EXEs; one Build Lite button, passwords always asked
+
 v1.0.6 (2026-11-10)  Engine synced v1.1.0 -> v1.1.1
   Changed : AppTemplate engine v1.1.0 -> v1.1.1 (Update Template): 1 file(s) replaced, 0 added, 0 removed.
   Note    : template v1.1.1  Session.log no longer rewritten on every line once full

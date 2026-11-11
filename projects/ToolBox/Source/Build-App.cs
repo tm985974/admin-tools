@@ -2,7 +2,8 @@
 // so a project can be built where PowerShell scripts are not allowed to run.
 //
 // Project folder (template 1.1) - only these three files at the top:
-//   <ExeName>.exe  <ExeName>Lite.exe  Build-App.cmd
+//   <ExeName>Dev.exe  <ExeName>Lite.exe  Build-App.cmd
+//   (Dev = developer build, no password; Lite = sealed build to hand out)
 //   Source\   the source (AppHost.cs, _AppLauncher.ps1, AppIdentity.json, VERSION.txt,
 //             Config\, Modules\, Build-App.cs, Build-App.ps1, ...)
 //   Build\    Build-App.exe            Archive\, Update\   made by the developer EXE
@@ -20,11 +21,16 @@
 //   1. checks the source layout and reads AppIdentity.json and VERSION.txt
 //   2. makes the Update folder (default place for update zips) if missing
 //   3. packs the source into AppPackage.zip, packs AppHost.cs into core.dat
-//   4. compiles the DEVELOPER build  <ExeName>.exe  with csc.exe
-//   5. runs  <ExeName>.exe --build-lite  to make  <ExeName>Lite.exe  (sealed test
-//      build: admin password "a", user password "u")
+//   4. compiles the DEVELOPER build  <ExeName>Dev.exe  with csc.exe
+//   5. runs  <ExeName>Dev.exe --build-lite  to make  <ExeName>Lite.exe, the SEALED
+//      build to hand out, with the user / admin passwords (template 1.1.2: no
+//      built-in test passwords). The passwords come from the environment
+//      variables APPTEMPLATE_LITE_USER / APPTEMPLATE_LITE_ADMIN (ToolBox sets them
+//      for its builds), else they are asked here; blank = no Lite EXE this time.
 //
 //   Build-App.exe [-Output <path\Name.exe>] [-Root <folder>] [-NoLite] [-NoPause]
+//   Build-App.exe -All <projects folder> [-NoLite] [-NoPause]
+//      every project in the folder, one after another - the passwords asked once
 //
 // Requirements: .NET Framework 4.x (csc.exe) and Windows PowerShell 5.1 installed
 // (its System.Management.Automation.dll is referenced, not run). C# 5 only.
@@ -57,26 +63,35 @@ static class BuildApp
 
     static int Main(string[] args)
     {
-        string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/'), output = null;
+        string root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/'), output = null, all = null;
         bool lite = true, pause = true;
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i].TrimStart('-', '/').ToLowerInvariant();
             if ((a == "output" || a == "outputexe") && i + 1 < args.Length) output = args[++i];
             else if (a == "root" && i + 1 < args.Length) root = Path.GetFullPath(args[++i]).TrimEnd('\\', '/');
+            else if (a == "all" && i + 1 < args.Length) all = Path.GetFullPath(args[++i]).TrimEnd('\\', '/');
             else if (a == "nolite") lite = false;
             else if (a == "nopause") pause = false;
             else if (a == "?" || a == "h" || a == "help")
             {
                 Console.WriteLine("Build-App.exe [-Output <path\\Name.exe>] [-Root <folder>] [-NoLite] [-NoPause]");
+                Console.WriteLine("Build-App.exe -All <projects folder> [-NoLite] [-NoPause]");
                 return 0;
             }
             else { Fail("Unknown argument: " + args[i]); return 1; }
         }
 
+        // The Lite (sealed) EXE needs the passwords: given by the caller, else asked once.
+        if (lite) GetLitePasswords(all != null);
+
         int rc;
-        try { rc = Run(root, output, lite); }
-        catch (Exception ex) { Fail(ex.Message); rc = 1; }
+        if (all != null) rc = RunAll(all, lite);
+        else
+        {
+            try { rc = Run(root, output, lite); }
+            catch (Exception ex) { Fail(ex.Message); rc = 1; }
+        }
         if (pause)
         {
             Console.WriteLine();
@@ -108,6 +123,73 @@ static class BuildApp
         return start;
     }
 
+    // ---- Lite passwords: asked once, used for every Lite EXE this run builds ----
+    const string EnvUser = "APPTEMPLATE_LITE_USER", EnvAdmin = "APPTEMPLATE_LITE_ADMIN";
+    static string LiteUser, LiteAdmin;
+
+    static void GetLitePasswords(bool several)
+    {
+        string u = Environment.GetEnvironmentVariable(EnvUser), a = Environment.GetEnvironmentVariable(EnvAdmin);
+        if (!string.IsNullOrEmpty(u) && !string.IsNullOrEmpty(a)) { LiteUser = u; LiteAdmin = a; return; }
+        bool interactive = true;
+        try { interactive = Environment.UserInteractive && !Console.IsInputRedirected; } catch { }
+        if (!interactive) return;
+        Console.WriteLine();
+        Say("Passwords for the Lite EXE" + (several ? "s" : "") + " (the sealed build to hand out" + (several ? "; the same for every tool" : "") + ").", ConsoleColor.Cyan);
+        Console.WriteLine("Press Enter at the first prompt to build without a Lite EXE this time.");
+        while (true)
+        {
+            string user = ReadSecret("  User password  : ");
+            if (user.Length == 0) { Say("  No Lite EXE this time.", ConsoleColor.Yellow); return; }
+            if (ReadSecret("  User again     : ") != user) { Say("  The two user passwords differ - try again.", ConsoleColor.Yellow); continue; }
+            string admin = ReadSecret("  Admin password : ");
+            if (admin.Length == 0) { Say("  The admin password is required.", ConsoleColor.Yellow); continue; }
+            if (ReadSecret("  Admin again    : ") != admin) { Say("  The two admin passwords differ - try again.", ConsoleColor.Yellow); continue; }
+            if (admin == user) { Say("  Use different user and admin passwords.", ConsoleColor.Yellow); continue; }
+            LiteUser = user; LiteAdmin = admin; return;
+        }
+    }
+
+    static string ReadSecret(string prompt)
+    {
+        Console.Write(prompt);
+        var sb = new StringBuilder();
+        while (true)
+        {
+            var k = Console.ReadKey(true);
+            if (k.Key == ConsoleKey.Enter) { Console.WriteLine(); return sb.ToString(); }
+            if (k.Key == ConsoleKey.Backspace) { if (sb.Length > 0) { sb.Length--; Console.Write("\b \b"); } continue; }
+            if (k.KeyChar != '\0' && !char.IsControl(k.KeyChar)) { sb.Append(k.KeyChar); Console.Write('*'); }
+        }
+    }
+
+    // -All: every project in the folder (a folder with Source\AppHost.cs), one after another.
+    static int RunAll(string folder, bool buildLite)
+    {
+        if (!Directory.Exists(folder)) { Fail("Not found: " + folder); return 1; }
+        var failed = new List<string>(); int ok = 0;
+        foreach (var d in Directory.GetDirectories(folder).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!File.Exists(Path.Combine(d, "Source", "AppHost.cs")) && !File.Exists(Path.Combine(d, "AppHost.cs"))) continue;
+            string name = Path.GetFileName(d);
+            Console.WriteLine();
+            Say("==================== " + name + " ====================", ConsoleColor.White);
+            int rc;
+            try { rc = Run(d, null, buildLite); }
+            catch (Exception ex) { Fail(ex.Message); rc = 1; }
+            if (rc == 0) ok++; else failed.Add(name);
+        }
+        Console.WriteLine();
+        Say("===================================================", ConsoleColor.White);
+        if (failed.Count == 0) Say("All " + ok + " tools built.", ConsoleColor.Green);
+        else
+        {
+            Say("Built: " + ok + "    FAILED: " + string.Join(", ", failed.ToArray()), ConsoleColor.Red);
+            Say("Scroll up for the errors. Is that tool still running? (A running EXE cannot be replaced.)", ConsoleColor.Yellow);
+        }
+        return failed.Count == 0 ? 0 : 1;
+    }
+
     static int Run(string start, string output, bool buildLite)
     {
         string root;
@@ -128,7 +210,7 @@ static class BuildApp
 
         string appName, exeName, dataFolder;
         ReadIdentity(root, sourceCs, out appName, out exeName, out dataFolder);
-        if (string.IsNullOrEmpty(output)) output = Path.Combine(project, exeName + ".exe");
+        if (string.IsNullOrEmpty(output)) output = Path.Combine(project, exeName + "Dev.exe");
         output = Path.GetFullPath(output);
 
         Console.WriteLine();
@@ -257,28 +339,34 @@ static class BuildApp
             Say("Build complete: v" + version, ConsoleColor.Green);
             Console.WriteLine("  Output : " + output);
             Console.WriteLine("  Size   : " + Math.Round(new FileInfo(output).Length / 1024.0, 1) + " KB");
-            Say("This is a DEVELOPER build (embedded source + full tooling). Do NOT distribute it.", ConsoleColor.Cyan);
-            Say("Use its Build Sealed button for the distributable with real user/admin passwords.", ConsoleColor.Cyan);
+            Say("This is the DEVELOPER build (embedded source + full tooling, no password). Do NOT hand it out.", ConsoleColor.Cyan);
+            Say("Hand out " + exeName + "Lite.exe, the sealed build (made next, or with the Build Lite button).", ConsoleColor.Cyan);
         }
         finally { try { Directory.Delete(temp, true); } catch { } }
 
         // ---- the Lite EXE, built by the developer EXE itself (same code as its Build Lite button) ----
         if (!buildLite) return 0;
         Console.WriteLine();
-        Say("Building " + exeName + "Lite.exe (sealed test build)...", ConsoleColor.Cyan);
+        if (string.IsNullOrEmpty(LiteUser) || string.IsNullOrEmpty(LiteAdmin))
+        {
+            Say("No Lite EXE: no passwords given (Build Lite in the developer EXE, or run Build-App.cmd and type them).", ConsoleColor.Yellow);
+            return 0;
+        }
+        Say("Building " + exeName + "Lite.exe (sealed build)...", ConsoleColor.Cyan);
         string lite = Path.Combine(Path.GetDirectoryName(output), exeName + "Lite.exe");
         string liteOut; int liteCode;
-        try { liteCode = RunProcess(output, "--build-lite \"" + lite + "\"", Path.GetDirectoryName(output), 600000, out liteOut); }
+        var env = new Dictionary<string, string> { { EnvUser, LiteUser }, { EnvAdmin, LiteAdmin } };
+        try { liteCode = RunProcess(output, "--build-lite \"" + lite + "\"", Path.GetDirectoryName(output), 600000, out liteOut, env); }
         catch (Exception ex) { liteCode = -1; liteOut = ex.Message; }
         if (liteCode == 0 && File.Exists(lite))
         {
             Say("  " + lite, ConsoleColor.Green);
-            Console.WriteLine("  Passwords: admin 'a', user 'u' (testing only).");
+            Console.WriteLine("  Sealed: give users the USER password; keep the ADMIN password private.");
             return 0;
         }
         Say(exeName + "Lite.exe was not built (exit " + liteCode + "):", ConsoleColor.Yellow);
         if (liteOut.Trim().Length > 0) Console.WriteLine(liteOut.Trim());
-        Say("The developer EXE builds it on its first start, or use its Build Lite button.", ConsoleColor.Yellow);
+        Say("Use the developer EXE's Build Lite button to try again.", ConsoleColor.Yellow);
         return 0;   // the developer build itself succeeded
     }
 
@@ -378,11 +466,17 @@ static class BuildApp
     // pipe never blocks it). Returns the exit code.
     static int RunProcess(string exe, string arguments, string workDir, int timeoutMs, out string output)
     {
+        return RunProcess(exe, arguments, workDir, timeoutMs, out output, null);
+    }
+
+    static int RunProcess(string exe, string arguments, string workDir, int timeoutMs, out string output, Dictionary<string, string> env)
+    {
         var psi = new ProcessStartInfo(exe, arguments)
         {
             UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = workDir,
             RedirectStandardOutput = true, RedirectStandardError = true
         };
+        if (env != null) foreach (var kv in env) psi.EnvironmentVariables[kv.Key] = kv.Value;   // the child only
         var buf = new StringBuilder(); var gate = new object();
         using (var p = new Process { StartInfo = psi })
         {

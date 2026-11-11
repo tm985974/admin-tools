@@ -47,11 +47,10 @@ $script:EngineToolTips = [ordered]@{
     # developer buttons (developer build only)
     'Update'          = 'Developer build: apply an update - a zip or folder of changed source files. Shows the changes first, then recompiles this EXE and restarts it (the previous EXE is archived).'
     'Update Template' = 'Developer build: move this project''s engine files to a newer AppTemplate version (pick the template''s Archive\Zip zip). Project files are not touched.'
-    'Build Sealed'    = 'Developer build: make the distributable EXE. Asks for a user and an admin password; the modules are encrypted with them and the source is left out.'
-    'Build Lite'      = 'Developer build: rebuild <ExeName>Lite.exe now - a sealed test build (admin password "a", user password "u") that shares this build''s settings and logs.'
+    'Build Lite'      = 'Developer build: make <ExeName>Lite.exe, the sealed build to hand out. Asks for a user and an admin password; the modules are encrypted with them and the source is left out.'
     'Extract'         = 'Developer build: write the full source of this build (plus Config\FunctionMap.txt and Config\Environment.txt) to AppData\Extract.'
     'Version History' = 'Show every version of this app with its CHANGELOG notes.'
-    'Open'            = 'Open a folder: the app folder (Archive, Update, Lite EXE), the Source folder, the Logs folder in use, or AppData (Settings, Extract, Build Sealed output).'
+    'Open'            = 'Open a folder: the app folder (Archive, Update, Lite EXE), the Source folder, the Logs folder in use, or AppData (Settings, Extract).'
 
     # Environment tab (template)
     'Environment'                                              = 'Pick, create and edit environments (one per domain / site). Editing needs the admin password.'

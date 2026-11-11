@@ -81,7 +81,7 @@ function New-OverviewTab {
     Add-Bullet 'Update folder beside the EXE - drop update zips there; Update and Update Template open it.'
     Add-Bullet 'Update - apply a zip or a folder, preview the changes, recompile.'
     Add-Bullet 'Update Template - pick the template''s source zip: the engine files move to the newer template (checked and previewed first), project files stay.'
-    Add-Bullet 'Build Sealed - mint the distributable with user/admin passwords.'
+    Add-Bullet 'Build Lite - make <ExeName>Lite.exe, the sealed build to hand out (asks for the user and admin passwords).'
     Add-Bullet 'Build Lite - rebuild <ExeName>Lite.exe now (test passwords: admin a, user u).'
     Add-Bullet 'Extract - write the whole project out now (with FunctionMap.txt and Environment.txt) for hand-off.'
     Add-Bullet 'Open - the app folder (Archive, Update, Lite EXE), the Logs in use, or AppData (Settings, Extract).'

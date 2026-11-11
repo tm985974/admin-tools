@@ -2,11 +2,15 @@
 #
 # The logic behind the Tools, Developer and Update tabs. No UI here.
 #
-#   Get-TbFolders  -App            Projects / Repo / Self / Sealed folders
+#   Get-TbFolders  -App            Projects / Repo / Self folders
 #   Get-TbProjects -App            every tool in the projects folder, with versions and status
 #   Get-TbRunning  -Project $p     the tool's EXEs that are running now (names)
-#   Start-TbBuild  -App -Projects  run each tool's Build-App.cmd, one at a time, in the
-#                                  background (a WinForms timer follows it; output -> log)
+#   Start-TbBuild  -App -Projects [-LiteUser -LiteAdmin]
+#                                  run each tool's Build-App.cmd, one at a time, in the
+#                                  background (a WinForms timer follows it; output -> log).
+#                                  With the passwords, each build also makes the tool's
+#                                  <ExeName>Lite.exe (the sealed build) - the same for all.
+#   Show-TbLitePasswordDialog      asks once for those passwords (or: no Lite EXEs)
 #   Stop-TbBuild                   finish the tool being built, skip the rest
 #   Test-TbBuilding
 #   Register-TbView -Refresh {} / -Log { param($text) } / -BuildState { param($busy) }
@@ -34,7 +38,6 @@ function Get-TbFolders {
         Projects = $projects
         Repo     = $repo                                  # '' when the projects folder is not admin-tools\projects
         Self     = $self
-        Sealed   = ([string]$App.GetSetting('SealedFolder')).Trim().TrimEnd('\')
         IsGit    = [bool]($repo -and (Test-Path -LiteralPath (Join-Path $repo '.git')))
     }
 }
@@ -76,9 +79,8 @@ function Get-TbProjects {
         try { $id = [System.IO.File]::ReadAllText($idPath) | ConvertFrom-Json } catch { continue }
         $exeName = [string]$id.ExeName
         if (-not $exeName) { continue }
-        $dev  = Get-TbExeInfo (Join-Path $d.FullName ($exeName + '.exe'))
+        $dev  = Get-TbExeInfo (Join-Path $d.FullName ($exeName + 'Dev.exe'))      # template 1.1.2: <ExeName>Dev.exe
         $lite = Get-TbExeInfo (Join-Path $d.FullName ($exeName + 'Lite.exe'))
-        $sealed = Get-TbExeInfo $(if ($f.Sealed) { Join-Path $f.Sealed ($exeName + '.exe') } else { '' })
         $srcVer = Read-TbText (Join-Path $src 'VERSION.txt')
         $newest = $null
         try { $newest = (Get-ChildItem -LiteralPath $src -Recurse -File | Measure-Object -Property LastWriteTime -Maximum).Maximum } catch { }
@@ -87,9 +89,7 @@ function Get-TbProjects {
         if (-not $dev.Exists) { $status = 'Not built' }
         elseif ($srcVer -and $dev.Version -and $srcVer -ne $dev.Version) { $status = "Needs build (v$($dev.Version) -> v$srcVer)" }
         elseif ($newest -and $dev.Time -and $newest -gt $dev.Time.AddSeconds(5)) { $status = 'Source changed since build' }
-        elseif (-not $lite.Exists) { $status = 'Lite EXE missing' }
-
-        $launch = $(if ($sealed.Exists) { $sealed } elseif ($lite.Exists) { $lite } else { $null })
+        $liteState = $(if (-not $lite.Exists) { 'none' } elseif ($dev.Exists -and $lite.Version -ne $dev.Version) { 'older' } else { 'current' })
         [pscustomobject]@{
             Name          = $d.Name
             AppName       = $(if ($id.AppName) { [string]$id.AppName } else { $d.Name })
@@ -99,9 +99,7 @@ function Get-TbProjects {
             SourceVersion = $srcVer
             Dev           = $dev
             Lite          = $lite
-            Sealed        = $sealed
-            Launch        = $launch
-            LaunchKind    = $(if ($sealed.Exists) { 'Sealed' } elseif ($lite.Exists) { 'Lite (test)' } else { '' })
+            LiteState     = $liteState                     # none | older (than the Dev build) | current
             IsSelf        = ($d.FullName.TrimEnd('\') -eq $f.Self.TrimEnd('\'))
             Status        = $status
             NeedsBuild    = ($status -ne 'Up to date')
@@ -113,7 +111,7 @@ function Get-TbProjects {
 function Get-TbRunning {
     [CmdletBinding()]
     param([Parameter(Mandatory)] $Project)
-    $names = @($Project.ExeName, ($Project.ExeName + 'Lite'))
+    $names = @(($Project.ExeName + 'Dev'), ($Project.ExeName + 'Lite'), $Project.ExeName)   # (+ a pre-1.1.2 <ExeName>.exe)
     $hits = @(Get-Process -Name $names -ErrorAction SilentlyContinue | Where-Object {
         $p = ''; try { $p = [string]$_.Path } catch { }
         $p -and $p.StartsWith($Project.Folder, [System.StringComparison]::OrdinalIgnoreCase)
@@ -148,9 +146,15 @@ function Get-TbBuildArguments {
 # The command window text for building these tools.
 function Get-TbBuildCode {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $App, [Parameter(Mandatory)] $Projects)
+    param([Parameter(Mandatory)] $App, [Parameter(Mandatory)] $Projects, [switch]$Lite)
     $logDir = Join-Path ([string]$App.DataRoot) 'Logs'
     $lines = @('# One tool at a time; the output appears in the Developer tab''s log.')
+    if ($Lite) {
+        $lines += '# The Lite (sealed) passwords go to each build in these variables - never shown or logged:'
+        $lines += '$env:APPTEMPLATE_LITE_USER  = Read-Host -Prompt ''User password''    # typed in the dialog'
+        $lines += '$env:APPTEMPLATE_LITE_ADMIN = Read-Host -Prompt ''Admin password''   # typed in the dialog'
+    }
+    else { $lines += '# No Lite EXEs this time (no passwords): developer builds only.' }
     foreach ($p in @($Projects)) {
         $log = Join-Path $logDir ('Build_' + $p.Name + '.log')
         $lines += 'Start-Process -FilePath cmd.exe -ArgumentList ' + (Format-AppCommandValue (Get-TbBuildArguments -BuildCmd $p.BuildCmd -LogFile $log)) + ' -WindowStyle Hidden -Wait'
@@ -168,7 +172,7 @@ function Stop-TbBuild {
 
 function Start-TbBuild {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $App, [Parameter(Mandatory)] $Projects)
+    param([Parameter(Mandatory)] $App, [Parameter(Mandatory)] $Projects, [string]$LiteUser = '', [string]$LiteAdmin = '')
     if (Test-TbBuilding) { $App.SetStatus('A build is already running.', 'warn'); return }
     $queue = New-Object System.Collections.Generic.Queue[object]
     foreach ($p in @($Projects)) { $queue.Enqueue($p) }
@@ -179,6 +183,7 @@ function Start-TbBuild {
         App = $App; Queue = $queue; Current = $null; Proc = $null; LogFile = ''; Pos = [long]0
         Ok = 0; Failed = (New-Object System.Collections.ArrayList); Skipped = (New-Object System.Collections.ArrayList)
         Finished = $false; Timer = (New-Object System.Windows.Forms.Timer); LogDir = $logDir; Started = (Get-Date)
+        LiteUser = $LiteUser; LiteAdmin = $LiteAdmin      # kept only while the builds run
     }
     $script:TbBuild = $st
     $tickFn = ${function:Invoke-TbBuildTick}       # captured: closures do not see module functions reliably
@@ -192,7 +197,7 @@ function Start-TbBuild {
         }
     }.GetNewClosure())
     Set-TbBuildState $true
-    Write-TbLog ("==== Build started: {0} tool(s)" -f $queue.Count)
+    Write-TbLog ("==== Build started: {0} tool(s){1}" -f $queue.Count, $(if ($LiteUser) { ', with Lite (sealed) EXEs' } else { ', developer builds only (no Lite EXEs)' }))
     $App.Log('INFO', 'Build', "Build started: $(@($Projects | ForEach-Object { $_.Name }) -join ', ')")
     $st.Timer.Start()
 }
@@ -259,6 +264,10 @@ function Invoke-TbBuildTick {
             Write-TbLog "==== $($p.Name) (source v$($p.SourceVersion))"
             $psi = New-Object System.Diagnostics.ProcessStartInfo('cmd.exe', (Get-TbBuildArguments -BuildCmd $p.BuildCmd -LogFile $State.LogFile))
             $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.WorkingDirectory = $p.Folder
+            if ($State.LiteUser -and $State.LiteAdmin) {                     # for this build only (Build-App reads them)
+                $psi.EnvironmentVariables['APPTEMPLATE_LITE_USER']  = $State.LiteUser
+                $psi.EnvironmentVariables['APPTEMPLATE_LITE_ADMIN'] = $State.LiteAdmin
+            }
             try {
                 $State.Proc = [System.Diagnostics.Process]::Start($psi)
                 $State.Current = $p
@@ -269,6 +278,7 @@ function Invoke-TbBuildTick {
         # ---- all done ----
         if (-not $State.Proc -and $State.Queue.Count -eq 0) {
             $State.Finished = $true
+            $State.LiteUser = $null; $State.LiteAdmin = $null
             $secs = [int]((Get-Date) - $State.Started).TotalSeconds
             $sum = "Build finished in $secs s: $($State.Ok) built" +
                    $(if ($State.Failed.Count) { ", FAILED: $($State.Failed -join ', ')" } else { '' }) +
@@ -284,6 +294,62 @@ function Invoke-TbBuildTick {
         }
     }
     finally { if (-not $State.Finished) { $State.Timer.Start() } }
+}
+
+# ---- the Lite passwords: asked once for a whole Build ----
+# Returns @{ Lite = $true; User; Admin }, @{ Lite = $false } (developer builds
+# only), or $null (cancelled). Each password twice; user and admin must differ.
+function Show-TbLitePasswordDialog {
+    param([Parameter(Mandatory)] $App, [int]$Count = 1)
+    $T = $App.Theme
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = 'Build - Lite (sealed) EXE passwords'
+    $dlg.FormBorderStyle = 'FixedDialog'; $dlg.MinimizeBox = $false; $dlg.MaximizeBox = $false
+    $dlg.StartPosition = 'CenterParent'; $dlg.ClientSize = New-Object System.Drawing.Size(430, 330)
+    $dlg.Font = New-Object System.Drawing.Font($T.FontName, $T.FontSizePt); $dlg.BackColor = $T.Panel
+    $chk = New-Object System.Windows.Forms.CheckBox
+    $chk.Text = 'Also build the Lite EXEs (the sealed builds to hand out)'; $chk.Checked = $true; $chk.AutoSize = $true
+    $chk.Location = New-Object System.Drawing.Point(14, 14)
+    $mk = {
+        param([string]$Text, [int]$Y)
+        $l = New-Object System.Windows.Forms.Label; $l.Text = $Text; $l.AutoSize = $true; $l.Location = New-Object System.Drawing.Point(14, $Y)
+        $t = New-Object System.Windows.Forms.TextBox; $t.UseSystemPasswordChar = $true; $t.Width = 400; $t.Location = New-Object System.Drawing.Point(14, ($Y + 20))
+        $dlg.Controls.AddRange(@($l, $t)); return $t
+    }
+    $u1 = & $mk 'User password (user features):' 48
+    $u2 = & $mk 'User password again:' 98
+    $a1 = & $mk 'Admin password (all features):' 148
+    $a2 = & $mk 'Admin password again:' 198
+    $hint = New-Object System.Windows.Forms.Label
+    $hint.AutoSize = $false; $hint.Size = New-Object System.Drawing.Size(400, 34); $hint.Location = New-Object System.Drawing.Point(14, 248)
+    $hint.ForeColor = $T.Muted
+    $hint.Text = "The same passwords for all $Count tool(s). They are passed to each build and not kept afterwards."
+    $ok = $T.MakeButton('Build'); $ok.AutoSize = $false; $ok.Size = New-Object System.Drawing.Size(90, 30); $ok.Location = New-Object System.Drawing.Point(230, 290)
+    $cn = $T.MakeButton('Cancel'); $cn.AutoSize = $false; $cn.Size = New-Object System.Drawing.Size(90, 30); $cn.Location = New-Object System.Drawing.Point(326, 290)
+    $cn.DialogResult = 'Cancel'
+    $chk.Add_CheckedChanged({ foreach ($b in @($u1, $u2, $a1, $a2)) { $b.Enabled = $chk.Checked } }.GetNewClosure())
+    $ok.Add_Click({
+        $why = ''
+        if ($chk.Checked) {
+            if (-not $u1.Text -or -not $a1.Text) { $why = 'Both passwords are required (or untick the Lite EXEs).' }
+            elseif ($u1.Text -cne $u2.Text) { $why = 'The two user passwords differ.' }
+            elseif ($a1.Text -cne $a2.Text) { $why = 'The two admin passwords differ.' }
+            elseif ($u1.Text -ceq $a1.Text) { $why = 'Use different user and admin passwords.' }
+        }
+        if ($why) { [void][System.Windows.Forms.MessageBox]::Show($dlg, $why, 'Build', 'OK', 'Warning'); return }
+        $dlg.DialogResult = 'OK'
+    }.GetNewClosure())
+    $dlg.Controls.AddRange(@($chk, $hint, $ok, $cn))
+    $dlg.AcceptButton = $ok; $dlg.CancelButton = $cn
+    $owner = $null; try { $owner = [System.Windows.Forms.Form]::ActiveForm } catch { }
+    $r = $(if ($owner) { $dlg.ShowDialog($owner) } else { $dlg.ShowDialog() })
+    $res = $null
+    if ($r -eq 'OK') {
+        $res = $(if ($chk.Checked) { @{ Lite = $true; User = $u1.Text; Admin = $a1.Text } } else { @{ Lite = $false } })
+    }
+    foreach ($b in @($u1, $u2, $a1, $a2)) { $b.Text = '' }
+    $dlg.Dispose()
+    return $res
 }
 
 # ---------------------------------------------------------- update from zip ---

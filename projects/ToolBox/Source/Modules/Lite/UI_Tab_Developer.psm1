@@ -1,7 +1,8 @@
 # UI_Tab_Developer.psm1   (LITE TIER)
 #
 # Developer tab: every tool's source version against the developer EXE built from
-# it, and whether it needs a build. Build selected / Build all run each tool's
+# it (<ExeName>Dev.exe), and whether it needs a build. A build also makes the
+# tool's Lite EXE (the sealed build) with the passwords asked once for the batch. Build selected / Build all run each tool's
 # Build-App.cmd here, one after another (Services_ToolBox: Start-TbBuild), with
 # the output in the log pane - a local build works where downloaded EXEs are
 # blocked. A tool that is running is skipped (Windows cannot replace a running
@@ -21,6 +22,7 @@ function New-TbDeveloperTab {
     $startBuild  = ${function:Start-TbBuild}
     $stopBuild   = ${function:Stop-TbBuild}
     $isBuilding  = ${function:Test-TbBuilding}
+    $askPw       = ${function:Show-TbLitePasswordDialog}
     $confirm     = ${function:Confirm-AppCommand}
     $invoke      = ${function:Invoke-AppCommand}
     $fmt         = ${function:Format-AppCommandValue}
@@ -66,7 +68,7 @@ function New-TbDeveloperTab {
             foreach ($p in $all) {
                 $status = $p.Status + $(if ($p.IsSelf) { '   (this app: close it to rebuild)' } else { '' })
                 $i = $grid.Rows.Add($p.AppName, $p.SourceVersion, $p.Dev.Version, $status, (& $fmtTime $p.Dev.Time),
-                                    $(if ($p.Lite.Exists) { 'v' + $p.Lite.Version } else { '-' }))
+                                    $(switch ($p.LiteState) { 'current' { 'v' + $p.Lite.Version } 'older' { 'v' + $p.Lite.Version + ' (older)' } default { '-' } }))
                 $row = $grid.Rows[$i]; $row.Tag = $p
                 $row.Cells['Status'].Style.ForeColor = $(if ($p.NeedsBuild) { $needColor } else { $okColor })
                 if ($keep -contains $p.Name) { $row.Selected = $true }
@@ -91,11 +93,16 @@ function New-TbDeveloperTab {
         $list = @($Projects)
         if ($list.Count -eq 0) { $App.SetStatus('Select one or more tools first.', 'warn'); return }
         if (& $isBuilding) { $App.SetStatus('A build is already running.', 'warn'); return }
+        $pw = & $askPw -App $App -Count $list.Count
+        if (-not $pw) { return }
         $sum = "$What : run Build-App.cmd for $($list.Count) tool(s), one at a time: " + (($list | ForEach-Object { $_.AppName }) -join ', ') +
-               '. Each makes the developer EXE and its Lite EXE in the tool''s folder. Running tools are skipped.'
-        if (-not (& $confirm -App $App -Title $What -Kind Change -RunLabel 'Build' -Summary $sum -Code (& $buildCode -App $App -Projects $list))) { return }
+               $(if ($pw.Lite) { '. Each makes <Name>Dev.exe and <Name>Lite.exe (sealed, with the passwords you typed)' } else { '. Developer builds only (no Lite EXEs)' }) +
+               ' in the tool''s folder. Running tools are skipped.'
+        if (-not (& $confirm -App $App -Title $What -Kind Change -RunLabel 'Build' -Summary $sum -Code (& $buildCode -App $App -Projects $list -Lite:([bool]$pw.Lite)))) { return }
         $log.Clear()
-        & $startBuild -App $App -Projects $list
+        if ($pw.Lite) { & $startBuild -App $App -Projects $list -LiteUser $pw.User -LiteAdmin $pw.Admin }
+        else { & $startBuild -App $App -Projects $list }
+        $pw = $null
     }.GetNewClosure()
 
     $btnBuildSel.Add_Click({ & $build (& $selection -Grid $grid) 'Build selected' }.GetNewClosure())
@@ -106,7 +113,7 @@ function New-TbDeveloperTab {
         if (-not $p) { $App.SetStatus('Select a tool first.', 'warn'); return }
         if (-not $p.Dev.Exists) { $App.SetStatus("$($p.AppName) has no developer EXE yet - build it first.", 'warn'); return }
         $r = & $invoke -App $App -Title "Launch $($p.AppName) (developer)" -Kind Read -RunLabel 'Launch' `
-            -Summary "Start the developer build of $($p.AppName) (v$($p.Dev.Version)): Update, Build Sealed, Extract ..." `
+            -Summary "Start the developer build of $($p.AppName) (v$($p.Dev.Version)): Update, Build Lite, Extract ..." `
             -Code ('Start-Process -FilePath ' + (& $fmt $p.Dev.Path) + ' -WorkingDirectory ' + (& $fmt $p.Folder))
         if ($r.Errors.Count) { $App.SetStatus("Not started: $($r.Errors[0])", 'err') }
     }.GetNewClosure())

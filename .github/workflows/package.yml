@@ -1,5 +1,5 @@
-# Builds every project's developer EXE and its Lite test EXE and keeps them as a
-# downloadable artifact for 3 days (Actions > Package > the run > Artifacts).
+# Builds every project's developer EXE (<Name>Dev.exe) and tests its Lite (sealed)
+# build; the Dev EXEs are kept as a downloadable artifact for 3 days (Actions > Package > the run > Artifacts).
 # Run by hand (Actions > Package > Run workflow), or by a push that changes this file.
 # The developer EXEs contain the source: the repository is private, and the artifact
 # expires. Never hand a developer or Lite EXE to users - use Build Sealed.
@@ -19,18 +19,23 @@ jobs:
       - name: Build developer + Lite EXEs
         shell: pwsh
         run: |
+          # Throwaway Lite passwords: every Lite (sealed) build is tested, but only the
+          # Dev EXEs are kept (a Lite EXE with passwords nobody knows is no use).
+          $env:APPTEMPLATE_LITE_USER  = [guid]::NewGuid().ToString('N')
+          $env:APPTEMPLATE_LITE_ADMIN = [guid]::NewGuid().ToString('N')
           $out = Join-Path $env:RUNNER_TEMP 'exe'
           New-Item -ItemType Directory -Path $out -Force | Out-Null
           $failed = @()
           $folders = @(Get-Item template) + @(Get-ChildItem projects -Directory | Sort-Object Name)
           foreach ($f in $folders) {
               $id = Get-Content (Join-Path $f.FullName 'Source/AppIdentity.json') -Raw | ConvertFrom-Json
-              $exe = Join-Path $out ($id.ExeName + '.exe')
-              Write-Host "==== $($f.Name) -> $($id.ExeName).exe"
+              $exe = Join-Path $out ($id.ExeName + 'Dev.exe')
+              Write-Host "==== $($f.Name) -> $($id.ExeName)Dev.exe"
               & cmd.exe /c "`"$(Join-Path $f.FullName 'Build-App.cmd')`" -NoPause -Output `"$exe`""
               $lite = Join-Path $out ($id.ExeName + 'Lite.exe')
-              if (-not (Test-Path $exe))  { $failed += "$($id.ExeName).exe" }
+              if (-not (Test-Path $exe))  { $failed += "$($id.ExeName)Dev.exe" }
               if (-not (Test-Path $lite)) { $failed += "$($id.ExeName)Lite.exe" }
+              else { Remove-Item $lite }                  # tested, not kept (throwaway passwords)
           }
           Get-ChildItem $out -Filter *.exe | Format-Table Name, Length | Out-String | Write-Host
           if ($failed.Count) { throw "Not built: $($failed -join ', ')" }

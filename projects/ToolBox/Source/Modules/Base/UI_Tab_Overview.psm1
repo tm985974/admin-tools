@@ -37,21 +37,21 @@ function New-OverviewTab {
     }
 
     Add-Section 'The tabs'
-    Add-Bullet 'Tools - every tool in the projects folder. Launch runs its sealed EXE when the environment''s Sealed EXE folder has one, otherwise its Lite (test) EXE.'
-    Add-Bullet 'Developer - each tool''s source version against the EXE built from it. Build selected / Build all run each tool''s Build-App.cmd here, one at a time, with the output below the list.'
+    Add-Bullet 'Tools - every tool''s Lite EXE: the sealed build, which asks for the user or admin password. Launch (or double-click) starts it.'
+    Add-Bullet 'Developer - each tool''s source version against its developer EXE (<Name>Dev.exe). Build selected / Build all run each tool''s Build-App.cmd here, one at a time, with the output below the list. The Lite passwords are asked once for the whole batch.'
     Add-Bullet 'Update - Open zip... (a zip of the repository downloaded from GitHub) shows which tools change; Apply update replaces their source and builds them. Pull (git) appears when this folder is a git clone.'
-    Add-Bullet 'Environment - Projects folder (blank = the folder ToolBox sits in) and Sealed EXE folder.'
+    Add-Bullet 'Environment - Projects folder (blank = the folder ToolBox sits in).'
 
     Add-Section 'Updating the tools'
     Add-Bullet 'On GitHub: open the repository, choose the branch, Code > Download ZIP.'
-    Add-Bullet 'Here: Update > Open zip... > check the list > Apply update. With "Build all after the update" ticked, the Developer tab builds every tool.'
+    Add-Bullet 'Here: Update > Open zip... > check the list > Apply update. With "Build all after the update" ticked, it asks for the Lite passwords once and builds every tool.'
     Add-Bullet 'Close the tools first - a running EXE cannot be replaced, so that tool is skipped (build it again afterwards).'
     Add-Bullet 'ToolBox cannot rebuild itself while it runs: close it and double-click its Build-App.cmd (or Build-All.cmd at the top of the repository, which builds every tool).'
     Add-Bullet 'The replaced Source folders are kept in <repository>\_Backup\Update_<time>.'
 
     Add-Section 'Good to know'
     Add-Bullet 'Building on this PC makes the EXEs locally, so they run where downloaded EXEs are blocked.'
-    Add-Bullet 'Lite EXEs are sealed TEST builds (admin password "a", user password "u") - for your own use. For others, make a sealed EXE with Build Sealed in the tool''s developer EXE and keep it in the Sealed EXE folder.'
+    Add-Bullet 'Each tool has two EXEs: <Name>Dev.exe (developer build, no password - never hand it out: it holds the source) and <Name>Lite.exe (sealed: hand this one out; give users the user password).'
     Add-Bullet 'Every launch, build and update shows its exact command first (Environment > General > Commands decides when).'
     Add-Bullet 'Saved environments and logs of each tool live in its AppData folder, so a rebuild or update keeps them.'
 

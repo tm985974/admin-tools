@@ -328,11 +328,11 @@ namespace AppTemplate
     // =====================================================================
     //  Project identity -- AppIdentity.json (project-owned, source root)
     //     { "AppName": "...", "ExeName": "...", "AppDataFolder": "..." }
-    //  AppName = window title, dialogs, EXE product name; ExeName = <ExeName>.exe
+    //  AppName = window title, dialogs, EXE product name; ExeName = <ExeName>Dev.exe / <ExeName>Lite.exe
     //  and the archive / Extract names; AppDataFolder = %LOCALAPPDATA%\<folder>.
     //  This file has no project-specific lines, so it is byte-identical in
     //  every project. Read from the plain AppIdentity.json resource (builds made
-    //  by Build-App.ps1, Update, Build Sealed since template 1.0.17), else from
+    //  by Build-App.ps1, Update, Build Lite since template 1.0.17), else from
     //  the developer package (a build compiled by an older Update engine).
     // =====================================================================
     static class ProjectIdentity
@@ -605,7 +605,6 @@ namespace AppTemplate
             // also on the Session.log start line.
             _devRow.Controls.Add(StyledButton("Update",          delegate { StartUpdate(); }));
             _devRow.Controls.Add(StyledButton("Update Template", delegate { StartTemplateUpdate(); }));
-            _devRow.Controls.Add(StyledButton("Build Sealed",    delegate { BuildSealed(); }));
             _devRow.Controls.Add(StyledButton("Build Lite",      delegate { BuildLiteNow(); }));
             _devRow.Controls.Add(StyledButton("Extract",         delegate { ExtractEmbedded(); }));
             _devRow.Controls.Add(StyledButton("Version History", delegate { ShowVersionHistory(); }));
@@ -766,7 +765,7 @@ namespace AppTemplate
         }
 
         // Project folder layout (template 1.1):
-        //   <ExeName>.exe, <ExeName>Lite.exe, Build-App.cmd     the only files at the top
+        //   <ExeName>Dev.exe, <ExeName>Lite.exe, Build-App.cmd  the only files at the top
         //   Source\    every source file (package paths: AppHost.cs, Config/..., Modules/...)
         //   Build\     Build-App.exe          Archive\, Update\  as before
         // A pre-1.1 flat folder (source beside the EXE) still works: no Source\ folder.
@@ -779,7 +778,7 @@ namespace AppTemplate
 
         // Write the current environment definitions to a loose Config\Environments.json
         // in the source folder (SourceDir; developer build only). The developer build reads this loose
-        // file first, so edits are live; Build-App.ps1 / Build Sealed then embed it.
+        // file first, so edits are live; Build-App.ps1 / Build Lite then embed it.
         internal bool SaveLooseDefaults()
         {
             if (_tier != "Developer") return false;
@@ -1200,7 +1199,7 @@ namespace AppTemplate
         }
 
         // Overlay any loose Config\*.json in the source folder (SourceDir) onto a file set.
-        // Lets the developer build read live-edited defaults, and Build Sealed /
+        // Lets the developer build read live-edited defaults, and Build Lite /
         // Extract embed them. A distributed sealed EXE has no loose Config.
         static void OverlayLooseConfig(Dictionary<string, string> files)
         {
@@ -1293,20 +1292,19 @@ namespace AppTemplate
             File.Move(tmp, zipPath);
         }
 
-        // ---------------- post-update archive + Lite build (developer build) ----------------
+        // ---------------- post-update archive (developer build) ----------------
         // Every start, in the background, a few seconds after the window opens:
         //   Archive\Exe\<ExeName>_v<ver>_t<template>.exe   copy of this developer EXE
         //   Archive\Zip\<ExeName>_v<ver>_t<template>.zip   full source (as Extract)
-        //   <ExeName>Lite.exe beside this EXE               sealed test build, DevLite passwords
         //   Build\Build-App.exe                             the builder, compiled from Build-App.cs
+        // (<ExeName>Lite.exe, the sealed build, is no longer made here: it needs the
+        //  user / admin passwords - Build Lite, Build-App.cmd or ToolBox ask for them.)
         //                                                  (beside this EXE in a pre-1.1 flat folder)
         // Work happens only when this EXE differs from the last run (i.e. after an
         // Update or a Build-App rebuild); Build-App.exe only when Build-App.cs
         // changed or the file is missing. Same version + template = same file name,
         // so a rebuild of the same version overwrites; a new version or template adds
         // a file. State: Archive\archive.state.
-        const string DevLiteAdminPassword = "a";   // developer test passwords for <ExeName>Lite.exe
-        const string DevLiteUserPassword  = "u";   // (a real distributable: Build Sealed, with real passwords)
 
         static string FileSha256(string path)
         {
@@ -1366,48 +1364,36 @@ namespace AppTemplate
             var st = ReadState(statePath);
             string hash = FileSha256(exe), name = ArchiveBaseName();
             string exeCopy = Path.Combine(exeDir, name + ".exe"), zipCopy = Path.Combine(zipDir, name + ".zip");
-            string lite = LitePath();
             string builderExe = BuilderExePath();
             string builderSrc = ReadBuilderSource();
             string builderHash = builderSrc == null ? null : NormalizedHash(BuilderResource, builderSrc);
             string val;
             bool exeDone  = st.TryGetValue("ExeHash", out val)  && val == hash && File.Exists(exeCopy);
             bool zipDone  = st.TryGetValue("ZipHash", out val)  && val == hash && File.Exists(zipCopy);
-            bool liteDone = st.TryGetValue("LiteHash", out val) && val == hash && File.Exists(lite);
             bool buildDone = builderSrc == null || (st.TryGetValue("BuilderHash", out val) && val == builderHash && File.Exists(builderExe));
-            if (exeDone && zipDone && liteDone && buildDone) { _ctx.Log("INFO", "Archive", "v" + _version + ": archive, " + ExeName + "Lite.exe and Build-App.exe are current."); return; }
+            if (exeDone && zipDone && buildDone) { _ctx.Log("INFO", "Archive", "v" + _version + ": archive and Build-App.exe are current."); return; }
 
             _ctx.Log("INFO", "Archive", "v" + _version + ": starting (exe " + (exeDone ? "done" : "to do") + ", zip " + (zipDone ? "done" : "to do") +
-                                        ", lite " + (liteDone ? "done" : "to do") + ", builder " + (buildDone ? "done" : "to do") + ").");
+                                        ", builder " + (buildDone ? "done" : "to do") + ").");
             var failed = new List<string>();
             var sw = Stopwatch.StartNew();
 
             if (!exeDone)
             {
-                ShowStatusMessage("Archiving v" + _version + " (1/4: EXE) - keep the app open ...", "info");
+                ShowStatusMessage("Archiving v" + _version + " (1/3: EXE) - keep the app open ...", "info");
                 try { File.Copy(exe, exeCopy, true); st["ExeHash"] = hash; WriteState(statePath, st); _ctx.Log("INFO", "Archive", "EXE -> " + exeCopy + " (" + sw.ElapsedMilliseconds + " ms)"); }
                 catch (Exception ex) { failed.Add("EXE copy"); _ctx.Log("WARN", "Archive", "EXE copy failed: " + ex.ToString()); }
             }
             if (!zipDone)
             {
-                ShowStatusMessage("Archiving v" + _version + " (2/4: source zip) - keep the app open ...", "info");
+                ShowStatusMessage("Archiving v" + _version + " (2/3: source zip) - keep the app open ...", "info");
                 sw.Restart();
                 try { WriteExtractZip(zipCopy, false); st["ZipHash"] = hash; WriteState(statePath, st); _ctx.Log("INFO", "Archive", "source -> " + zipCopy + " (" + sw.ElapsedMilliseconds + " ms)"); }
                 catch (Exception ex) { failed.Add("source zip"); _ctx.Log("WARN", "Archive", "source zip failed: " + ex.ToString()); }
             }
-            if (!liteDone)
-            {
-                ShowStatusMessage("Building " + ExeName + "Lite.exe (3/4) - keep the app open ...", "info");
-                sw.Restart();
-                string err;
-                try { err = BuildSealedTo(DevLiteUserPassword, DevLiteAdminPassword, lite, _version); }
-                catch (Exception ex) { err = ex.ToString(); }
-                if (err == null) { st["LiteHash"] = hash; WriteState(statePath, st); _ctx.Log("INFO", "Archive", ExeName + "Lite.exe -> " + lite + " (" + sw.ElapsedMilliseconds + " ms)"); }
-                else { failed.Add(ExeName + "Lite.exe"); _ctx.Log("WARN", "Archive", ExeName + "Lite.exe not built: " + err); }
-            }
             if (!buildDone)
             {
-                ShowStatusMessage("Building Build-App.exe (4/4) - keep the app open ...", "info");
+                ShowStatusMessage("Building Build-App.exe (3/3) - keep the app open ...", "info");
                 sw.Restart();
                 string err;
                 try { Directory.CreateDirectory(Path.GetDirectoryName(builderExe)); err = BuildBuilderTo(builderSrc, builderExe); }
@@ -1419,7 +1405,7 @@ namespace AppTemplate
             if (failed.Count > 0)
                 ShowStatusMessage("Not done: " + string.Join(", ", failed.ToArray()) + " (see Session.log) - retried on the next start.", "warn");
             else
-                ShowStatusMessage("Archived v" + _version + "; " + ExeName + "Lite.exe ready (admin '" + DevLiteAdminPassword + "', user '" + DevLiteUserPassword + "').", "ok");
+                ShowStatusMessage("Archived v" + _version + ". Build Lite makes " + ExeName + "Lite.exe, the sealed build to hand out.", "ok");
         }
 
         // ---- Open \u25BE : the folders a developer needs ----
@@ -1429,7 +1415,7 @@ namespace AppTemplate
             AddOpenItem(menu, "App folder  (Archive, Update, Lite EXE)", ExeDir());
             if (!SourceDir().Equals(ExeDir(), StringComparison.OrdinalIgnoreCase)) AddOpenItem(menu, "Source folder  (Config, Modules, VERSION, CHANGELOG)", SourceDir());
             AddOpenItem(menu, "Logs  (" + (_dataRootStatus == "Network" ? "shared" : "local") + ")", Path.Combine(_dataRoot ?? GetLocalAppDataRoot(), "Logs"));
-            AddOpenItem(menu, "AppData  (Settings, Extract, Build Sealed output)", GetLocalAppDataRoot());
+            AddOpenItem(menu, "AppData  (Settings, Extract)", GetLocalAppDataRoot());
             menu.Closed += delegate { BeginInvoke((MethodInvoker)delegate { menu.Dispose(); }); };
             if (anchor != null) menu.Show(anchor, new Point(0, anchor.Height));
             else menu.Show(Cursor.Position);
@@ -1525,16 +1511,20 @@ namespace AppTemplate
             finally { try { Directory.Delete(temp, true); } catch { } }
         }
 
-        // ---- Build Lite button: <ExeName>Lite.exe now, with the test passwords ----
+        // ---- Build Lite: <ExeName>Lite.exe beside this EXE - the SEALED build to hand
+        //      out (source left out, modules sealed per tier). Asks for the user and
+        //      admin passwords every time (template 1.1.2: no built-in test passwords).
         void BuildLiteNow()
         {
-            if (_postWorkRunning) { MessageBox.Show(this, "The background archive / Lite build is still running. Try again in a moment.", "Build Lite"); return; }
+            if (_postWorkRunning) { MessageBox.Show(this, "The background archive is still running. Try again in a moment.", "Build Lite"); return; }
+            string userPw, adminPw;
+            if (!PromptTwoPasswords(out userPw, out adminPw)) return;
             string lite = LitePath();
             Cursor = Cursors.WaitCursor;
             ShowStatusMessage("Building " + ExeName + "Lite.exe ...", "info");
             string err;
             var sw = Stopwatch.StartNew();
-            try { err = BuildSealedTo(DevLiteUserPassword, DevLiteAdminPassword, lite, _version); }
+            try { err = BuildSealedTo(userPw, adminPw, lite, _version); }
             catch (Exception ex) { err = ex.ToString(); }
             finally { Cursor = Cursors.Default; }
             if (err != null)
@@ -1546,9 +1536,9 @@ namespace AppTemplate
             }
             RecordLiteBuilt();
             _ctx.Log("INFO", "BuildLite", ExeName + "Lite.exe -> " + lite + " (" + sw.ElapsedMilliseconds + " ms)");
-            ShowStatusMessage(ExeName + "Lite.exe built (admin '" + DevLiteAdminPassword + "', user '" + DevLiteUserPassword + "').", "ok");
-            MessageBox.Show(this, "Built " + lite + "\n\nSealed TEST build: admin password '" + DevLiteAdminPassword + "', user password '" +
-                DevLiteUserPassword + "'.\nFor a distributable use Build Sealed with real passwords.", "Build Lite", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            ShowStatusMessage(ExeName + "Lite.exe built - the sealed build to hand out.", "ok");
+            MessageBox.Show(this, "Built " + lite + "\n\nSource left out; modules sealed per tier.\nGive users the USER password; keep the ADMIN password private.",
+                "Build Lite", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         // The Lite EXE now matches this developer EXE: the next start does not rebuild it.
@@ -1565,18 +1555,23 @@ namespace AppTemplate
             catch { }
         }
 
-        // ---- headless:  <ExeName>.exe --build-lite ["out.exe"] ----
-        // Used by Build-App.exe right after it compiles the developer EXE, so a
-        // fresh build comes with its Lite EXE. No window, no launcher; exit code 0 =
-        // built, errors on stderr.
+        // ---- headless:  <ExeName>Dev.exe --build-lite ["out.exe"] ----
+        // Used by Build-App.exe right after it compiles the developer EXE. The user /
+        // admin passwords come in the environment variables APPTEMPLATE_LITE_USER /
+        // APPTEMPLATE_LITE_ADMIN, which Build-App.exe sets for this process only.
+        // No window, no launcher; exit code 0 = built, errors on stderr.
         internal static int HeadlessBuildLite(string outExe)
         {
             try
             {
+                string userPw = Environment.GetEnvironmentVariable("APPTEMPLATE_LITE_USER");
+                string adminPw = Environment.GetEnvironmentVariable("APPTEMPLATE_LITE_ADMIN");
+                if (string.IsNullOrEmpty(userPw) || string.IsNullOrEmpty(adminPw)) { WriteStdErr("No Lite passwords given (APPTEMPLATE_LITE_USER / APPTEMPLATE_LITE_ADMIN)."); return 3; }
+                if (userPw == adminPw) { WriteStdErr("The user and admin passwords must differ."); return 3; }
                 EnsureUpdateFolder(null);
                 if (string.IsNullOrEmpty(outExe)) outExe = LitePath();
                 string version = VersionOf(LoadPackage());
-                string err = BuildSealedTo(DevLiteUserPassword, DevLiteAdminPassword, outExe, version);
+                string err = BuildSealedTo(userPw, adminPw, outExe, version);
                 if (err != null) { WriteStdErr(err); return 1; }
                 if (string.Equals(Path.GetFullPath(outExe), Path.GetFullPath(LitePath()), StringComparison.OrdinalIgnoreCase)) RecordLiteBuilt();
                 return 0;
@@ -2186,28 +2181,9 @@ namespace AppTemplate
             Application.Exit();
         }
 
-        // ---- Build Sealed: single distributable (two password-keyed bundles) ----
-        void BuildSealed()
-        {
-            string userPw, adminPw;
-            if (!PromptTwoPasswords(out userPw, out adminPw)) return;
-            if (userPw == adminPw) { MessageBox.Show(this, "Use different user and admin passwords.", "Build Sealed"); return; }
-            string outDir = Path.Combine(GetLocalAppDataRoot(), "Extract"); Directory.CreateDirectory(outDir);
-            string outExe = Path.Combine(outDir, ExeName + ".exe");
-            Cursor = Cursors.WaitCursor;
-            string err;
-            try { err = BuildSealedTo(userPw, adminPw, outExe, _version); }
-            finally { Cursor = Cursors.Default; }
-            if (err != null) { MessageBox.Show(this, "Sealed build failed:\n\n" + err, "Build Sealed", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
-            _ctx.Log("INFO", "BuildSealed", "Sealed distributable written -> " + outExe);
-            MessageBox.Show(this, "Sealed distributable written to:\n" + outExe +
-                "\n\nSource omitted; modules sealed per tier.\nGive operators the USER password; keep the ADMIN password private.",
-                "Build Sealed", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
         // Compile a sealed build of the current package to outExe. Returns null on
-        // success, else the error. No UI - also used by Build Lite, the post-update
-        // Lite build and the headless --build-lite mode. version = the EXE's version.
+        // success, else the error. No UI - used by Build Lite and the headless
+        // --build-lite mode. version = the EXE's version.
         static string BuildSealedTo(string userPw, string adminPw, string outExe, string version)
         {
             EnsureUpdateFolder(null);
@@ -2259,20 +2235,33 @@ namespace AppTemplate
         bool PromptTwoPasswords(out string userPw, out string adminPw)
         {
             userPw = null; adminPw = null;
-            using (var dlg = new Form { Text = "Build Sealed -- set tier passwords", Size = new Size(384, 212),
+            using (var dlg = new Form { Text = "Build Lite -- passwords for the sealed build", Size = new Size(400, 330),
                        FormBorderStyle = FormBorderStyle.FixedDialog, StartPosition = FormStartPosition.CenterParent,
                        MinimizeBox = false, MaximizeBox = false, Font = Font, BackColor = _theme.Panel })
             {
-                var l1 = new Label { Text = "User password (lite):", AutoSize = true, Location = new Point(14, 16) };
-                var t1 = new TextBox { UseSystemPasswordChar = true, Location = new Point(14, 36), Width = 340 };
-                var l2 = new Label { Text = "Admin password (full):", AutoSize = true, Location = new Point(14, 74) };
-                var t2 = new TextBox { UseSystemPasswordChar = true, Location = new Point(14, 94), Width = 340 };
-                var ok = _theme.MakeButton("Build"); ok.AutoSize = false; ok.Size = new Size(80, 28); ok.Location = new Point(190, 136); ok.DialogResult = DialogResult.OK;
-                var cancel = _theme.MakeButton("Cancel"); cancel.AutoSize = false; cancel.Size = new Size(80, 28); cancel.Location = new Point(276, 136); cancel.DialogResult = DialogResult.Cancel;
-                dlg.Controls.AddRange(new Control[] { l1, t1, l2, t2, ok, cancel });
+                var l1 = new Label { Text = "User password (user features):", AutoSize = true, Location = new Point(14, 14) };
+                var t1 = new TextBox { UseSystemPasswordChar = true, Location = new Point(14, 34), Width = 356 };
+                var t1b = new TextBox { UseSystemPasswordChar = true, Location = new Point(14, 62), Width = 356 };
+                var l2 = new Label { Text = "Admin password (all features):", AutoSize = true, Location = new Point(14, 100) };
+                var t2 = new TextBox { UseSystemPasswordChar = true, Location = new Point(14, 120), Width = 356 };
+                var t2b = new TextBox { UseSystemPasswordChar = true, Location = new Point(14, 148), Width = 356 };
+                var hint = new Label { Text = "Each password twice. Give users the user password; keep the admin password private.",
+                                       AutoSize = false, Size = new Size(356, 36), Location = new Point(14, 184), ForeColor = _theme.Muted };
+                var ok = _theme.MakeButton("Build"); ok.AutoSize = false; ok.Size = new Size(84, 28); ok.Location = new Point(196, 240);
+                var cancel = _theme.MakeButton("Cancel"); cancel.AutoSize = false; cancel.Size = new Size(84, 28); cancel.Location = new Point(286, 240); cancel.DialogResult = DialogResult.Cancel;
+                ok.Click += delegate
+                {
+                    string why = null;
+                    if (t1.Text.Length == 0 || t2.Text.Length == 0) why = "Both passwords are required.";
+                    else if (t1.Text != t1b.Text) why = "The two user passwords differ.";
+                    else if (t2.Text != t2b.Text) why = "The two admin passwords differ.";
+                    else if (t1.Text == t2.Text) why = "Use different user and admin passwords.";
+                    if (why != null) { MessageBox.Show(dlg, why, "Build Lite"); return; }
+                    dlg.DialogResult = DialogResult.OK;
+                };
+                dlg.Controls.AddRange(new Control[] { l1, t1, t1b, l2, t2, t2b, hint, ok, cancel });
                 dlg.AcceptButton = ok; dlg.CancelButton = cancel;
                 if (dlg.ShowDialog(this) != DialogResult.OK) return false;
-                if (string.IsNullOrEmpty(t1.Text) || string.IsNullOrEmpty(t2.Text)) { MessageBox.Show(this, "Both passwords are required.", "Build Sealed"); return false; }
                 userPw = t1.Text; adminPw = t2.Text; return true;
             }
         }
@@ -2476,7 +2465,7 @@ namespace AppTemplate
             new MainForm(run.Item1, run.Item2).RunMessageLoop();
             return 0;
 #else
-            // Headless helper for Build-App.exe:  <ExeName>.exe --build-lite ["<out.exe>"]
+            // Headless helper for Build-App.exe:  <ExeName>Dev.exe --build-lite ["<out.exe>"]
             if (args != null && args.Length > 0 && string.Equals(args[0], "--build-lite", StringComparison.OrdinalIgnoreCase))
                 return MainForm.HeadlessBuildLite(args.Length > 1 ? args[1] : null);
 

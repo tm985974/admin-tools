@@ -17,7 +17,7 @@
 #
 # Per machine on purpose: the store decides the data root, so it cannot live on
 # the shared path. In a DEVELOPER build every save also writes the set to
-# Config\Environments.json beside the EXE, so the next Update / Build Sealed
+# Config\Environments.json beside the EXE, so the next Update / Build Lite
 # embeds it and a new machine starts with the same environments.
 #
 #   Read-AppEnvironmentStore    -App           -> @{ ActiveDefault; Environments (ArrayList of [ordered]); Removed (ArrayList); Extra ([ordered]); Exists }
@@ -128,7 +128,7 @@ function Write-AppEnvironmentStore {
     Move-Item -LiteralPath $tmp -Destination $path -Force
     $script:EnvStoreCache = @{ Path = ''; Stamp = [datetime]::MinValue; Json = $null }
 
-    # Developer build: stage the set for embedding (next Update / Build Sealed).
+    # Developer build: stage the set for embedding (next Update / Build Lite).
     if ([string]$App.Tier -eq 'Developer' -and $App.ExePath) {
         try {
             $cfg = Join-Path (Split-Path -Parent ([string]$App.ExePath)) 'Config'

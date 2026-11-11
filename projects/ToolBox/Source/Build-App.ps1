@@ -15,9 +15,10 @@
 
     Build-App.exe:
       - makes the Update folder (default place for update zips) if missing
-      - packs the source and compiles the DEVELOPER build  <ExeName>.exe
+      - packs the source and compiles the DEVELOPER build  <ExeName>Dev.exe
         (names from AppIdentity.json, version from VERSION.txt)
-      - builds <ExeName>Lite.exe, the sealed TEST build (admin "a", user "u")
+      - builds <ExeName>Lite.exe, the sealed build to hand out (asks for the
+        user / admin passwords; blank = no Lite EXE this time)
 
     You only need a build for the first build on a machine or for recovery.
     Every other change goes through the developer EXE: Update (an update zip) or
@@ -31,7 +32,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$OutputExe = '',   # defaults to <project>\<ExeName>.exe
+    [string]$OutputExe = '',   # defaults to <project>\<ExeName>Dev.exe
     [switch]$NoLite            # skip <ExeName>Lite.exe
 )
 
