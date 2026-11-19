@@ -38,7 +38,8 @@ function New-OverviewTab {
 
     Add-Section 'What it does'
     Add-Bullet 'Finds folders that are copies of each other across all your drives (only the content counts, not names or dates).'
-    Add-Bullet 'Keeps one copy in X:\_Clean and moves the others to X:\_Duplicates, so you can check them before anything is deleted.'
+    Add-Bullet 'Keeps one copy in X:\_Clean\<Name>\<Name>_n and moves the others to X:\_Duplicates\<Name>\<Name>_n\<Name>_n (k), so you can check them before anything is deleted.'
+    Add-Bullet 'Folders with the same name (all your Desktop folders, say) end up side by side: _Clean\Desktop\Desktop_1, Desktop_2 ... A _sources.txt in each <Name> folder says where each one came from.'
     Add-Bullet 'Remembers every drive in one hash database, so you can scan one drive, unplug it, and plug in the next.'
 
     Add-Section 'How to use it (File Manager tab)'
@@ -49,7 +50,7 @@ function New-OverviewTab {
     Add-Bullet 'Scan every drive before moving much: the oldest copy may be on a drive you have not scanned yet.'
 
     Add-Section 'What the list says'
-    Add-Bullet 'Duplicate - the same content is kept elsewhere (Note says where). Move -> _Duplicates\<kept name>\<kept name> (n).'
+    Add-Bullet 'Duplicate - the same content is kept elsewhere (Note says where). Move -> _Duplicates\<Name>\<Name>_n\<Name>_n (k), next to the kept copy''s number.'
     Add-Bullet 'Older copy found - older than the copy already in _Clean. Move swaps them: this one into _Clean, that one into _Duplicates. Select all leaves these out (setting: Ask).'
     Add-Bullet 'Keep (has copies) - this copy is the one kept (oldest files). Move -> _Clean; its copies show as Duplicate on their drives.'
     Add-Bullet 'Partly - some folders inside have copies. Double-click to look inside (Up one level to go back), or move the whole folder to _Clean.'
@@ -64,7 +65,8 @@ function New-OverviewTab {
     Add-Bullet 'Drives and priority - every drive in the database, priority, health check, forget a drive, Start fresh.'
     Add-Bullet 'History - every move: undo or delete just the ones you tick.'
     Add-Bullet 'Check a folder - is a folder (for example on a thumb drive) already in the database? Nothing is added or moved.'
-    Add-Bullet 'Consolidate - later: copy each _Clean to one NTFS drive, verify, remove the verified source files.'
+    Add-Bullet 'Reorganize _Clean - one time: puts what earlier versions put in _Clean into the new layout.'
+    Add-Bullet 'Consolidate - later: copy each _Clean to one NTFS drive, verify, remove the verified source files. Numbers are unique across drives, so nothing clashes.'
 
     Add-Section 'Settings (Environment tab > File Manager)'
     Add-Bullet 'Older copy than the one in _Clean (Ask / On / Off), same-date tolerance, hash every file, smallest folder to list, ignore lists (empty: everything counts).'

@@ -109,13 +109,14 @@ function Build-FmMainTab {
     $btnDelete = $App.Theme.MakeButton('Delete duplicates')
     $hint = New-Object System.Windows.Forms.Label
     $hint.AutoSize = $true; $hint.ForeColor = $App.Theme.Muted; $hint.Margin = New-Object System.Windows.Forms.Padding(16, 8, 0, 0)
-    $hint.Text = 'Duplicate -> X:\_Duplicates.  Unique, Keep, Partly, Loose files -> X:\_Clean (paths kept).  Every move stays on its drive and can be undone. Nothing is deleted until Delete duplicates.'
+    $hint.Text = 'Unique, Keep, Partly -> X:\_Clean\<Name>\<Name>_n.  Duplicate -> X:\_Duplicates\<Name>\<Name>_n\<Name>_n (k).  Each <Name> folder has a _sources.txt (where each one came from). Moves stay on the drive and can be undone.'
     $bar3.Controls.AddRange(@($btnMove, $btnUndo, $btnDelete, $hint))
 
     $moreMenu = New-Object System.Windows.Forms.ContextMenuStrip
     [void]$moreMenu.Items.Add('Drives and priority...')
     [void]$moreMenu.Items.Add('History...')
     [void]$moreMenu.Items.Add('Check a folder...')
+    [void]$moreMenu.Items.Add('Reorganize _Clean...')
     [void]$moreMenu.Items.Add('Consolidate...')
 
     $s = @{ Cat = $cat; App = $App; Combo = $cbo; Grid = $grid; Sum = $sum; Where = $lblWhere; Show = $cboShow; Sel = $lblSel; Prog = $prog
@@ -178,6 +179,7 @@ function Build-FmMainTab {
         $info = $(if ($dr) { '{0:N0} files, {1}, {2:N0} hashed, scanned {3}' -f $dr.Files, [FileManagerEngine.Util]::Size($dr.Bytes), $dr.Hashed, $(if ($dr.LastScan) { $dr.LastScan } else { 'never' }) } else { '' })
         if ($dr -and $dr.NeedsRescan) { $info += '  -  SCAN AGAIN: the drive changed' }
         $s.Sum.Text = $info + '     ' + $s.Cat.ViewSummary($d)
+        if ($s.Cat.NeedsReorganize($d)) { $s.Sum.Text += '     -  _Clean still has the old layout: More > Reorganize _Clean' }
         & $s.CountSel
     }.GetNewClosure()
     $s.Fill = $fill
@@ -355,6 +357,21 @@ function Build-FmMainTab {
             'Drives*'      { Show-FmPageWindow -App $s.App -Title 'Drives and priority' -Build ${function:Build-FmDrivesTab}; & $s.LoadDrives; & $s.Fill }
             'History*'     { Show-FmPageWindow -App $s.App -Title 'History' -Build ${function:Build-FmReportsTab}; & $s.Fill }
             'Consolidate*' { Show-FmPageWindow -App $s.App -Title 'Consolidate' -Build ${function:Build-FmConsolidateTab}; & $s.LoadDrives; & $s.Fill }
+            'Reorganize*' {
+                $d = & $s.DriveId
+                $vol = $s.Combo.SelectedItem
+                if ($d -le 0) { $s.App.SetStatus('Pick a scanned drive first.', 'warn'); return }
+                $plan = Invoke-FmSafe -App $s.App -What 'Reorganize _Clean' -Action { $s.Cat.BuildReorganizePlan($d) }
+                if (-not $plan) { return }
+                if ($plan.BatchId -le 0) { $s.App.SetStatus("$($vol.Letter)\_Clean is already in the new layout.", 'ok'); return }
+                $summary = "Put the $($plan.CleanItems) item(s) at the top of $($vol.Letter)\_Clean into the new layout: _Clean\<Name>\<Name>_n, with a _sources.txt in each <Name> folder. " +
+                           'Renames on the same drive (instant); folders whose new name is the same as the old one go through a temporary name first. Undo puts everything back.'
+                if (-not (Confirm-AppCommand -App $s.App -Title 'Reorganize _Clean' -Kind Change -Always -Code $s.Cat.MoveScript($plan.BatchId, $null) -Summary $summary -RunLabel 'Reorganize')) {
+                    $s.Cat.CancelBatch($plan.BatchId); return
+                }
+                $s.App.LogAction("Reorganize _Clean on $($vol.Letter): batch $($plan.BatchId), $($plan.CleanItems) item(s).")
+                & $s.Run (Invoke-FmSafe -App $s.App -What 'Reorganize _Clean' -Action { $s.Cat.StartApply($plan.BatchId) }) 'Reorganizing _Clean...' $null
+            }
             'Check*' {
                 $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
                 $dlg.Description = 'Pick a folder to compare with the catalog (for example on a thumb drive). Nothing is added or moved.'

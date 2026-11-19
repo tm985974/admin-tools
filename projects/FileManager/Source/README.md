@@ -38,12 +38,23 @@ aside so they can be checked before anything is deleted. Built on AppTemplate
 ## Where things go (on each drive)
 
 ```
-X:\_Clean\<original path>\FolderName                    kept copies + folders with no duplicate
-X:\_Duplicates\<kept folder path>\FolderName\
-      FolderName (1)\                                   a copy, renamed after the kept folder (left exactly as it was)
-      FolderName (1)_origin.txt                         where it came from and where the kept copy is
-      FolderName (2)\                                   numbers are unique across all drives
+X:\_Clean\
+  Desktop\
+    _sources.txt          Desktop_1  <-  E: HP_SSD  \OldPC\Users\John\Desktop   (3.2 GB, ..., moved ...)
+    Desktop_1\            the folders themselves, exactly as they were
+    Desktop_2\
+  _Loose files\
+    _Loose files_1\       files that were at the top of a drive
+X:\_Duplicates\
+  Desktop\
+    _sources.txt          Desktop_1 (1)  <-  F: Backup2  \Laptop\Desktop   (copy of ..., moved ...)
+    Desktop_1\
+      Desktop_1 (1)\      a copy of _Clean\Desktop\Desktop_1
 ```
+
+- Names are grouped ignoring capital letters and copy suffixes ("Copy of X", "X - Copy", "X (2)").
+- Numbers are unique across all drives, so the _Clean folders of different drives never clash.
+- More > Reorganize _Clean puts what earlier versions left in _Clean into this layout (one time).
 
 ## Matching
 

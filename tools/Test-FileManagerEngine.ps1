@@ -216,6 +216,14 @@ try {
     New-File "$data\top.txt" 'a loose file' $old                      # Loose files
     Wait-Job2 ($cat.StartScan($drive, $o2))
     $d2 = @($cat.GetDrives())[0].Id
+    Check ([FileManagerEngine.Catalog]::GroupName('Copy of Desktop - Copy (2)') -eq 'Desktop' -and [FileManagerEngine.Catalog]::GroupName('Desktop (3)') -eq 'Desktop') 'group names drop copy suffixes'
+    Check ($cat.NeedsReorganize($d2)) '_Clean in the old layout is noticed'
+    $re = $cat.BuildReorganizePlan($d2)
+    Write-Host $cat.MoveScript($re.BatchId, $null) -ForegroundColor DarkGray
+    Wait-Job2 ($cat.StartApply($re.BatchId))
+    Check (Test-Path -LiteralPath "$($drive)_Clean\Photos\Photos_1\a.jpg") 'reorganize: _Clean\Photos -> _Clean\Photos\Photos_1'
+    Check (Test-Path -LiteralPath "$($drive)_Clean\Photos\_sources.txt") 'reorganize: _sources.txt written'
+    Check (-not $cat.NeedsReorganize($d2)) '_Clean is now in the new layout'
     $view = @($cat.GetView($d2, ''))
     $st = @{}; foreach ($r in $view) { $st[$r.Name] = $r.Status }
     Write-Host ("        " + (($view | ForEach-Object { "$($_.Name)=$($_.Status)" }) -join '; ')) -ForegroundColor DarkGray
@@ -235,12 +243,14 @@ try {
     $plan = $cat.BuildPlanFor($d2, $ids, $true)
     Write-Host $cat.MoveScript($plan.BatchId, $null) -ForegroundColor DarkGray
     Wait-Job2 ($cat.StartApply($plan.BatchId))
-    Check (Test-Path -LiteralPath "$($drive)_Clean\Photos 2004\a.jpg") 'swap: the older copy is now in _Clean'
-    Check (Test-Path -LiteralPath "$($drive)_Duplicates\Photos 2004\Photos 2004 (1)\a.jpg") 'swap: the newer _Clean copy went to _Duplicates'
-    Check (-not (Test-Path -LiteralPath "$($drive)_Clean\Photos")) 'swap: _Clean\Photos is gone'
-    Check (Test-Path -LiteralPath "$($drive)_Duplicates\Docs\Docs (1)\x.txt") 'Docs copy -> _Duplicates\Docs\Docs (1)'
-    Check ((Test-Path -LiteralPath "$($drive)_Clean\Docs\x.txt") -and (Test-Path -LiteralPath "$($drive)_Clean\Solo\y.txt") -and (Test-Path -LiteralPath "$($drive)_Clean\Mixed\Docs2\x.txt")) 'Docs, Solo and Mixed (whole) -> _Clean'
-    Check (Test-Path -LiteralPath "$($drive)_Clean\top.txt") 'loose file -> _Clean'
+    Check ((Get-Item -LiteralPath "$($drive)_Clean\Photos\Photos_1\a.jpg").LastWriteTime.Year -eq 2004) 'swap: the older copy took over _Clean\Photos\Photos_1'
+    Check (Test-Path -LiteralPath "$($drive)_Duplicates\Photos\Photos_1\Photos_1 (1)\a.jpg") 'swap: the newer copy went to _Duplicates\Photos\Photos_1\Photos_1 (1)'
+    Check ((Get-Content -LiteralPath "$($drive)_Clean\Photos\_sources.txt" -Raw) -match 'Photos 2004') '_sources.txt says Photos_1 came from Photos 2004'
+    Check (Test-Path -LiteralPath "$($drive)_Duplicates\Docs\Docs_1\Docs_1 (1)\x.txt") 'Docs copy -> _Duplicates\Docs\Docs_1\Docs_1 (1)'
+    Check (Test-Path -LiteralPath "$($drive)_Duplicates\Docs\_sources.txt") '_Duplicates\Docs\_sources.txt written'
+    Check ((Test-Path -LiteralPath "$($drive)_Clean\Docs\Docs_1\x.txt") -and (Test-Path -LiteralPath "$($drive)_Clean\Solo\Solo_1\y.txt") -and (Test-Path -LiteralPath "$($drive)_Clean\Mixed\Mixed_1\Docs2\x.txt")) 'Docs, Solo and Mixed (whole) -> _Clean\<Name>\<Name>_1'
+    Check (Test-Path -LiteralPath "$($drive)_Clean\_Loose files\_Loose files_1\top.txt") 'loose file -> _Clean\_Loose files\_Loose files_1'
+    Check (-not $cat.NeedsReorganize($d2)) 'still in the new layout after the move'
     Check (@($cat.GetView($d2, '')).Count -eq 0) 'nothing left outside _Clean'
     Check ($cat.LastUndoableBatch() -eq $plan.BatchId) 'Undo last points at this move'
     Check ($cat.MovedDuplicates() -eq 2) "2 duplicates waiting to be deleted: $($cat.MovedDuplicates())"

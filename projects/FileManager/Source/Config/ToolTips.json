@@ -49,6 +49,7 @@
         "Refresh": "Read the data again and redraw this list.",
         "Browse": "Pick a folder.",
         "Show the parts of Partly folders": "On: under each Partly folder, the folders inside it that have copies are listed (indented), so you can see and tick them without opening the folder.",
-        "Remove folders a move leaves empty": "On: a folder a move leaves empty (and the empty folders above it) is removed. Folders that were empty before are left alone. Undo puts them back."
+        "Remove folders a move leaves empty": "On: a folder a move leaves empty (and the empty folders above it) is removed. Folders that were empty before are left alone. Undo puts them back.",
+        "Reorganize _Clean": "One time: put what is already in this drive's _Clean (from earlier versions) into the new layout _Clean\\<Name>\\<Name>_n with a _sources.txt. Renames on the drive; you see them first; Undo puts them back."
     }
 }

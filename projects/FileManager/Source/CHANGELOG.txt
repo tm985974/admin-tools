@@ -2,6 +2,25 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v2.1.0 (2026-11-19)  Flat layout: _Clean\<Name>\<Name>_n, with _sources.txt
+  Changed : Every folder moved to _Clean goes to _Clean\<Name>\<Name>_<n>: folders with the same
+            name are grouped side by side. Names are grouped ignoring capital letters and copy
+            suffixes ("Copy of X", "X - Copy", "X (2)"). Numbers are unique across all drives
+            (one counter per name in the database), so _Clean folders of different drives never
+            clash when they are consolidated.
+  Changed : Duplicates go to _Duplicates\<Name>\<Name>_n\<Name>_n (k): the same name and number as
+            the kept copy, one level down.
+  Added   : Each <Name> folder (in _Clean and in _Duplicates) has a _sources.txt: one line per
+            folder - where it came from (drive and full path), size, date. Kept up to date by
+            Move, Undo and Delete duplicates. (Replaces the "<name> (n)_origin.txt" notes.)
+  Changed : An older copy found takes over the number of the _Clean copy it replaces.
+  Changed : Loose files go to _Clean\_Loose files\_Loose files_<n>.
+  Added   : More > Reorganize _Clean - one time, puts what is already in _Clean into the new
+            layout (renames on the drive, shown first, undoable). The summary line says when a
+            drive still has the old layout.
+  Fixed   : When a kept folder moves (to _Clean, or by Reorganize), the records that point at
+            it follow, so Delete duplicates still finds the kept copy.
+
 v2.0.2 (2026-11-19)  Folders a move leaves empty are removed
   Fixed   : Moving the parts out of a Partly folder (or merging into a folder already in _Clean)
             left the emptied folders behind. Now a folder a move leaves empty is removed, and

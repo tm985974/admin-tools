@@ -837,6 +837,8 @@ CREATE TABLE IF NOT EXISTS actions(id INTEGER PRIMARY KEY, batch_id INTEGER NOT 
     bytes INTEGER NOT NULL DEFAULT 0, files INTEGER NOT NULL DEFAULT 0, status TEXT, done TEXT, error TEXT);
 CREATE INDEX IF NOT EXISTS ix_actions_batch ON actions(batch_id);
 CREATE TABLE IF NOT EXISTS dupnum(keeper TEXT PRIMARY KEY, n INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS tagnum(grp TEXT PRIMARY KEY, display TEXT, n INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS tagres(drive_id INTEGER NOT NULL, path TEXT NOT NULL, grp TEXT, tag TEXT, PRIMARY KEY(drive_id, path));
 CREATE TABLE IF NOT EXISTS vruns(id INTEGER PRIMARY KEY, src TEXT, dst TEXT, started TEXT, finished TEXT, status TEXT,
     ok INTEGER NOT NULL DEFAULT 0, missing INTEGER NOT NULL DEFAULT 0, different INTEGER NOT NULL DEFAULT 0,
     errors INTEGER NOT NULL DEFAULT 0, removed INTEGER NOT NULL DEFAULT 0);
@@ -869,6 +871,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             _db = Open();
             _db.Exec(Schema);
             try { _db.Exec("ALTER TABLE dgroups ADD COLUMN swap INTEGER NOT NULL DEFAULT 0"); } catch { }   // 2.0: column added to older catalogs
+            try { _db.Exec("ALTER TABLE actions ADD COLUMN note TEXT"); } catch { }                           // 2.1: the _sources.txt line of a move
             string alg = _db.Scalar("SELECT v FROM meta WHERE k='hash'") as string;
             if (string.IsNullOrEmpty(alg))
             {
@@ -1919,14 +1922,14 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             _db.Run("UPDATE actions SET status='replaced', error=? WHERE status IN ('planned','failed') AND batch_id<>?", "Not run; replaced by plan " + bid, bid);
             foreach (object[] o in older) SetBatchStatus(_db, Util.L(o[0]));
             if (older.Count > 0) ps.Notes.Add("Steps that older plans never ran were replaced by this plan (" + older.Count + " plan(s)).");
-            using (Stmt ins = _db.Prepare(@"INSERT INTO actions(batch_id, seq, kind, drive_id, root, src, dst, isdir, qsig, csig, confirmed, keeper_drive, keeper_path, keeper_rel, dupn, bytes, files, status)
-                                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'planned')"))
+            using (Stmt ins = _db.Prepare(@"INSERT INTO actions(batch_id, seq, kind, drive_id, root, src, dst, isdir, qsig, csig, confirmed, keeper_drive, keeper_path, keeper_rel, dupn, bytes, files, note, status)
+                                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'planned')"))
             {
                 int seq = 0;
                 foreach (object[] it in items)
                 {
                     seq++;
-                    ins.Exec(bid, seq, it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7], it[8], it[9], it[10], it[11], it[12], it[13], it[14]);
+                    ins.Exec(bid, seq, it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7], it[8], it[9], it[10], it[11], it[12], it[13], it[14], it.Length > 15 ? it[15] : null);
                 }
             }
             _db.Commit();
@@ -2068,13 +2071,16 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("# File Manager - batch " + batchId + ": the moves you ticked. Every move stays on its own drive (a rename).");
             sb.AppendLine("# Nothing is deleted. The tool runs the same moves itself (long paths included) and records each one for undo.");
-            foreach (object[] r in _db.Rows("SELECT id, kind, root, src, dst, keeper_path FROM actions WHERE batch_id=? AND status IN ('planned','failed') ORDER BY seq", batchId))
+            foreach (object[] r in _db.Rows("SELECT id, kind, root, src, dst, keeper_path, note FROM actions WHERE batch_id=? AND status IN ('planned','failed') ORDER BY seq", batchId))
             {
                 if (set != null && !set.ContainsKey(Util.L(r[0]))) continue;
                 string root = Util.S(r[2]), from = Fs.Join(root, Util.S(r[3])), to = Fs.Join(root, Util.S(r[4]));
                 sb.AppendLine("New-Item -ItemType Directory -Force -Path " + Util.Q(Fs.Parent(to)) + " | Out-Null");
                 sb.AppendLine("Move-Item -LiteralPath " + Util.Q(from) + " -Destination " + Util.Q(to));
-                if (Util.S(r[1]) == "dup")
+                string gd, key;
+                if (r[6] != null && SourcesTarget(root, Util.S(r[1]), Util.S(r[4]), out gd, out key))
+                    sb.AppendLine("Add-Content -LiteralPath " + Util.Q(Fs.Join(gd, SourcesName)) + " -Value " + Util.Q(key + "  <-  " + Util.S(r[6])));
+                else if (Util.S(r[1]) == "dup")
                     sb.AppendLine("Set-Content -LiteralPath " + Util.Q(OriginPath(to)) + " -Value " + Util.Q("Original: " + from + " | Kept copy: \\" + Util.S(r[5])));
             }
             return sb.ToString();
@@ -2103,7 +2109,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
         void DoApply(Job j, Db db, long batchId, Dictionary<long, bool> sel)
         {
             Dictionary<long, string> roots = ConnectedRoots(db);
-            List<object[]> all = db.Rows(@"SELECT id, kind, drive_id, root, src, dst, isdir, keeper_drive, keeper_path, keeper_rel, dupn, csig, qsig, confirmed
+            List<object[]> all = db.Rows(@"SELECT id, kind, drive_id, root, src, dst, isdir, keeper_drive, keeper_path, keeper_rel, dupn, csig, qsig, confirmed, note
                                           FROM actions WHERE batch_id=? AND status IN ('planned','failed') ORDER BY seq", batchId);
             List<object[]> rows = new List<object[]>();
             foreach (object[] r in all) if (sel == null || sel.ContainsKey(Util.L(r[0]))) rows.Add(r);
@@ -2141,10 +2147,16 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                             db.Run("INSERT OR IGNORE INTO dupnum(keeper, n) VALUES(?, 0)", Util.S(r[9]));
                             db.Run("UPDATE dupnum SET n=max(n, ?) WHERE keeper=?", Util.L(r[10]), Util.S(r[9]));
                         }
-                        else MoveSubtree(db, d, src, dst, Util.L(r[6]) != 0);
+                        else { MoveSubtree(db, d, src, dst, Util.L(r[6]) != 0); RewriteKeeperPaths(db, d, src, dst); }
                         db.Run("UPDATE actions SET status='done', done=?, error=NULL WHERE id=?", Util.Now(), id);
                         db.Commit();
-                        if (kind == "dup")
+                        string gd, key;
+                        if (r[14] != null && SourcesTarget(root, kind, dst, out gd, out key))
+                        {
+                            try { SourcesSet(gd, key, Util.S(r[14])); }
+                            catch (Exception ex) { j.Log("Moved, but could not update " + Fs.Join(gd, SourcesName) + ": " + ex.Message); }
+                        }
+                        else if (kind == "dup")
                         {
                             try
                             {
@@ -2270,12 +2282,16 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             Dictionary<long, bool> set = ToSet(ids);
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("# File Manager - undo in batch " + batchId + ": the ticked moves go back, newest first.");
-            foreach (object[] r in _db.Rows("SELECT id, kind, root, src, dst FROM actions WHERE batch_id=? AND status='done' ORDER BY seq DESC", batchId))
+            foreach (object[] r in _db.Rows("SELECT id, kind, root, src, dst, note FROM actions WHERE batch_id=? AND status='done' ORDER BY seq DESC", batchId))
             {
                 if (set != null && !set.ContainsKey(Util.L(r[0]))) continue;
                 string root = Util.S(r[2]);
                 string from = Fs.Join(root, Util.S(r[4])), to = Fs.Join(root, Util.S(r[3]));
-                if (Util.S(r[1]) == "dup") sb.AppendLine("Remove-Item -LiteralPath " + Util.Q(OriginPath(from)) + " -ErrorAction SilentlyContinue");
+                string gd, key;
+                if (r[5] != null && SourcesTarget(root, Util.S(r[1]), Util.S(r[4]), out gd, out key))
+                    sb.AppendLine("# then remove the line for " + key + " from " + Fs.Join(gd, SourcesName));
+                else if (Util.S(r[1]) == "dup") sb.AppendLine("Remove-Item -LiteralPath " + Util.Q(OriginPath(from)) + " -ErrorAction SilentlyContinue");
+                sb.AppendLine("New-Item -ItemType Directory -Force -Path " + Util.Q(Fs.Parent(to)) + " | Out-Null");
                 sb.AppendLine("Move-Item -LiteralPath " + Util.Q(from) + " -Destination " + Util.Q(to));
             }
             return sb.ToString();
@@ -2285,7 +2301,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
         {
             Dictionary<long, string> roots = ConnectedRoots(db);
             List<object[]> rows = new List<object[]>();
-            foreach (object[] r in db.Rows("SELECT id, kind, drive_id, root, src, dst, isdir FROM actions WHERE batch_id=? AND status='done' ORDER BY seq DESC", batchId))
+            foreach (object[] r in db.Rows("SELECT id, kind, drive_id, root, src, dst, isdir, note FROM actions WHERE batch_id=? AND status='done' ORDER BY seq DESC", batchId))
                 if (sel == null || sel.ContainsKey(Util.L(r[0]))) rows.Add(r);
             db.Run("UPDATE batches SET status='undoing' WHERE id=?", batchId);
             j.NewPhase("Undoing moves", rows.Count, 0);
@@ -2321,11 +2337,22 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                         }
                         db.Begin();
                         if (kind == "dup") rescan[d] = true;
-                        else { MoveSubtree(db, d, Util.S(r[5]), Util.S(r[4]), Util.L(r[6]) != 0); touched[d] = true; }
+                        else { MoveSubtree(db, d, Util.S(r[5]), Util.S(r[4]), Util.L(r[6]) != 0); RewriteKeeperPaths(db, d, Util.S(r[5]), Util.S(r[4])); touched[d] = true; }
                         db.Run("UPDATE actions SET status='undone', done=?, error=NULL WHERE id=?", Util.Now(), id);
                         db.Commit();
                         done++;
                         j.Log("Moved back " + now + "  ->  " + back);
+                        string gd, key;
+                        if (r[7] != null && SourcesTarget(root, kind, Util.S(r[5]), out gd, out key))
+                        {
+                            try
+                            {
+                                string tagFolder = kind == "dup" ? now : Fs.Join(gd, key);
+                                if (!Fs.Exists(tagFolder)) SourcesSet(gd, key, null);
+                                RemoveEmptyParents(j, root, Fs.Parent(now));
+                            }
+                            catch (Exception ex) { j.Log("Moved back, but could not tidy " + gd + ": " + ex.Message); }
+                        }
                         if (kind == "dup")
                         {
                             string p = Fs.Parent(now);
@@ -2367,12 +2394,14 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             sb.AppendLine("# File Manager - delete the ticked duplicate folders of batch " + batchId + ".");
             sb.AppendLine("# Before each delete the tool reads every file again and compares it with the kept copy;");
             sb.AppendLine("# a folder that differs in any way, or whose kept copy cannot be found, is NOT deleted.");
-            foreach (object[] r in _db.Rows("SELECT id, root, dst FROM actions WHERE batch_id=? AND kind='dup' AND status='done' ORDER BY seq", batchId))
+            foreach (object[] r in _db.Rows("SELECT id, root, dst, note FROM actions WHERE batch_id=? AND kind='dup' AND status='done' ORDER BY seq", batchId))
             {
                 if (set != null && !set.ContainsKey(Util.L(r[0]))) continue;
                 string full = Fs.Join(Util.S(r[1]), Util.S(r[2]));
                 sb.AppendLine("Remove-Item -LiteralPath " + Util.Q(full) + " -Recurse -Force");
-                sb.AppendLine("Remove-Item -LiteralPath " + Util.Q(OriginPath(full)) + " -ErrorAction SilentlyContinue");
+                string gd, key;
+                if (r[3] != null && SourcesTarget(Util.S(r[1]), "dup", Util.S(r[2]), out gd, out key)) sb.AppendLine("# and remove the line for " + key + " from " + Fs.Join(gd, SourcesName));
+                else sb.AppendLine("Remove-Item -LiteralPath " + Util.Q(OriginPath(full)) + " -ErrorAction SilentlyContinue");
             }
             return sb.ToString();
         }
@@ -2438,7 +2467,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             Dictionary<long, string> roots = ConnectedRoots(db);
             string[] ignF = Wild.Prepare(Options.IgnoreFiles), ignD = Wild.Prepare(Options.IgnoreFolders);
             List<object[]> rows = new List<object[]>();
-            foreach (object[] r in db.Rows(@"SELECT id, drive_id, root, dst, confirmed, qsig, csig, keeper_drive, keeper_path, keeper_rel, bytes
+            foreach (object[] r in db.Rows(@"SELECT id, drive_id, root, dst, confirmed, qsig, csig, keeper_drive, keeper_path, keeper_rel, bytes, note
                                             FROM actions WHERE batch_id=? AND kind='dup' AND status='done' ORDER BY seq", batchId))
                 if (sel == null || sel.ContainsKey(Util.L(r[0]))) rows.Add(r);
             long total = 0;
@@ -2483,6 +2512,8 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                         }
                         Fs.DeleteTree(dupFull, null);   // never stopped halfway
                         try { if (Fs.Exists(OriginPath(dupFull))) Fs.DeleteFile(OriginPath(dupFull)); } catch { }
+                        string gd, key;
+                        if (r[11] != null && SourcesTarget(root, "dup", Util.S(r[3]), out gd, out key)) { try { SourcesSet(gd, key, null); } catch { } }
                         string p = Fs.Parent(dupFull);
                         string stop = Fs.Join(root, DupName);
                         while (p != null && p.Length > stop.Length && Fs.TryRemoveDir(p)) p = Fs.Parent(p);
@@ -2521,7 +2552,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             _db.Begin();
             _db.Exec("DELETE FROM files; DELETE FROM folders; DELETE FROM dgroups; DELETE FROM dmembers; DELETE FROM contained; DELETE FROM keeper_pick; DELETE FROM scans; DELETE FROM checks; DELETE FROM checkrows;");
             if (keepBatches) _db.Exec("UPDATE drives SET folders=0, files=0, bytes=0, hashed=0, last_scan=NULL, needs_rescan=0;");
-            else _db.Exec("DELETE FROM drives; DELETE FROM batches; DELETE FROM actions; DELETE FROM dupnum; DELETE FROM vruns; DELETE FROM vrows;");
+            else _db.Exec("DELETE FROM drives; DELETE FROM batches; DELETE FROM actions; DELETE FROM dupnum; DELETE FROM vruns; DELETE FROM vrows; DELETE FROM tagnum; DELETE FROM tagres;");
             _db.Commit();
             _db.Exec("VACUUM;");
             Touch();
@@ -2996,6 +3027,247 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             return parts.Count == 0 ? "Nothing outside _Clean." : string.Join("   |   ", parts.ToArray());
         }
 
+        // ------------------------------------------------------------ flat layout (2.1): _Clean\<Name>\<Name>_<n>
+
+        public const string SourcesName = "_sources.txt";
+        public const string LooseGroup = "_Loose files";
+
+        static bool AllDigits(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return false;
+            foreach (char c in s) if (c < '0' || c > '9') return false;
+            return true;
+        }
+
+        // The name a folder is grouped under: capital letters do not matter (the key is lower case)
+        // and common copy suffixes are dropped: "Copy of X", "Copy (2) of X", "X - Copy", "X - Copy (2)", "X (2)".
+        public static string GroupName(string name)
+        {
+            string s = (name ?? "").Trim();
+            bool changed = true;
+            while (changed && s.Length > 0)
+            {
+                changed = false;
+                string l = s.ToLowerInvariant();
+                if (l.StartsWith("copy of ")) { s = s.Substring(8).Trim(); changed = true; continue; }
+                if (l.StartsWith("copy ("))
+                {
+                    int k = l.IndexOf(") of ", StringComparison.Ordinal);
+                    if (k > 6 && AllDigits(l.Substring(6, k - 6))) { s = s.Substring(k + 5).Trim(); changed = true; continue; }
+                }
+                if (l.EndsWith(" - copy")) { s = s.Substring(0, s.Length - 7).Trim(); changed = true; continue; }
+                if (l.EndsWith(")"))
+                {
+                    int k = l.LastIndexOf(" (", StringComparison.Ordinal);
+                    if (k > 0 && AllDigits(l.Substring(k + 2, l.Length - k - 3))) { s = s.Substring(0, k).Trim(); changed = true; continue; }
+                }
+            }
+            return s.Length == 0 ? name : s;
+        }
+
+        // "_Clean\G\G_n" (exactly) is a folder in the new layout.
+        static bool IsTagged(string rel, out string g, out string t)
+        {
+            g = null; t = null;
+            string[] p = (rel ?? "").Split('\\');
+            if (p.Length != 3 || !string.Equals(p[0], CleanName, StringComparison.OrdinalIgnoreCase)) return false;
+            int u = p[2].LastIndexOf('_');
+            if (u < 1 || !AllDigits(p[2].Substring(u + 1)) || !string.Equals(p[2].Substring(0, u), p[1], StringComparison.OrdinalIgnoreCase)) return false;
+            g = p[1]; t = p[2];
+            return true;
+        }
+
+        // Next number for a group; numbers are unique across all drives (one counter per name in the database).
+        void NewTag(string group, out string g, out string t)
+        {
+            string key = group.ToLowerInvariant();
+            string disp = _db.Scalar("SELECT display FROM tagnum WHERE grp=?", key) as string;
+            if (disp == null) { _db.Run("INSERT INTO tagnum(grp, display, n) VALUES(?,?,0)", key, group); disp = group; }
+            _db.Run("UPDATE tagnum SET n=n+1 WHERE grp=?", key);
+            g = disp;
+            t = disp + "_" + _db.ScalarLong("SELECT n FROM tagnum WHERE grp=?", key);
+        }
+
+        // The group and tag a folder has (already in the new layout), was given (reserved), or gets now.
+        void TagFor(long d, string path, out string g, out string t)
+        {
+            if (IsTagged(path, out g, out t)) return;
+            foreach (object[] r in _db.Rows("SELECT grp, tag FROM tagres WHERE drive_id=? AND path=?", d, path)) { g = Util.S(r[0]); t = Util.S(r[1]); return; }
+            NewTag(GroupName(Fs.LastPart(path)), out g, out t);
+            _db.Run("INSERT OR REPLACE INTO tagres(drive_id, path, grp, tag) VALUES(?,?,?,?)", d, path, g, t);
+        }
+
+        static string Describe(Db db, long d, string path, string extra)
+        {
+            object[] r = null;
+            foreach (object[] x in db.Rows("SELECT label, letter FROM drives WHERE id=?", d)) r = x;
+            string drive = r == null ? "?" : (Util.S(r[1]) + " " + Util.S(r[0])).Trim();
+            return drive + "  \\" + path + "   (" + extra + ", moved " + Util.Now() + ")";
+        }
+
+        // Where the _sources.txt line of a move goes: _Clean\G\T... -> (_Clean\G, T); _Duplicates\G\T\T (k) -> (_Duplicates\G, "T (k)").
+        static bool SourcesTarget(string root, string kind, string dst, out string groupDir, out string key)
+        {
+            groupDir = null; key = null;
+            string[] p = (dst ?? "").Split('\\');
+            if (kind == "dup") { if (p.Length < 4) return false; key = p[3]; }
+            else { if (p.Length < 3) return false; key = p[2]; }
+            groupDir = Fs.Join(root, p[0] + "\\" + p[1]);
+            return true;
+        }
+
+        static List<string> ReadLines(string path)
+        {
+            List<string> l = new List<string>();
+            if (!Fs.Exists(path)) return l;
+            using (FileStream fs = Fs.OpenRead(path))
+            using (StreamReader rd = new StreamReader(fs, Encoding.UTF8))
+            {
+                string s;
+                while ((s = rd.ReadLine()) != null) l.Add(s);
+            }
+            return l;
+        }
+
+        // Adds (text) or removes (text = null) the line for one folder in groupDir\_sources.txt.
+        static void SourcesSet(string groupDir, string key, string text)
+        {
+            string f = Fs.Join(groupDir, SourcesName);
+            string prefix = key + "  <-  ";
+            List<string> keep = new List<string>();
+            foreach (string l in ReadLines(f))
+            {
+                if (l.StartsWith("#") || l.Trim().Length == 0) continue;
+                if (l.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+                keep.Add(l);
+            }
+            if (text != null) keep.Add(prefix + text);
+            if (keep.Count == 0) { if (Fs.Exists(f)) Fs.DeleteFile(f); return; }
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("# Where each folder in here came from (written by File Manager; one line per folder).");
+            foreach (string l in keep) sb.AppendLine(l);
+            Fs.EnsureDir(groupDir);
+            Fs.WriteText(f, sb.ToString());
+        }
+
+        // A kept folder moved: keep the records that point at it (for the re-check before delete) in step.
+        static void RewriteKeeperPaths(Db db, long d, string from, string to)
+        {
+            int cut = Util.CodePoints(from) + 1;
+            db.Run("UPDATE actions SET keeper_path=? || substr(keeper_path, ?) WHERE keeper_drive=? AND (keeper_path=? OR (keeper_path>? AND keeper_path<?))", to, cut, d, from, from + "\\", from + "]");
+            db.Run("UPDATE tagres SET path=? || substr(path, ?) WHERE drive_id=? AND (path=? OR (path>? AND path<?))", to, cut, d, from, from + "\\", from + "]");
+        }
+
+        void AddDupTagged(List<object[]> items, PlanSummary ps, long d, string root, string src, object[] g, long kdrive, string kpath, string kg, string kt,
+                          Dictionary<string, long> nextN, Dictionary<string, bool> usedDst, Dictionary<string, bool> dupSources)
+        {
+            string krel = kg + "\\" + kt;
+            string baseDir = DupName + "\\" + krel;
+            long n;
+            if (!nextN.TryGetValue(krel, out n)) n = _db.ScalarLong("SELECT n FROM dupnum WHERE keeper=?", krel);
+            string dst;
+            do { n++; dst = baseDir + "\\" + kt + " (" + n + ")"; }
+            while (usedDst.ContainsKey(root + dst) || Fs.Exists(Fs.Join(root, dst)));
+            nextN[krel] = n;
+            usedDst[root + dst] = true;
+            bool confirmed = Util.L(g[2]) != 0;
+            string note = Describe(_db, d, src, "copy of " + DriveName(_db, kdrive) + " \\" + kpath + ", " + Util.Size(Util.L(g[5])));
+            items.Add(new object[] { "dup", d, root, src, dst, 1, g[0], g[1], confirmed ? 1 : 0, kdrive, kpath, krel, n, Util.L(g[5]), Util.L(g[6]), note });
+            dupSources[d + "|" + src.ToLowerInvariant()] = true;
+            ps.DupItems++;
+            ps.DupBytes += Util.L(g[5]);
+        }
+
+        void AddCleanTagged(List<object[]> items, PlanSummary ps, long d, string root, VNode n, Dictionary<string, bool> vacated)
+        {
+            string g, t;
+            TagFor(d, n.Path, out g, out t);
+            string dst = CleanName + "\\" + g + "\\" + t;
+            while (Fs.Exists(Fs.Join(root, dst)) && !vacated.ContainsKey(Fs.Join(root, dst)))
+            {
+                NewTag(g, out g, out t);
+                _db.Run("INSERT OR REPLACE INTO tagres(drive_id, path, grp, tag) VALUES(?,?,?,?)", d, n.Path, g, t);
+                dst = CleanName + "\\" + g + "\\" + t;
+            }
+            string note = Describe(_db, d, n.Path, Util.Size(n.Bytes) + ", " + n.Files.ToString("N0") + " files");
+            items.Add(new object[] { "clean", d, root, n.Path, dst, 1, null, null, 0, 0L, null, null, 0L, n.Bytes, n.Files, note });
+            ps.CleanItems++;
+        }
+
+        // _Clean is in the new layout when every item at its top is a group folder holding only
+        // <Name>_<n> folders (and _sources.txt).
+        public bool NeedsReorganize(long driveId)
+        {
+            string root;
+            if (!ConnectedRoots(_db).TryGetValue(driveId, out root)) return false;
+            string clean = Fs.Join(root, CleanName);
+            if (!Fs.IsDir(clean)) return false;
+            int err;
+            foreach (FsEntry e in Fs.ListDir(clean, out err)) if (!IsNewGroup(clean, e)) return true;
+            return false;
+        }
+
+        static bool IsNewGroup(string clean, FsEntry e)
+        {
+            if (!e.IsDir || e.IsReparse) return false;
+            int err;
+            foreach (FsEntry c in Fs.ListDir(Fs.Join(clean, e.Name), out err))
+            {
+                if (!c.IsDir && string.Equals(c.Name, SourcesName, StringComparison.OrdinalIgnoreCase)) continue;
+                string g, t;
+                if (!c.IsDir || !IsTagged(CleanName + "\\" + e.Name + "\\" + c.Name, out g, out t)) return false;
+            }
+            return true;
+        }
+
+        // One-time: put what is in _Clean from earlier versions into the new layout (renames on the same drive).
+        public PlanSummary BuildReorganizePlan(long driveId)
+        {
+            if (Busy) throw new InvalidOperationException("Wait for the running task to finish first.");
+            PlanSummary ps = new PlanSummary();
+            string root;
+            if (!ConnectedRoots(_db).TryGetValue(driveId, out root)) throw new InvalidOperationException(DriveName(_db, driveId) + " is not connected.");
+            string clean = Fs.Join(root, CleanName);
+            if (!Fs.IsDir(clean)) return ps;
+            List<object[]> hops = new List<object[]>(), finals = new List<object[]>();
+            string lg = null, lt = null;
+            int err, k = 0;
+            string stamp = DateTime.Now.ToString("HHmmss");
+            List<FsEntry> entries = Fs.ListDir(clean, out err);
+            entries.Sort(delegate(FsEntry a, FsEntry b) { return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase); });
+            foreach (FsEntry e in entries)
+            {
+                if (IsNewGroup(clean, e) || e.IsReparse) continue;
+                string old = CleanName + "\\" + e.Name;
+                string from = "earlier";
+                foreach (object[] r in _db.Rows("SELECT src FROM actions WHERE drive_id=? AND kind='clean' AND status='done' AND dst=? ORDER BY id DESC LIMIT 1", driveId, old)) from = "\\" + Util.S(r[0]);
+                if (e.IsDir)
+                {
+                    long fb = 0, ff = 0;
+                    foreach (object[] r in _db.Rows("SELECT files, bytes FROM folders WHERE drive_id=? AND path=?", driveId, old)) { ff = Util.L(r[0]); fb = Util.L(r[1]); }
+                    string tmp = CleanName + "\\_reorg_" + stamp + "_" + (++k);
+                    string g, t;
+                    NewTag(GroupName(e.Name), out g, out t);
+                    string dst = CleanName + "\\" + g + "\\" + t;
+                    string note = Describe(_db, driveId, old, "was " + old + "; came from " + from + ", " + Util.Size(fb));
+                    hops.Add(new object[] { "clean", driveId, root, old, tmp, 1, null, null, 0, 0L, null, null, 0L, fb, ff, null });
+                    finals.Add(new object[] { "clean", driveId, root, tmp, dst, 1, null, null, 0, 0L, null, null, 0L, fb, ff, note });
+                }
+                else
+                {
+                    if (lg == null) NewTag(LooseGroup, out lg, out lt);
+                    string note = Describe(_db, driveId, "", "loose files that were at the top of " + CleanName);
+                    finals.Add(new object[] { "clean", driveId, root, old, CleanName + "\\" + lg + "\\" + lt + "\\" + e.Name, 0, null, null, 0, 0L, null, null, 0L, e.Size, 1L, note });
+                }
+                ps.CleanItems++;
+            }
+            if (hops.Count + finals.Count == 0) return ps;
+            List<object[]> all = new List<object[]>(hops);
+            all.AddRange(finals);
+            SavePlan(ps, all, "Reorganize " + clean + " into the new layout");
+            return ps;
+        }
+
         // A batch for the ticked rows of one drive: Duplicate -> _Duplicates; Older copy found -> the _Clean copy
         // goes to _Duplicates and this one to _Clean; everything else (and loose files) -> _Clean.
         public PlanSummary BuildPlanFor(long driveId, long[] folderIds, bool rootFiles)
@@ -3028,7 +3300,9 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                 if (st == "Duplicate" || st == "Swap out")
                 {
                     if (g == null) continue;
-                    AddDup(items, ps, driveId, root, n.Path, g, Util.L(g[3]), Util.S(g[4]), nextN, usedDst, dupSources);
+                    string kg, kt;
+                    TagFor(Util.L(g[3]), Util.S(g[4]), out kg, out kt);
+                    AddDupTagged(items, ps, driveId, root, n.Path, g, Util.L(g[3]), Util.S(g[4]), kg, kt, nextN, usedDst, dupSources);
                 }
                 else if (st == "Older copy found")
                 {
@@ -3038,32 +3312,41 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                         long md = Util.L(m[0]); string mp = Util.S(m[1]), mroot;
                         if (!Util.InClean(mp)) continue;
                         if (!roots.TryGetValue(md, out mroot)) { ps.Notes.Add("The copy in _Clean is on " + DriveName(_db, md) + ", which is not connected: connect it to swap " + n.Path + "."); continue; }
-                        if (g != null) AddDup(items, ps, md, mroot, mp, g, driveId, n.Path, nextN, usedDst, dupSources);
+                        // the older copy takes over the tag of the copy it replaces
+                        string mg, mt;
+                        TagFor(md, mp, out mg, out mt);
+                        _db.Run("INSERT OR REPLACE INTO tagres(drive_id, path, grp, tag) VALUES(?,?,?,?)", driveId, n.Path, mg, mt);
+                        if (g != null) AddDupTagged(items, ps, md, mroot, mp, g, driveId, n.Path, mg, mt, nextN, usedDst, dupSources);
                         vacated[Fs.Join(mroot, mp)] = true;
+                        vacated[Fs.Join(root, CleanName + "\\" + mg + "\\" + mt)] = true;
                     }
                     toClean.Add(n);
                 }
                 else if (st == "In _Clean") continue;
                 else toClean.Add(n);
             }
-            // A ticked folder inside another ticked folder moves with it (paths are kept in _Clean).
+            // A ticked folder inside another ticked folder moves with it.
             Dictionary<long, bool> cleanIds = new Dictionary<long, bool>();
             foreach (VNode n in toClean) cleanIds[n.Id] = true;
             foreach (VNode n in toClean)
             {
                 bool inside = false;
                 for (int p = n.ParentIdx; p >= 0; p = v.Nodes[p].ParentIdx) if (cleanIds.ContainsKey(v.Nodes[p].Id)) { inside = true; break; }
-                if (!inside) AddCleanMoves(items, sb, ps, driveId, root, n.Path, true, 0, dupSources, 0, vacated);
+                if (!inside) AddCleanTagged(items, ps, driveId, root, n, vacated);
             }
             if (rootFiles)
             {
                 int err;
+                string lg = null, lt = null;
                 foreach (FsEntry e in Fs.ListDir(root, out err))
                 {
                     if (e.IsDir || e.IsReparse || e.Name.StartsWith("$")) continue;
                     if ((e.Attributes & Fs.Hidden) != 0 && (e.Attributes & Fs.SystemAttr) != 0) continue;
                     if (string.Equals(e.Name, "autorun.inf", StringComparison.OrdinalIgnoreCase)) continue;
-                    AddCleanMoves(items, sb, ps, driveId, root, e.Name, false, e.Size, dupSources, 0, vacated);
+                    if (lg == null) NewTag(LooseGroup, out lg, out lt);
+                    string note = Describe(_db, driveId, "", "files that were at the top of the drive");
+                    items.Add(new object[] { "clean", driveId, root, e.Name, CleanName + "\\" + lg + "\\" + lt + "\\" + e.Name, 0, null, null, 0, 0L, null, null, 0L, e.Size, 1L, note });
+                    ps.CleanItems++;
                 }
             }
             if (items.Count == 0) return ps;
