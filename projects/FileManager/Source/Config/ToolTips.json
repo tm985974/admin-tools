@@ -48,6 +48,7 @@
         "Reset File Manager settings to defaults": "Put the File Manager settings back to: Ask, 2 hours, hash every file, list every folder, ignore nothing (Save to keep it).",
         "Refresh": "Read the data again and redraw this list.",
         "Browse": "Pick a folder.",
-        "Show the parts of Partly folders": "On: under each Partly folder, the folders inside it that have copies are listed (indented), so you can see and tick them without opening the folder."
+        "Show the parts of Partly folders": "On: under each Partly folder, the folders inside it that have copies are listed (indented), so you can see and tick them without opening the folder.",
+        "Remove folders a move leaves empty": "On: a folder a move leaves empty (and the empty folders above it) is removed. Folders that were empty before are left alone. Undo puts them back."
     }
 }

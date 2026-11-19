@@ -307,6 +307,7 @@ function Build-FmMainTab {
         if ($d -le 0) { $App.SetStatus('Scan the drive first.', 'warn'); return }
         $t = & $ticked
         if ($t.Count -eq 0) { $App.SetStatus('Tick the rows to move first.', 'warn'); return }
+        $s.Cat.Options = New-FmOptions -App $App
         $plan = Invoke-FmSafe -App $App -What 'Move selected' -Action { $s.Cat.BuildPlanFor($d, $t.Ids, $t.Files) }
         if (-not $plan) { return }
         if ($plan.BatchId -le 0) {

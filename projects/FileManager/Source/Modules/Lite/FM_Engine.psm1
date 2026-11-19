@@ -684,7 +684,8 @@ namespace FileManagerEngine
         public string[] IgnoreFiles = new string[0];
         public string[] IgnoreFolders = new string[0];
         public long MinGroupBytes = 1;
-        public bool HashEverything = true;        // read every file during a scan (not only possible duplicates)
+        public bool HashEverything = true;
+        public bool RemoveEmptyFolders = true;    // remove folders a move left empty (never _Clean / _Duplicates themselves)        // read every file during a scan (not only possible duplicates)
         public double ToleranceHours = 2;         // file dates this close count as the same (FAT32 / time zones)
         public string SwapMode = "Ask";           // Ask / On: the oldest copy is kept, even over one in _Clean. Off: _Clean always wins.
     }
@@ -2155,6 +2156,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                         touched[d] = true;
                         done++;
                         j.Log("Moved " + from + "  ->  " + to);
+                        if (Options.RemoveEmptyFolders) RemoveEmptyParents(j, root, Fs.Parent(from));
                     }
                     catch (OperationCanceledException) { throw; }
                     catch (Exception ex)
@@ -2176,6 +2178,23 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                 j.Summary = "Batch " + batchId + ": " + done + " moved" + (failed > 0 ? ", " + failed + " failed (the reason is on each row)" : "") +
                             (left > 0 ? ", " + left + " not moved yet" : "") + ".";
                 j.Log(j.Summary);
+            }
+        }
+
+        // Removes the folder the moved item came from, and the folders above it, while they are empty.
+        // Stops at the first folder that still holds something, at the drive root, and never removes
+        // _Clean or _Duplicates. (Undo puts the folders back: it re-creates the path it moves into.)
+        static void RemoveEmptyParents(Job j, string root, string folder)
+        {
+            string top = root.TrimEnd('\\');
+            string clean = Fs.Join(root, CleanName), dups = Fs.Join(root, DupName);
+            for (string p = folder; p != null && p.TrimEnd('\\').Length > top.Length; p = Fs.Parent(p))
+            {
+                if (string.Equals(p, clean, StringComparison.OrdinalIgnoreCase) || string.Equals(p, dups, StringComparison.OrdinalIgnoreCase)) break;
+                int err;
+                if (Fs.ListDir(p, out err).Count > 0 || err != 0) break;
+                if (!Fs.TryRemoveDir(p)) break;
+                j.Log("Removed the empty folder " + p);
             }
         }
 
@@ -3639,6 +3658,7 @@ function Get-FmDefaults {
         FmMinFolderKB    = 0
         FmIgnoreFiles    = ''
         FmIgnoreFolders  = ''
+        FmRemoveEmpty    = $true
     }
 }
 
@@ -3663,5 +3683,6 @@ function New-FmOptions {
     $o.IgnoreFiles = [string[]](& $split (Get-FmSetting -App $App -Key 'FmIgnoreFiles'))
     $o.IgnoreFolders = [string[]](& $split (Get-FmSetting -App $App -Key 'FmIgnoreFolders'))
     $o.MinGroupBytes = [long]([Math]::Max(1, [double](Get-FmSetting -App $App -Key 'FmMinFolderKB') * 1024))
+    $o.RemoveEmptyFolders = [bool]::Parse([string](Get-FmSetting -App $App -Key 'FmRemoveEmpty'))
     return $o
 }

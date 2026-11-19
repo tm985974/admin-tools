@@ -2,6 +2,13 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v2.0.2 (2026-11-19)  Folders a move leaves empty are removed
+  Fixed   : Moving the parts out of a Partly folder (or merging into a folder already in _Clean)
+            left the emptied folders behind. Now a folder a move leaves empty is removed, and
+            the folders above it while they are empty too (never the drive root, _Clean or
+            _Duplicates). Folders that were empty before are left alone; Undo re-creates the
+            path. Setting: Environment > File Manager > Remove folders a move leaves empty (on).
+
 v2.0.1 (2026-11-19)  The parts of Partly folders show in the list
   Added   : Under each Partly row, the folders inside it that have copies (Duplicate, Keep, Older
             copy found - the topmost ones) are listed, indented, with their own size, files,

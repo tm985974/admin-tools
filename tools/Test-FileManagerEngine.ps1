@@ -246,6 +246,19 @@ try {
     Check ($cat.MovedDuplicates() -eq 2) "2 duplicates waiting to be deleted: $($cat.MovedDuplicates())"
     Wait-Job2 ($cat.StartDeleteAllDuplicates())
     Check ($cat.MovedDuplicates() -eq 0 -and -not (Test-Path -LiteralPath "$($drive)_Duplicates\Docs")) 'Delete duplicates: both re-checked and deleted'
+
+    Write-Host 'Folders a move leaves empty are removed...'
+    New-File "$data\Shell\Inner\x.txt" ('X' * 300) $old           # a copy of _Clean\Docs, alone in Shell\Inner
+    Wait-Job2 ($cat.StartScan($drive, $o2))
+    $inner = @($cat.GetView($d2, '', $true) | Where-Object { $_.IsPart -and $_.Name -eq 'Inner' })
+    Check ($inner.Count -eq 1) 'Shell > Inner listed as a part'
+    $o2.RemoveEmptyFolders = $true; $cat.Options = $o2
+    $plan = $cat.BuildPlanFor($d2, [long[]]@($inner[0].FolderId), $false)
+    Wait-Job2 ($cat.StartApply($plan.BatchId))
+    Check (-not (Test-Path -LiteralPath "$data\Shell")) 'the emptied Shell folder was removed'
+    Check ((Test-Path -LiteralPath "$($drive)_Clean") -and (Test-Path -LiteralPath "$($drive)_Duplicates")) '_Clean and _Duplicates stay'
+    Wait-Job2 ($cat.StartUndo($plan.BatchId))
+    Check (Test-Path -LiteralPath "$data\Shell\Inner\x.txt") 'undo puts the folder back where it was'
 }
 finally {
     if ($cat) { try { $cat.Close() } catch { } }

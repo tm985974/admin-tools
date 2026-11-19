@@ -63,6 +63,12 @@ function Register-FmEnvironmentPage {
         & $add 'Ignore folders' $igd 'Wildcards, comma separated. Empty (default) = nothing is skipped (old Windows drives are shown in full, so you can decide).' 520
         $ctl.FmIgnoreFolders = $igd
 
+        $rem = New-Object System.Windows.Forms.CheckBox
+        $rem.Text = 'Remove folders a move leaves empty'
+        $rem.AutoSize = $true
+        & $add 'After a move' $rem 'On (default): when a move leaves the folder it came from empty (and the folders above it), they are removed. Folders that were empty before are left alone. Undo puts them back.'
+        $ctl.FmRemoveEmpty = $rem
+
         $btnDef = $App.Theme.MakeButton('Reset File Manager settings to defaults')
         $btnDef.Location = New-Object System.Drawing.Point(280, ($script:fmY + 4))
         $btnDef.Add_Click({
@@ -71,6 +77,7 @@ function Register-FmEnvironmentPage {
             $ctl.FmHashEverything.Checked = [bool]$defaults.FmHashEverything
             $ctl.FmMinFolderKB.Value = [decimal]$defaults.FmMinFolderKB
             $ctl.FmIgnoreFiles.Text = ''; $ctl.FmIgnoreFolders.Text = ''
+            $ctl.FmRemoveEmpty.Checked = [bool]$defaults.FmRemoveEmpty
         }.GetNewClosure())
         $Page.Controls.Add($btnDef)
 
@@ -84,6 +91,7 @@ function Register-FmEnvironmentPage {
                 $ctl.FmMinFolderKB.Value = [decimal][Math]::Max(0, [double](& $get 'FmMinFolderKB'))
                 $ctl.FmIgnoreFiles.Text = [string](& $get 'FmIgnoreFiles')
                 $ctl.FmIgnoreFolders.Text = [string](& $get 'FmIgnoreFolders')
+                $ctl.FmRemoveEmpty.Checked = [bool]::Parse([string](& $get 'FmRemoveEmpty'))
             }.GetNewClosure()
             Collect = {
                 param($Record)
@@ -94,6 +102,7 @@ function Register-FmEnvironmentPage {
                     FmMinFolderKB    = [double]$ctl.FmMinFolderKB.Value
                     FmIgnoreFiles    = $ctl.FmIgnoreFiles.Text.Trim()
                     FmIgnoreFolders  = $ctl.FmIgnoreFolders.Text.Trim()
+                    FmRemoveEmpty    = [bool]$ctl.FmRemoveEmpty.Checked
                 }
             }.GetNewClosure()
             Validate = { param($Record) return '' }
