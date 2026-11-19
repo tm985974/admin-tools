@@ -3,13 +3,9 @@
 # Builds the main-form tabs. Called once by _AppLauncher.ps1 with the empty
 # TabControl and the App context. One function per tab module keeps the Function
 # Map (function -> module) meaningful:
-#   Overview    -> New-OverviewTab       (Base/UI_Tab_Overview.psm1)      -- how to use File Manager
-#   Workflow    -> New-FmWorkflowTab     (Lite/UI_Tab_Workflow.psm1)      -- the recommended steps, where you are, buttons to each
-#   Drives      -> New-FmDrivesTab       (Lite/UI_Tab_Drives.psm1)        -- drives, priority, health check
-#   Scan        -> New-FmScanTab         (Lite/UI_Tab_Scan.psm1)          -- quick scan + content check, ignore lists
-#   Duplicates  -> New-FmDuplicatesTab   (Lite/UI_Tab_Duplicates.psm1)    -- duplicate folders, keepers, contained folders
-#   Reports     -> New-FmReportsTab      (Lite/UI_Tab_Reports.psm1)       -- batches (continue / undo / delete), history, exports
-#   Consolidate -> New-FmConsolidateTab  (Lite/UI_Tab_Consolidate.psm1)   -- Robocopy, verify, remove verified source files
+#   Overview     -> New-OverviewTab      (Base/UI_Tab_Overview.psm1)     -- how to use File Manager
+#   File Manager -> New-FmMainTab        (Lite/UI_Tab_FileManager.psm1)  -- the one page: drive, Scan, list, Move
+#                   (More: Drives, History, Check a folder, Consolidate - the old tabs, shown in a window)
 #   Environment -> New-EnvironmentTab    (Base/UI_Tab_Environment.psm1)   -- environment picker + fields + registered sections
 #
 # Admin-tier tabs: drop a module in Modules\Admin, define its function, and add
@@ -23,18 +19,18 @@ function Register-AppTabs {
         [Parameter(Mandatory)] $App
     )
 
+    # The File Manager page on the Environment tab (settings that rarely change).
+    if (Get-Command Register-FmEnvironmentPage -ErrorAction SilentlyContinue) {
+        try { Register-FmEnvironmentPage } catch { $App.Log('ERROR', 'Tabs', "Register-FmEnvironmentPage threw: $($_.Exception.Message)") }
+    }
+
     # Apply the saved app-wide logging settings (Settings\Logging.json) first.
     if (Get-Command Initialize-AppLogging -ErrorAction SilentlyContinue) { Initialize-AppLogging -App $App }
 
     $defs = @(
-        @{ Title = 'Overview';    Fn = 'New-OverviewTab' }
-        @{ Title = 'Workflow';    Fn = 'New-FmWorkflowTab' }
-        @{ Title = 'Drives';      Fn = 'New-FmDrivesTab' }
-        @{ Title = 'Scan';        Fn = 'New-FmScanTab' }
-        @{ Title = 'Duplicates';  Fn = 'New-FmDuplicatesTab' }
-        @{ Title = 'Reports';     Fn = 'New-FmReportsTab' }
-        @{ Title = 'Consolidate'; Fn = 'New-FmConsolidateTab' }
-        @{ Title = 'Environment'; Fn = 'New-EnvironmentTab' }
+        @{ Title = 'Overview';     Fn = 'New-OverviewTab' }
+        @{ Title = 'File Manager'; Fn = 'New-FmMainTab' }
+        @{ Title = 'Environment';  Fn = 'New-EnvironmentTab' }
     )
     $adminDefs = @(
         # @{ Title = 'Admin'; Fn = 'New-AdminTab' }   # example: add admin-tier tabs here

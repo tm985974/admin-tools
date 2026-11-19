@@ -6,37 +6,34 @@ aside so they can be checked before anything is deleted. Built on AppTemplate
 
 ## What it does
 
-- **One catalog for every drive.** Scan a drive, unplug it, plug in the next. Drives
-  are recognised by their serial number, so a changed drive letter does not matter.
-- **Matches folders by content only.** Folder names, file names and dates are ignored.
-  The layout inside the folder must match.
-- **Top-down.** When a whole folder is a copy, its sub folders are not listed again.
-- **Safe moves.** Everything moves on its own drive (a rename: instant, no free space
-  needed). You tick which moves run. Nothing is deleted until you ask, and each delete is
-  re-checked first.
-- **Start fresh** (Drives tab) empties the catalog; nothing on the drives changes.
+- **One hash database for every drive.** Scan a drive, unplug it, plug in the next. Drives are
+  recognised by their serial number, so a changed drive letter does not matter.
+- **Matches folders by content only.** Names and dates do not count; the layout inside must match.
+- **One page.** Pick a drive, **Scan**, then a list of the folders at the top of the drive:
 
-## Scan modes (Scan tab)
+| Status | Meaning | Move selected |
+|---|---|---|
+| Duplicate | the same content is kept elsewhere (Note says where) | to `_Duplicates` |
+| Older copy found | older than the copy already in `_Clean` | swap: this one to `_Clean`, that one to `_Duplicates` |
+| Keep (has copies) | this is the copy that is kept | to `_Clean` |
+| Partly | some folders inside have copies (double-click to look inside) | whole folder to `_Clean` |
+| Unique | no copy anywhere in the database | to `_Clean` |
+| Loose files | files at the top of the drive | to `_Clean` |
 
-- **Whole drive** - the usual scan.
-- **One folder** - scans one folder; the rest of that drive in the catalog stays. Actions can then
-  plan for just that folder (**Only this folder**).
-- **Check only** - compares a folder (for example on a thumb drive) with the catalog: each folder is
-  "Already have it" (and where), "Partly" or "New", plus the files not found. Nothing is added or moved.
+- Sorted by **reward** (the space you get back); size, files, folders and copies sort too.
+- Every move stays on its drive (an instant rename) and can be undone. Nothing is deleted until
+  **Delete duplicates**, which reads each folder again and compares it with its kept copy first.
+- **More**: Drives and priority (Start fresh), History (undo / delete only some moves), Check a
+  folder (is it already in the database?), Consolidate.
+- **Settings** (Environment tab > File Manager): older copy over `_Clean` (Ask / On / Off),
+  same-date tolerance (2 hours), hash every file, smallest folder to list, ignore lists.
 
-## The steps
+## Which copy is kept
 
-The **Workflow** tab shows these steps as a checklist, with where you are and a button for each.
-
-
-1. **Scan** every drive (quick scan: minutes per drive).
-2. Run the **content check** (reads only the files in folders that might be duplicates).
-3. **Duplicates** tab: review the groups. Change a keeper with **Make keeper**.
-4. **Actions > Build plan**: every move is listed with a tick box (nothing moves yet).
-5. Tick all, some or one, then **Move selected** (the exact commands are shown first).
-   Unticked steps wait for later (**Reports > Open batch**).
-6. Check `_Duplicates` by hand if you like, then tick them and **Delete selected duplicates**.
-7. Later: **Consolidate** each drive's `_Clean` onto one NTFS drive (copy, verify, remove).
+1. Your pick (History / older versions), else a copy inside a folder that is kept.
+2. The copy with the oldest files (dates within the tolerance count as the same; dates before
+   1980 or in the future are ignored). With the swap setting Off, a copy in `_Clean` wins first.
+3. A copy already in `_Clean`, then the drive priority, then the shortest path.
 
 ## Where things go (on each drive)
 
@@ -48,14 +45,6 @@ X:\_Duplicates\<kept folder path>\FolderName\
       FolderName (2)\                                   numbers are unique across all drives
 ```
 
-## Which copy is kept
-
-1. Your pick (**Make keeper**).
-2. A copy already in `_Clean` (or inside a folder that is kept).
-3. The copy with the oldest files.
-4. The drive with the lowest priority number (**Drives** tab).
-5. The shortest path.
-
 ## Matching
 
 | | How | Used for |
@@ -64,7 +53,7 @@ X:\_Duplicates\<kept folder path>\FolderName\
 | Content fingerprint | the hashes (MD5; SHA-1 on FIPS machines) of the files + the sub folders' content fingerprints | confirming matches; only these move by default |
 
 - Every file counts by default, so folders only match when they are identical. Optional ignore
-  lists are on the Scan tab (empty by default). Empty folders hold no data and are not compared.
+  lists are on the Environment tab > File Manager (empty by default). Empty folders hold no data and are not compared.
 - Not scanned: `_Duplicates`, `System Volume Information`, `$RECYCLE.BIN`, junctions / links,
   cloud placeholder files.
 - File hashes are kept in the catalog, so the file phase will not need to read the drives again.
@@ -74,7 +63,7 @@ X:\_Duplicates\<kept folder path>\FolderName\
 | What | Where |
 |---|---|
 | Catalog (SQLite) | `%LOCALAPPDATA%\FileManagerData\Catalog\FileManager.db` (always local) |
-| Settings (ignore lists) | `<data root>\Settings\FileManager.json` |
+| Settings | the environment record (Environment tab > File Manager) |
 | Logs (Session.log, Robocopy logs) | `<data root>\Logs` |
 
 ## Requirements
@@ -89,15 +78,13 @@ X:\_Duplicates\<kept folder path>\FolderName\
 |---|---|
 | `Lite\FM_Engine.psm1` | the engine (catalog, scan, hashing, analysis, plans, moves, undo, delete, verify, exports) + settings |
 | `Lite\FM_Common.psm1` | shared UI helpers (grid, progress, task watcher, refresh between tabs) |
-| `Lite\FM_ActionsDialog.psm1` | the Actions window (build a plan) |
 | `Lite\FM_BatchWindow.psm1` | the batch window (tick steps: move, undo, delete) |
 | `Lite\FM_CheckWindow.psm1` | Check only results |
-| `Lite\UI_Tab_Workflow.psm1` | Workflow tab |
-| `Lite\UI_Tab_Drives.psm1` | Drives tab |
-| `Lite\UI_Tab_Scan.psm1` | Scan tab |
-| `Lite\UI_Tab_Duplicates.psm1` | Duplicates tab |
-| `Lite\UI_Tab_Reports.psm1` | Reports tab |
-| `Lite\UI_Tab_Consolidate.psm1` | Consolidate tab |
+| `Lite\UI_Tab_FileManager.psm1` | the one page (and the More windows) |
+| `Lite\UI_Env_FileManager.psm1` | the File Manager page on the Environment tab |
+| `Lite\UI_Tab_Drives.psm1` | More > Drives and priority |
+| `Lite\UI_Tab_Reports.psm1` | More > History |
+| `Lite\UI_Tab_Consolidate.psm1` | More > Consolidate |
 
 ---
 

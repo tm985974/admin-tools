@@ -7,9 +7,8 @@
 # heavy loops run at native speed and never block the window.
 #
 #   Get-FmCatalog  -App $App          the one catalog for this session
-#   Get-FmSettings -App $App          Settings\FileManager.json (ignore lists ...)
-#   Save-FmSettings -App $App -Settings $s
-#   New-FmOptions  -App $App [-ContentCheck] [-HashAllSameSize] [-IncludeQuick]
+#   Get-FmSetting  -App $App -Key FmSwapOlder   a setting from Environment > File Manager (or its default)
+#   New-FmOptions  -App $App          the engine options built from those settings
 #
 # Where things are: the catalog is <LocalAppData>\FileManagerData\Catalog\FileManager.db
 # (always local - a database on a network share is slow and fragile).
@@ -685,6 +684,9 @@ namespace FileManagerEngine
         public string[] IgnoreFiles = new string[0];
         public string[] IgnoreFolders = new string[0];
         public long MinGroupBytes = 1;
+        public bool HashEverything = true;        // read every file during a scan (not only possible duplicates)
+        public double ToleranceHours = 2;         // file dates this close count as the same (FAT32 / time zones)
+        public string SwapMode = "Ask";           // Ask / On: the oldest copy is kept, even over one in _Clean. Off: _Clean always wins.
     }
 
     public class VolumeRow
@@ -751,6 +753,13 @@ namespace FileManagerEngine
     {
         public long Id, Size;
         public string Rel, Status, Note;
+    }
+
+    public class ViewRow
+    {
+        public long FolderId, Files, Bytes, Folders, Copies, Reward;
+        public string Kind, Rel, Name, Status, Oldest, Note;
+        public bool HasInside;
     }
 
     public class CheckRun
@@ -858,6 +867,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             if (!System.IO.Directory.Exists(dir)) System.IO.Directory.CreateDirectory(dir);
             _db = Open();
             _db.Exec(Schema);
+            try { _db.Exec("ALTER TABLE dgroups ADD COLUMN swap INTEGER NOT NULL DEFAULT 0"); } catch { }   // 2.0: column added to older catalogs
             string alg = _db.Scalar("SELECT v FROM meta WHERE k='hash'") as string;
             if (string.IsNullOrEmpty(alg))
             {
@@ -925,6 +935,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                 finally
                 {
                     if (db != null) { try { db.Rollback(); } catch { } db.Dispose(); }
+                    Touch();
                     job.Phase = job.Failed ? "Failed" : (job.Cancelled ? "Stopped" : "Done");
                     job.Current = "";
                     job.Finished = true;
@@ -1297,8 +1308,12 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             public string Q, C;
         }
 
+        // File dates before 1980 or in the future are wrong clocks: they never count as "oldest".
+        static readonly long MinValidTime = new DateTime(1980, 1, 2, 0, 0, 0, DateTimeKind.Utc).ToFileTimeUtc();
+
         internal void Recompute(Db db, long d)
         {
+            long maxValid = DateTime.UtcNow.AddDays(2).ToFileTimeUtc();
             List<FNode> nodes = new List<FNode>();
             Dictionary<long, int> index = new Dictionary<long, int>();
             using (Stmt s = db.Prepare("SELECT id, parent_id FROM folders WHERE drive_id=?"))
@@ -1319,7 +1334,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                     n.OwnFiles++;
                     n.OwnBytes += size;
                     if (s.IsNull(3)) n.OwnHashed = false; else n.Hashes.Add(s.Text(3) + ":" + size);
-                    if (mt > 0 && (n.Oldest == 0 || mt < n.Oldest)) n.Oldest = mt;
+                    if (mt > MinValidTime && mt < maxValid && (n.Oldest == 0 || mt < n.Oldest)) n.Oldest = mt;
                 }
             }
             List<int> order = new List<int>(nodes.Count);
@@ -1430,7 +1445,23 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                     }
                 }
             }
-            if (o.HashAllSameSize)
+            if (o.HashEverything)
+            {
+                using (Stmt s = db.Prepare("SELECT id, drive_id, path, size FROM files WHERE drive_id>0 AND hash IS NULL AND size>0"))
+                {
+                    s.Bind();
+                    while (s.Step())
+                    {
+                        long id = s.Long(0), dr = s.Long(1);
+                        if (seen.ContainsKey(id) || stale.ContainsKey(dr)) continue;
+                        string root;
+                        if (!roots.TryGetValue(dr, out root)) { offline[dr] = true; continue; }
+                        seen[id] = true;
+                        todo.Add(new HashItem(id, dr, Fs.Join(root, s.Text(2)), s.Long(3)));
+                    }
+                }
+            }
+            if (o.HashAllSameSize && !o.HashEverything)
             {
                 using (Stmt s = db.Prepare("SELECT id, drive_id, path, size FROM files WHERE drive_id>0 AND hash IS NULL AND size>0 AND size IN (SELECT size FROM files WHERE drive_id>0 AND size>0 GROUP BY size HAVING count(*)>1)"))
                 {
@@ -1585,6 +1616,8 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                 return c != 0 ? c : a.MinDepth.CompareTo(b.MinDepth);
             });
 
+            long tol = (long)(Math.Max(0, o.ToleranceHours) * 36000000000.0);   // FILETIME: 100 ns units
+            bool cleanFirst = string.Equals(o.SwapMode, "Off", StringComparison.OrdinalIgnoreCase);
             Dictionary<string, object[]> picks = new Dictionary<string, object[]>();
             foreach (object[] r in db.Rows("SELECT sig, drive_id, path FROM keeper_pick")) picks[Util.S(r[0])] = r;
 
@@ -1592,7 +1625,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             long reclaim = 0;
             db.Begin();
             db.Exec("DELETE FROM dmembers; DELETE FROM dgroups;");
-            using (Stmt insG = db.Prepare("INSERT INTO dgroups(gkey, qsig, csig, confirmed, name, copies, files, bytes, reclaim, keeper_drive, keeper_path) VALUES(?,?,?,?,?,?,?,?,?,?,?)"))
+            using (Stmt insG = db.Prepare("INSERT INTO dgroups(gkey, qsig, csig, confirmed, name, copies, files, bytes, reclaim, keeper_drive, keeper_path, swap) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)"))
             using (Stmt insM = db.Prepare("INSERT INTO dmembers(group_id, folder_id, drive_id, path, oldest, role, reason) VALUES(?,?,?,?,?,?,?)"))
             {
                 foreach (GroupWork g in groups)
@@ -1625,13 +1658,17 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                         foreach (int m in live)
                         {
                             if (keeper < 0) { keeper = m; continue; }
-                            if (Better(nodes, m, keeper)) keeper = m;
+                            if (Better(nodes, m, keeper, tol, cleanFirst)) keeper = m;
                         }
                         ANode k = nodes[keeper];
-                        if (Util.InClean(k.Path)) reason = "Already in _Clean";
-                        else if (UnderRole(nodes, keeper, 1)) reason = "Inside a kept folder";
+                        if (UnderRole(nodes, keeper, 1)) reason = "Inside a kept folder";
+                        else if (Util.InClean(k.Path)) reason = "Already in _Clean";
                         else reason = "Oldest files" + (k.Oldest > 0 ? " (" + Util.Date(k.Oldest) + ")" : "") + ", drive priority " + k.Prio;
                     }
+                    // An older copy than the one already in _Clean: the _Clean copy becomes the duplicate (a swap).
+                    bool swap = false;
+                    if (!Util.InClean(nodes[keeper].Path)) foreach (int m in live) if (m != keeper && Util.InClean(nodes[m].Path)) swap = true;
+                    if (swap) reason = "Older than the copy in _Clean (" + Util.Date(nodes[keeper].Oldest) + ")";
                     List<int> dups = new List<int>();
                     List<int> held = new List<int>();
                     foreach (int m in live)
@@ -1647,10 +1684,11 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
 
                     ANode kn = nodes[keeper];
                     long rec = kn.Bytes * dups.Count;
-                    insG.Exec(g.Key, kn.Q, kn.C, confirmed ? 1 : 0, kn.Name, live.Count, kn.Files, kn.Bytes, rec, kn.Drive, kn.Path);
+                    insG.Exec(g.Key, kn.Q, kn.C, confirmed ? 1 : 0, kn.Name, live.Count, kn.Files, kn.Bytes, rec, kn.Drive, kn.Path, swap ? 1 : 0);
                     long gid = db.LastId;
                     insM.Exec(gid, kn.Id, kn.Drive, kn.Path, kn.Oldest, "Keep", reason);
-                    foreach (int m in dups) insM.Exec(gid, nodes[m].Id, nodes[m].Drive, nodes[m].Path, nodes[m].Oldest, "Duplicate", confirmed ? "Same content" : "Same sizes (quick match only)");
+                    foreach (int m in dups) insM.Exec(gid, nodes[m].Id, nodes[m].Drive, nodes[m].Path, nodes[m].Oldest, "Duplicate",
+                        Util.InClean(nodes[m].Path) ? "In _Clean, but a copy with older files was found" : (confirmed ? "Same content" : "Same sizes (quick match only)"));
                     foreach (int m in held) insM.Exec(gid, nodes[m].Id, nodes[m].Drive, nodes[m].Path, nodes[m].Oldest, "Stays", "Holds a folder that is kept elsewhere in the list");
                     groupCount++;
                     dupCount += dups.Count;
@@ -1665,15 +1703,20 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             j.Log(j.Summary);
         }
 
-        // true when a is the better keeper than b
-        static bool Better(List<ANode> nodes, int a, int b)
+        // true when a is the better keeper than b:
+        //   inside a folder that is kept already; then (swap Off) a copy in _Clean;
+        //   then the oldest files (dates within the tolerance count as the same); then a copy in _Clean;
+        //   then drive priority, the shallowest and shortest path.
+        static bool Better(List<ANode> nodes, int a, int b, long tol, bool cleanFirst)
         {
             ANode x = nodes[a], y = nodes[b];
-            int sx = (Util.InClean(x.Path) || UnderRole(nodes, a, 1)) ? 0 : 1;
-            int sy = (Util.InClean(y.Path) || UnderRole(nodes, b, 1)) ? 0 : 1;
-            if (sx != sy) return sx < sy;
+            int kx = UnderRole(nodes, a, 1) ? 0 : 1, ky = UnderRole(nodes, b, 1) ? 0 : 1;
+            if (kx != ky) return kx < ky;
+            int cx = Util.InClean(x.Path) ? 0 : 1, cy = Util.InClean(y.Path) ? 0 : 1;
+            if (cleanFirst && cx != cy) return cx < cy;
             long ox = x.Oldest > 0 ? x.Oldest : long.MaxValue, oy = y.Oldest > 0 ? y.Oldest : long.MaxValue;
-            if (ox != oy) return ox < oy;
+            if (ox != oy && (ox == long.MaxValue || oy == long.MaxValue || Math.Abs(ox - oy) > tol)) return ox < oy;
+            if (cx != cy) return cx < cy;
             if (x.Prio != y.Prio) return x.Prio < y.Prio;
             if (x.Depth != y.Depth) return x.Depth < y.Depth;
             if (x.Path.Length != y.Path.Length) return x.Path.Length < y.Path.Length;
@@ -1894,10 +1937,15 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
         // was cleaned into it), the contents are merged: whatever is not there yet moves in.
         void AddCleanMoves(List<object[]> items, StringBuilder sb, PlanSummary ps, long d, string root, string rel, bool isDir, long size, Dictionary<string, bool> dupSources, int depth)
         {
+            AddCleanMoves(items, sb, ps, d, root, rel, isDir, size, dupSources, depth, null);
+        }
+
+        void AddCleanMoves(List<object[]> items, StringBuilder sb, PlanSummary ps, long d, string root, string rel, bool isDir, long size, Dictionary<string, bool> dupSources, int depth, Dictionary<string, bool> vacated)
+        {
             if (dupSources.ContainsKey(d + "|" + rel.ToLowerInvariant())) return;
             string dst = CleanName + "\\" + rel;
             string dstFull = Fs.Join(root, dst);
-            if (Fs.Exists(dstFull))
+            if (Fs.Exists(dstFull) && (vacated == null || !vacated.ContainsKey(dstFull)))
             {
                 if (isDir && Fs.IsDir(dstFull) && depth < 40)
                 {
@@ -1907,7 +1955,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                     foreach (FsEntry e in kids)
                     {
                         if (e.IsReparse) continue;
-                        AddCleanMoves(items, sb, ps, d, root, rel + "\\" + e.Name, e.IsDir, e.Size, dupSources, depth + 1);
+                        AddCleanMoves(items, sb, ps, d, root, rel + "\\" + e.Name, e.IsDir, e.Size, dupSources, depth + 1, vacated);
                     }
                     return;
                 }
@@ -2457,6 +2505,7 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             else _db.Exec("DELETE FROM drives; DELETE FROM batches; DELETE FROM actions; DELETE FROM dupnum; DELETE FROM vruns; DELETE FROM vrows;");
             _db.Commit();
             _db.Exec("VACUUM;");
+            Touch();
         }
 
         // ------------------------------------------------------------ check only (compare a folder with the catalog; add nothing)
@@ -2743,6 +2792,289 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
             w.VerifyRuns = _db.ScalarLong("SELECT count(*) FROM vruns WHERE status='done'");
             w.Checks = _db.ScalarLong("SELECT count(*) FROM checks WHERE status='done'");
             return w;
+        }
+
+        // ------------------------------------------------------------ the one-page list (2.0)
+
+        sealed class VNode
+        {
+            public long Id, Parent, Files, Bytes, Oldest, Folders, InnerDupBytes, Copies, GroupId, KeeperDrive;
+            public string Path, Name, Role, Reason, KeeperPath;
+            public int Depth, ParentIdx = -1;
+            public bool Swap, InnerRole;
+            public List<int> Kids = new List<int>();
+        }
+
+        sealed class VData { public List<VNode> Nodes = new List<VNode>(); public Dictionary<long, int> Index = new Dictionary<long, int>(); public long RootFiles, RootBytes; }
+
+        int _stamp;
+        long _vDrive = -1; int _vStamp = -1; VData _vData;
+
+        // Anything that changes the catalog bumps the stamp, so the list is read again.
+        void Touch() { Interlocked.Increment(ref _stamp); }
+
+        VData LoadView(long d)
+        {
+            if (_vData != null && _vDrive == d && _vStamp == _stamp && !Busy) return _vData;
+            VData v = new VData();
+            Dictionary<long, string> names = new Dictionary<long, string>();
+            foreach (object[] r in _db.Rows("SELECT id, label, letter FROM drives")) names[Util.L(r[0])] = Util.S(r[2]) + " " + Util.S(r[1]);
+            using (Stmt s = _db.Prepare("SELECT id, parent_id, path, name, depth, files, bytes, oldest, own_files FROM folders WHERE drive_id=?"))
+            {
+                s.Bind(d);
+                while (s.Step())
+                {
+                    VNode n = new VNode();
+                    n.Id = s.Long(0); n.Parent = s.Long(1); n.Path = s.Text(2); n.Name = s.Text(3); n.Depth = (int)s.Long(4);
+                    n.Files = s.Long(5); n.Bytes = s.Long(6); n.Oldest = s.Long(7);
+                    if (n.Depth == 0) v.RootFiles = s.Long(8);
+                    v.Index[n.Id] = v.Nodes.Count; v.Nodes.Add(n);
+                }
+            }
+            foreach (object[] r in _db.Rows(@"SELECT m.folder_id, m.role, m.reason, g.id, g.copies, g.swap, g.keeper_drive, g.keeper_path
+                                             FROM dmembers m JOIN dgroups g ON g.id=m.group_id WHERE m.drive_id=?", d))
+            {
+                int i;
+                if (!v.Index.TryGetValue(Util.L(r[0]), out i)) continue;
+                VNode n = v.Nodes[i];
+                n.Role = Util.S(r[1]); n.Reason = Util.S(r[2]); n.GroupId = Util.L(r[3]); n.Copies = Util.L(r[4]); n.Swap = Util.L(r[5]) != 0;
+                n.KeeperDrive = Util.L(r[6]);
+                string kn; names.TryGetValue(n.KeeperDrive, out kn);
+                n.KeeperPath = (kn ?? "?") + "  \\" + Util.S(r[7]);
+            }
+            // tree, folder counts and what is inside (children before parents)
+            List<int> order = new List<int>();
+            for (int i = 0; i < v.Nodes.Count; i++) { int p; if (v.Index.TryGetValue(v.Nodes[i].Parent, out p) && p != i) { v.Nodes[i].ParentIdx = p; v.Nodes[p].Kids.Add(i); } }
+            for (int i = 0; i < v.Nodes.Count; i++) order.Add(i);
+            order.Sort(delegate(int a, int b) { return v.Nodes[b].Depth.CompareTo(v.Nodes[a].Depth); });
+            foreach (int i in order)
+            {
+                VNode n = v.Nodes[i];
+                foreach (int c in n.Kids)
+                {
+                    VNode m = v.Nodes[c];
+                    n.Folders += 1 + m.Folders;
+                    if (m.Role == "Duplicate" || m.Role == "Keep") { n.InnerRole = true; if (m.Role == "Duplicate") n.InnerDupBytes += m.Bytes; }
+                    if (m.InnerRole) { n.InnerRole = true; n.InnerDupBytes += m.InnerDupBytes; }
+                }
+                if (n.Depth == 0)
+                {
+                    long fb = n.Bytes;
+                    foreach (int c in n.Kids) fb -= v.Nodes[c].Bytes;
+                    v.RootBytes = fb;
+                }
+            }
+            _vData = v; _vDrive = d; _vStamp = _stamp;
+            return v;
+        }
+
+        // What to show (and do) for one folder.
+        static string Classify(VNode n)
+        {
+            if (n.Role == "Duplicate") return Util.InClean(n.Path) ? "Swap out" : "Duplicate";
+            if (n.Role == "Keep") return n.Swap ? "Older copy found" : (Util.InClean(n.Path) ? "In _Clean" : "Keep (has copies)");
+            if (n.InnerRole) return "Partly";
+            return "Unique";
+        }
+
+        // Rows for the folders directly inside parentRel ("" = the top of the drive), biggest reward first.
+        public List<ViewRow> GetView(long driveId, string parentRel)
+        {
+            VData v = LoadView(driveId);
+            List<ViewRow> rows = new List<ViewRow>();
+            int pi = -1;
+            for (int i = 0; i < v.Nodes.Count; i++) if (string.Equals(v.Nodes[i].Path, parentRel ?? "", StringComparison.OrdinalIgnoreCase)) { pi = i; break; }
+            if (pi < 0) return rows;
+            VNode parent = v.Nodes[pi];
+            if (parent.Depth == 0 && v.RootFiles > 0)
+            {
+                ViewRow lf = new ViewRow();
+                lf.Kind = "files"; lf.Status = "Loose files"; lf.Name = "(files at the top of the drive)"; lf.Rel = ""; lf.Files = v.RootFiles; lf.Bytes = v.RootBytes;
+                lf.Note = "Files directly in the drive's top folder; Move puts them in _Clean.";
+                rows.Add(lf);
+            }
+            foreach (int c in parent.Kids)
+            {
+                VNode n = v.Nodes[c];
+                if (n.Files == 0) continue;
+                if (n.Depth == 1 && (string.Equals(n.Path, CleanName, StringComparison.OrdinalIgnoreCase) || string.Equals(n.Path, DupName, StringComparison.OrdinalIgnoreCase))) continue;
+                ViewRow r = new ViewRow();
+                r.Kind = "folder"; r.FolderId = n.Id; r.Rel = n.Path; r.Name = n.Name; r.Status = Classify(n);
+                r.Files = n.Files; r.Bytes = n.Bytes; r.Folders = n.Folders; r.Copies = n.Copies; r.Oldest = Util.Date(n.Oldest);
+                r.HasInside = n.Kids.Count > 0;
+                switch (r.Status)
+                {
+                    case "Duplicate": r.Reward = n.Bytes; r.Note = "Kept copy: " + n.KeeperPath; break;
+                    case "Swap out": r.Reward = n.Bytes; r.Note = "An older copy was found: " + n.KeeperPath; break;
+                    case "Older copy found": r.Reward = n.Bytes; r.Note = "Older than the copy in _Clean; Move swaps them (that copy goes to _Duplicates)."; break;
+                    case "Keep (has copies)": r.Reward = n.Bytes * Math.Max(0, n.Copies - 1); r.Note = (n.Copies - 1) + " other copy/copies; this one is kept (" + n.Reason + ")."; break;
+                    case "Partly": r.Reward = n.InnerDupBytes; r.Note = "Some folders inside have copies - double-click to see them."; break;
+                    default: r.Note = "No copy anywhere in the catalog."; break;
+                }
+                rows.Add(r);
+            }
+            rows.Sort(delegate(ViewRow a, ViewRow b)
+            {
+                int c = b.Reward.CompareTo(a.Reward);
+                return c != 0 ? c : b.Bytes.CompareTo(a.Bytes);
+            });
+            return rows;
+        }
+
+        // Totals for the top of a drive: count and bytes per status.
+        public string ViewSummary(long driveId)
+        {
+            Dictionary<string, long[]> t = new Dictionary<string, long[]>();
+            foreach (ViewRow r in GetView(driveId, ""))
+            {
+                long[] a;
+                if (!t.TryGetValue(r.Status, out a)) { a = new long[2]; t[r.Status] = a; }
+                a[0]++; a[1] += r.Bytes;
+            }
+            List<string> parts = new List<string>();
+            foreach (string k in new string[] { "Duplicate", "Older copy found", "Keep (has copies)", "Partly", "Unique", "Loose files" })
+            {
+                long[] a;
+                if (t.TryGetValue(k, out a)) parts.Add(k + ": " + a[0].ToString("N0") + " (" + Util.Size(a[1]) + ")");
+            }
+            return parts.Count == 0 ? "Nothing outside _Clean." : string.Join("   |   ", parts.ToArray());
+        }
+
+        // A batch for the ticked rows of one drive: Duplicate -> _Duplicates; Older copy found -> the _Clean copy
+        // goes to _Duplicates and this one to _Clean; everything else (and loose files) -> _Clean.
+        public PlanSummary BuildPlanFor(long driveId, long[] folderIds, bool rootFiles)
+        {
+            if (Busy) throw new InvalidOperationException("Wait for the running task to finish first.");
+            PlanSummary ps = new PlanSummary();
+            Dictionary<long, string> roots = ConnectedRoots(_db);
+            string root;
+            if (!roots.TryGetValue(driveId, out root)) throw new InvalidOperationException(DriveName(_db, driveId) + " is not connected.");
+            if (_db.ScalarLong("SELECT needs_rescan FROM drives WHERE id=?", driveId) != 0) throw new InvalidOperationException("Scan " + DriveName(_db, driveId) + " again first: it changed since the last scan.");
+            VData v = LoadView(driveId);
+            List<object[]> items = new List<object[]>();
+            Dictionary<string, bool> dupSources = new Dictionary<string, bool>();
+            Dictionary<string, long> nextN = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, bool> usedDst = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, bool> vacated = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            List<VNode> toClean = new List<VNode>();
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("# File Manager - moves for the rows you ticked on " + root + ", built " + Util.Now());
+
+            foreach (long fid in folderIds ?? new long[0])
+            {
+                int i;
+                if (!v.Index.TryGetValue(fid, out i)) continue;
+                VNode n = v.Nodes[i];
+                string st = Classify(n);
+                if (!Fs.IsDir(Fs.Join(root, n.Path))) { ps.Skipped++; ps.Notes.Add("Not found any more (scan again): " + Fs.Join(root, n.Path)); continue; }
+                object[] g = null;
+                foreach (object[] r in _db.Rows("SELECT qsig, csig, confirmed, keeper_drive, keeper_path, bytes, files FROM dgroups WHERE id=?", n.GroupId)) g = r;
+                if (st == "Duplicate" || st == "Swap out")
+                {
+                    if (g == null) continue;
+                    AddDup(items, ps, driveId, root, n.Path, g, Util.L(g[3]), Util.S(g[4]), nextN, usedDst, dupSources);
+                }
+                else if (st == "Older copy found")
+                {
+                    // the copy in _Clean (on this or another drive) moves to _Duplicates first
+                    foreach (object[] m in _db.Rows("SELECT drive_id, path FROM dmembers WHERE group_id=? AND role='Duplicate'", n.GroupId))
+                    {
+                        long md = Util.L(m[0]); string mp = Util.S(m[1]), mroot;
+                        if (!Util.InClean(mp)) continue;
+                        if (!roots.TryGetValue(md, out mroot)) { ps.Notes.Add("The copy in _Clean is on " + DriveName(_db, md) + ", which is not connected: connect it to swap " + n.Path + "."); continue; }
+                        if (g != null) AddDup(items, ps, md, mroot, mp, g, driveId, n.Path, nextN, usedDst, dupSources);
+                        vacated[Fs.Join(mroot, mp)] = true;
+                    }
+                    toClean.Add(n);
+                }
+                else if (st == "In _Clean") continue;
+                else toClean.Add(n);
+            }
+            foreach (VNode n in toClean) AddCleanMoves(items, sb, ps, driveId, root, n.Path, true, 0, dupSources, 0, vacated);
+            if (rootFiles)
+            {
+                int err;
+                foreach (FsEntry e in Fs.ListDir(root, out err))
+                {
+                    if (e.IsDir || e.IsReparse || e.Name.StartsWith("$")) continue;
+                    if ((e.Attributes & Fs.Hidden) != 0 && (e.Attributes & Fs.SystemAttr) != 0) continue;
+                    if (string.Equals(e.Name, "autorun.inf", StringComparison.OrdinalIgnoreCase)) continue;
+                    AddCleanMoves(items, sb, ps, driveId, root, e.Name, false, e.Size, dupSources, 0, vacated);
+                }
+            }
+            if (items.Count == 0) return ps;
+            // dup moves first, then _Clean moves (a swap frees the name in _Clean first)
+            List<object[]> ordered = new List<object[]>();
+            foreach (object[] it in items) if ((string)it[0] == "dup") ordered.Add(it);
+            foreach (object[] it in items) if ((string)it[0] != "dup") ordered.Add(it);
+            SavePlan(ps, ordered, ps.DupItems + " to _Duplicates, " + ps.CleanItems + " to _Clean (" + root + ")");
+            return ps;
+        }
+
+        void AddDup(List<object[]> items, PlanSummary ps, long d, string root, string src, object[] g, long kdrive, string kpath,
+                    Dictionary<string, long> nextN, Dictionary<string, bool> usedDst, Dictionary<string, bool> dupSources)
+        {
+            string krel = Util.StripClean(kpath);
+            string kname = Fs.LastPart(krel);
+            string baseDir = DupName + "\\" + krel;
+            long n;
+            if (!nextN.TryGetValue(krel, out n)) n = _db.ScalarLong("SELECT n FROM dupnum WHERE keeper=?", krel);
+            string dst;
+            do { n++; dst = baseDir + "\\" + kname + " (" + n + ")"; }
+            while (usedDst.ContainsKey(root + dst) || Fs.Exists(Fs.Join(root, dst)));
+            nextN[krel] = n;
+            usedDst[root + dst] = true;
+            bool confirmed = Util.L(g[2]) != 0;
+            items.Add(new object[] { "dup", d, root, src, dst, 1, g[0], g[1], confirmed ? 1 : 0, kdrive, kpath, krel, n, Util.L(g[5]), Util.L(g[6]) });
+            dupSources[d + "|" + src.ToLowerInvariant()] = true;
+            ps.DupItems++;
+            ps.DupBytes += Util.L(g[5]);
+        }
+
+        void SavePlan(PlanSummary ps, List<object[]> items, string note)
+        {
+            _db.Begin();
+            _db.Run("INSERT INTO batches(created, status, note, script) VALUES(?, 'planned', ?, '')", Util.Now(), note);
+            long bid = _db.LastId;
+            List<object[]> older = _db.Rows("SELECT DISTINCT batch_id FROM actions WHERE status IN ('planned','failed') AND batch_id<>?", bid);
+            _db.Run("UPDATE actions SET status='replaced', error=? WHERE status IN ('planned','failed') AND batch_id<>?", "Not run; replaced by plan " + bid, bid);
+            foreach (object[] o in older) SetBatchStatus(_db, Util.L(o[0]));
+            using (Stmt ins = _db.Prepare(@"INSERT INTO actions(batch_id, seq, kind, drive_id, root, src, dst, isdir, qsig, csig, confirmed, keeper_drive, keeper_path, keeper_rel, dupn, bytes, files, status)
+                                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'planned')"))
+            {
+                int seq = 0;
+                foreach (object[] it in items)
+                {
+                    seq++;
+                    ins.Exec(bid, seq, it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7], it[8], it[9], it[10], it[11], it[12], it[13], it[14]);
+                }
+            }
+            _db.Commit();
+            ps.BatchId = bid;
+            _db.Run("UPDATE batches SET script=? WHERE id=?", MoveScript(bid, null), bid);
+            Touch();
+        }
+
+        // The newest batch with moves that can still be undone (0 = none).
+        public long LastUndoableBatch() { return _db.ScalarLong("SELECT ifnull(max(batch_id),0) FROM actions WHERE status='done'"); }
+
+        public long MovedDuplicates() { return _db.ScalarLong("SELECT count(*) FROM actions WHERE kind='dup' AND status='done'"); }
+        public long MovedDuplicateBytes() { return _db.ScalarLong("SELECT ifnull(sum(bytes),0) FROM actions WHERE kind='dup' AND status='done'"); }
+
+        public string DeleteAllScript()
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (object[] r in _db.Rows("SELECT DISTINCT batch_id FROM actions WHERE kind='dup' AND status='done' ORDER BY batch_id")) sb.Append(DeleteScript(Util.L(r[0]))).AppendLine();
+            return sb.ToString();
+        }
+
+        public Job StartDeleteAllDuplicates()
+        {
+            return StartJob("Delete moved duplicates", delegate(Job j, Db db)
+            {
+                foreach (object[] r in db.Rows("SELECT DISTINCT batch_id FROM actions WHERE kind='dup' AND status='done' ORDER BY batch_id"))
+                    DoDeleteDuplicates(j, db, Util.L(r[0]), null);
+            });
         }
 
         // ------------------------------------------------------------ "contained in" report
@@ -3250,55 +3582,41 @@ function Get-FmCatalog {
     return $cat
 }
 
-function Get-FmSettings {
+# Settings live in the environment record (Environment tab > File Manager page), keys Fm*.
+# Defaults when nothing is saved: ask before a swap, 2 hours, hash every file, nothing ignored.
+function Get-FmDefaults {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $App)
-    # Default: compare EVERYTHING, so a copy only matches when its folder is identical.
-    $s = [pscustomobject]@{
-        SettingsVersion      = 2
-        IgnoreFiles          = @()
-        IgnoreFolders        = @()
-        MinFolderKB          = 0
-        ShowActionsAfterScan = $true
+    param()
+    return [ordered]@{
+        FmSwapOlder      = 'Ask'
+        FmToleranceHours = 2
+        FmHashEverything = $true
+        FmMinFolderKB    = 0
+        FmIgnoreFiles    = ''
+        FmIgnoreFolders  = ''
     }
-    $path = Join-Path (Get-AppSettingsDir -App $App) 'FileManager.json'
-    if (Test-Path -LiteralPath $path) {
-        try {
-            $j = [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
-            $v = $(if ($j.PSObject.Properties['SettingsVersion']) { [int]$j.SettingsVersion } else { 1 })
-            foreach ($p in $s.PSObject.Properties) {
-                if ($p.Name -eq 'SettingsVersion') { continue }
-                # 1.0.x saved its default ignore lists; from 1.1 the default is to ignore nothing.
-                if ($v -lt 2 -and ($p.Name -eq 'IgnoreFiles' -or $p.Name -eq 'IgnoreFolders')) { continue }
-                if ($j.PSObject.Properties[$p.Name]) { $s.($p.Name) = $j.($p.Name) }
-            }
-        }
-        catch { $App.Log('WARN', 'FileManager', "Settings file not readable, using defaults: $($_.Exception.Message)") }
-    }
-    $s.IgnoreFiles = @($s.IgnoreFiles | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
-    $s.IgnoreFolders = @($s.IgnoreFolders | ForEach-Object { [string]$_ } | Where-Object { $_.Trim() })
-    return $s
 }
 
-function Save-FmSettings {
+function Get-FmSetting {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $App, [Parameter(Mandatory)] $Settings)
-    $path = Join-Path (Get-AppSettingsDir -App $App) 'FileManager.json'
-    [System.IO.File]::WriteAllText($path, ($Settings | ConvertTo-Json -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
-    if ($script:FmCatalog) { $script:FmCatalog.Options = New-FmOptions -App $App }
-    $App.Log('INFO', 'FileManager', "Settings saved: $path")
+    param([Parameter(Mandatory)] $App, [Parameter(Mandatory)] [string]$Key)
+    $d = Get-FmDefaults
+    return Get-AppEnvironmentValue -App $App -Key $Key -Default $d[$Key]
 }
 
 function New-FmOptions {
     [CmdletBinding()]
-    param([Parameter(Mandatory)] $App, [switch]$ContentCheck, [switch]$HashAllSameSize, [switch]$IncludeQuick)
-    $s = Get-FmSettings -App $App
+    param([Parameter(Mandatory)] $App)
+    $split = { param($t) @(([string]$t) -split '[,;]' | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
     $o = New-Object FileManagerEngine.ScanOptions
-    $o.ContentCheck = [bool]$ContentCheck
-    $o.HashAllSameSize = [bool]$HashAllSameSize
-    $o.IncludeQuick = [bool]$IncludeQuick
-    $o.IgnoreFiles = [string[]]@($s.IgnoreFiles)
-    $o.IgnoreFolders = [string[]]@($s.IgnoreFolders)
-    $o.MinGroupBytes = [long]([Math]::Max(1, [double]$s.MinFolderKB * 1024))
+    $o.ContentCheck = $true
+    $o.HashEverything = [bool]::Parse([string](Get-FmSetting -App $App -Key 'FmHashEverything'))
+    $o.HashAllSameSize = $false
+    $o.IncludeQuick = $false
+    $o.SwapMode = [string](Get-FmSetting -App $App -Key 'FmSwapOlder')
+    $o.ToleranceHours = [double](Get-FmSetting -App $App -Key 'FmToleranceHours')
+    $o.IgnoreFiles = [string[]](& $split (Get-FmSetting -App $App -Key 'FmIgnoreFiles'))
+    $o.IgnoreFolders = [string[]](& $split (Get-FmSetting -App $App -Key 'FmIgnoreFolders'))
+    $o.MinGroupBytes = [long]([Math]::Max(1, [double](Get-FmSetting -App $App -Key 'FmMinFolderKB') * 1024))
     return $o
 }

@@ -200,6 +200,49 @@ try {
     Check (@($cat.GetDrives())[0].Files -eq 0 -and @($cat.GetBatches(10)).Count -ge 2) 'Start fresh (keep history): catalog empty, batches kept'
     $cat.Reset($false)
     Check (@($cat.GetDrives()).Count -eq 0 -and @($cat.GetBatches(10)).Count -eq 0) 'Start fresh (everything): catalog and history empty'
+
+    Write-Host '2.0 one-page list: statuses, swap with an older copy, move ticked rows...'
+    Get-ChildItem -LiteralPath $data -Force | Remove-Item -Recurse -Force
+    $o2 = New-Object FileManagerEngine.ScanOptions
+    $o2.ContentCheck = $true; $o2.HashEverything = $true; $o2.SwapMode = 'Ask'; $o2.ToleranceHours = 2
+    $cat.Options = $o2
+    New-File "$data\_Clean\Photos\a.jpg" ('P' * 500) $new          # already cleaned, newer dates
+    New-File "$data\Photos 2004\a.jpg" ('P' * 500) $old             # same content, older -> swap
+    New-File "$data\Docs\x.txt" ('X' * 300) $old
+    New-File "$data\Docs copy\x.txt" ('X' * 300) $old                # duplicate of Docs (same dates, longer name)
+    New-File "$data\Mixed\own.txt" 'only in Mixed' $old
+    New-File "$data\Mixed\Docs2\x.txt" ('X' * 300) $old             # Mixed holds a copy -> Partly
+    New-File "$data\Solo\y.txt" 'nowhere else at all' $old           # Unique
+    New-File "$data\top.txt" 'a loose file' $old                      # Loose files
+    Wait-Job2 ($cat.StartScan($drive, $o2))
+    $d2 = @($cat.GetDrives())[0].Id
+    $view = @($cat.GetView($d2, ''))
+    $st = @{}; foreach ($r in $view) { $st[$r.Name] = $r.Status }
+    Write-Host ("        " + (($view | ForEach-Object { "$($_.Name)=$($_.Status)" }) -join '; ')) -ForegroundColor DarkGray
+    Check ($st['Photos 2004'] -eq 'Older copy found') "Photos 2004: older copy found ($($st['Photos 2004']))"
+    Check ($st['Docs'] -eq 'Keep (has copies)') "Docs: keep ($($st['Docs']))"
+    Check ($st['Docs copy'] -eq 'Duplicate') "Docs copy: duplicate ($($st['Docs copy']))"
+    Check ($st['Mixed'] -eq 'Partly') "Mixed: partly ($($st['Mixed']))"
+    Check ($st['Solo'] -eq 'Unique') "Solo: unique ($($st['Solo']))"
+    Check ($st['(files at the top of the drive)'] -eq 'Loose files') 'top.txt: loose files'
+    Check (-not $st.ContainsKey('_Clean')) '_Clean itself is not listed'
+    $inside = @($cat.GetView($d2, 'Mixed'))
+    Check (@($inside | Where-Object { $_.Name -eq 'Docs2' -and $_.Status -eq 'Duplicate' }).Count -eq 1) 'inside Mixed: Docs2 is a duplicate'
+    $ids = [long[]]@($view | Where-Object { $_.Kind -eq 'folder' } | ForEach-Object { $_.FolderId })
+    $plan = $cat.BuildPlanFor($d2, $ids, $true)
+    Write-Host $cat.MoveScript($plan.BatchId, $null) -ForegroundColor DarkGray
+    Wait-Job2 ($cat.StartApply($plan.BatchId))
+    Check (Test-Path -LiteralPath "$($drive)_Clean\Photos 2004\a.jpg") 'swap: the older copy is now in _Clean'
+    Check (Test-Path -LiteralPath "$($drive)_Duplicates\Photos 2004\Photos 2004 (1)\a.jpg") 'swap: the newer _Clean copy went to _Duplicates'
+    Check (-not (Test-Path -LiteralPath "$($drive)_Clean\Photos")) 'swap: _Clean\Photos is gone'
+    Check (Test-Path -LiteralPath "$($drive)_Duplicates\Docs\Docs (1)\x.txt") 'Docs copy -> _Duplicates\Docs\Docs (1)'
+    Check ((Test-Path -LiteralPath "$($drive)_Clean\Docs\x.txt") -and (Test-Path -LiteralPath "$($drive)_Clean\Solo\y.txt") -and (Test-Path -LiteralPath "$($drive)_Clean\Mixed\Docs2\x.txt")) 'Docs, Solo and Mixed (whole) -> _Clean'
+    Check (Test-Path -LiteralPath "$($drive)_Clean\top.txt") 'loose file -> _Clean'
+    Check (@($cat.GetView($d2, '')).Count -eq 0) 'nothing left outside _Clean'
+    Check ($cat.LastUndoableBatch() -eq $plan.BatchId) 'Undo last points at this move'
+    Check ($cat.MovedDuplicates() -eq 2) "2 duplicates waiting to be deleted: $($cat.MovedDuplicates())"
+    Wait-Job2 ($cat.StartDeleteAllDuplicates())
+    Check ($cat.MovedDuplicates() -eq 0 -and -not (Test-Path -LiteralPath "$($drive)_Duplicates\Docs")) 'Delete duplicates: both re-checked and deleted'
 }
 finally {
     if ($cat) { try { $cat.Close() } catch { } }

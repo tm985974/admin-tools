@@ -2,6 +2,26 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v2.0.0 (2026-11-19)  One page: pick a drive, Scan, tick rows, Move
+  Note    : new layout. Tabs are Overview, File Manager and Environment; settings moved to
+            the environment record (Environment > File Manager page, keys Fm*). The old
+            Settings\FileManager.json is no longer read.
+  Changed : The File Manager tab replaces Workflow, Drives, Scan, Duplicates, Reports and
+            Consolidate. It lists the folders at the top of a drive (double-click to look
+            inside): Duplicate, Older copy found, Keep (has copies), Partly, Unique, Loose
+            files - with size, files, folders, copies and reward (space you get back), sorted
+            by reward; every column sorts. Tick rows, Move selected; Undo last; Delete
+            duplicates (re-checked first).
+  Added   : The oldest copy is kept, even over one already in _Clean ("Older copy found": Move
+            swaps them). Setting: Ask (default; Select all leaves these out) / On / Off.
+  Added   : File dates within 2 hours count as the same (setting); dates before 1980 or in the
+            future are ignored when finding the oldest copy.
+  Changed : Scan reads every file into the hash database (setting: hash every file, default on).
+  Moved   : Drives and priority (with Start fresh), History (the batch window), Check a folder
+            and Consolidate are under the page's More button.
+  Removed : The Workflow, Scan, Duplicates tabs and the Actions window; nothing is hidden by
+            default (old Windows drives are shown in full).
+
 v1.2.0 (2026-11-19)  Workflow tab; scan one folder; check a folder against the catalog
   Added   : Workflow tab (second tab) - the recommended steps as a checklist, worked out from
             the catalog: what is done, what is next (arrow), what is waiting, and a button to
