@@ -757,9 +757,9 @@ namespace FileManagerEngine
 
     public class ViewRow
     {
-        public long FolderId, Files, Bytes, Folders, Copies, Reward;
+        public long FolderId, Files, Bytes, Folders, Copies, Reward, ParentFolderId;
         public string Kind, Rel, Name, Status, Oldest, Note;
-        public bool HasInside;
+        public bool HasInside, IsPart;
     }
 
     public class CheckRun
@@ -2878,7 +2878,11 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
         }
 
         // Rows for the folders directly inside parentRel ("" = the top of the drive), biggest reward first.
-        public List<ViewRow> GetView(long driveId, string parentRel)
+        public List<ViewRow> GetView(long driveId, string parentRel) { return GetView(driveId, parentRel, false); }
+
+        // withParts: under each Partly row, the folders inside it that have copies (the topmost ones),
+        // so they can be seen and ticked without opening the folder.
+        public List<ViewRow> GetView(long driveId, string parentRel, bool withParts)
         {
             VData v = LoadView(driveId);
             List<ViewRow> rows = new List<ViewRow>();
@@ -2918,7 +2922,40 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                 int c = b.Reward.CompareTo(a.Reward);
                 return c != 0 ? c : b.Bytes.CompareTo(a.Bytes);
             });
-            return rows;
+            if (!withParts) return rows;
+            List<ViewRow> all = new List<ViewRow>();
+            foreach (ViewRow r in rows)
+            {
+                all.Add(r);
+                if (r.Status != "Partly") continue;
+                int pi2;
+                if (!v.Index.TryGetValue(r.FolderId, out pi2)) continue;
+                List<ViewRow> parts = new List<ViewRow>();
+                List<int> stack = new List<int>(v.Nodes[pi2].Kids);
+                while (stack.Count > 0 && parts.Count < 500)
+                {
+                    int k = stack[stack.Count - 1];
+                    stack.RemoveAt(stack.Count - 1);
+                    VNode n = v.Nodes[k];
+                    if (n.Files == 0) continue;
+                    string st = Classify(n);
+                    if (st == "Partly") { stack.AddRange(n.Kids); continue; }
+                    if (st == "Unique" || st == "In _Clean") continue;
+                    ViewRow pr = new ViewRow();
+                    pr.Kind = "folder"; pr.IsPart = true; pr.ParentFolderId = r.FolderId;
+                    pr.FolderId = n.Id; pr.Rel = n.Path; pr.Name = n.Path.Substring(Math.Min(n.Path.Length, r.Rel.Length + 1));
+                    pr.Status = st; pr.Files = n.Files; pr.Bytes = n.Bytes; pr.Folders = n.Folders; pr.Copies = n.Copies; pr.Oldest = Util.Date(n.Oldest);
+                    pr.HasInside = n.Kids.Count > 0;
+                    pr.Reward = st == "Keep (has copies)" ? n.Bytes * Math.Max(0, n.Copies - 1) : n.Bytes;
+                    pr.Note = st == "Duplicate" ? "Kept copy: " + n.KeeperPath
+                            : st == "Older copy found" ? "Older than the copy in _Clean; Move swaps them."
+                            : (n.Copies - 1) + " other copy/copies; this one is kept (" + n.Reason + ").";
+                    parts.Add(pr);
+                }
+                parts.Sort(delegate(ViewRow a, ViewRow b) { return b.Reward.CompareTo(a.Reward); });
+                all.AddRange(parts);
+            }
+            return all;
         }
 
         // Totals for the top of a drive: count and bytes per status.
@@ -2990,7 +3027,15 @@ CREATE INDEX IF NOT EXISTS ix_checkrows ON checkrows(check_id, kind);
                 else if (st == "In _Clean") continue;
                 else toClean.Add(n);
             }
-            foreach (VNode n in toClean) AddCleanMoves(items, sb, ps, driveId, root, n.Path, true, 0, dupSources, 0, vacated);
+            // A ticked folder inside another ticked folder moves with it (paths are kept in _Clean).
+            Dictionary<long, bool> cleanIds = new Dictionary<long, bool>();
+            foreach (VNode n in toClean) cleanIds[n.Id] = true;
+            foreach (VNode n in toClean)
+            {
+                bool inside = false;
+                for (int p = n.ParentIdx; p >= 0; p = v.Nodes[p].ParentIdx) if (cleanIds.ContainsKey(v.Nodes[p].Id)) { inside = true; break; }
+                if (!inside) AddCleanMoves(items, sb, ps, driveId, root, n.Path, true, 0, dupSources, 0, vacated);
+            }
             if (rootFiles)
             {
                 int err;

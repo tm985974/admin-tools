@@ -2,6 +2,14 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v2.0.1 (2026-11-19)  The parts of Partly folders show in the list
+  Added   : Under each Partly row, the folders inside it that have copies (Duplicate, Keep, Older
+            copy found - the topmost ones) are listed, indented, with their own size, files,
+            reward and note, and can be ticked. Check box "Show the parts of Partly folders"
+            (on by default).
+  Fixed   : Ticking a folder for _Clean together with a folder inside it no longer plans the
+            inner one twice (it moves with its parent).
+
 v2.0.0 (2026-11-19)  One page: pick a drive, Scan, tick rows, Move
   Note    : new layout. Tabs are Overview, File Manager and Environment; settings moved to
             the environment record (Environment > File Manager page, keys Fm*). The old

@@ -83,12 +83,15 @@ function Build-FmMainTab {
     $lblFilter.Text = 'Filter:'; $lblFilter.AutoSize = $true; $lblFilter.Margin = New-Object System.Windows.Forms.Padding(0, 9, 4, 0)
     $txtFilter = New-Object System.Windows.Forms.TextBox
     $txtFilter.Width = 200; $txtFilter.Margin = New-Object System.Windows.Forms.Padding(0, 6, 12, 0)
+    $chkParts = New-Object System.Windows.Forms.CheckBox
+    $chkParts.Text = 'Show the parts of Partly folders'
+    $chkParts.AutoSize = $true; $chkParts.Checked = $true; $chkParts.Margin = New-Object System.Windows.Forms.Padding(0, 8, 12, 0)
     $btnAll = $App.Theme.MakeButton('Select all')
     $btnNone = $App.Theme.MakeButton('Select none')
     $btnOpen = $App.Theme.MakeButton('Open folder')
     $lblSel = New-Object System.Windows.Forms.Label
     $lblSel.AutoSize = $true; $lblSel.Margin = New-Object System.Windows.Forms.Padding(12, 9, 0, 0)
-    $bar2.Controls.AddRange(@($btnUp, $lblWhere, $lblShow, $cboShow, $lblFilter, $txtFilter, $btnAll, $btnNone, $btnOpen, $lblSel))
+    $bar2.Controls.AddRange(@($btnUp, $lblWhere, $lblShow, $cboShow, $lblFilter, $txtFilter, $chkParts, $btnAll, $btnNone, $btnOpen, $lblSel))
 
     $grid = New-FmGrid -App $App -Columns @('Status', 'Folder', 'Size', 'Files', 'Folders', 'Copies', 'Reward', 'Oldest file', 'Note') -Weights @(110, 330, 70, 70, 60, 50, 70, 75, 420) -Multi
     $grid.ReadOnly = $false
@@ -116,7 +119,7 @@ function Build-FmMainTab {
     [void]$moreMenu.Items.Add('Consolidate...')
 
     $s = @{ Cat = $cat; App = $App; Combo = $cbo; Grid = $grid; Sum = $sum; Where = $lblWhere; Show = $cboShow; Sel = $lblSel; Prog = $prog
-            Job = $null; Stop = $btnStop; Busy = @($btnScan, $btnMove, $btnUndo, $btnDelete, $btnLoad); Rel = ''; Rows = @(); Regex = $null; More = $moreMenu; MoreBtn = $btnMore }
+            Job = $null; Stop = $btnStop; Busy = @($btnScan, $btnMove, $btnUndo, $btnDelete, $btnLoad); Rel = ''; Rows = @(); Regex = $null; Parts = $chkParts; More = $moreMenu; MoreBtn = $btnMore }
 
     # ---- helpers ----
     $driveId = { $v = $s.Combo.SelectedItem; if ($v -and $v.DriveId -gt 0) { [long]$v.DriveId } else { [long]0 } }.GetNewClosure()
@@ -149,7 +152,7 @@ function Build-FmMainTab {
             $s.Where.Text = ''
             & $s.CountSel; return
         }
-        $rows = @($s.Cat.GetView($d, $s.Rel))
+        $rows = @($s.Cat.GetView($d, $s.Rel, [bool]$s.Parts.Checked))
         $s.Rows = $rows
         $colors = @{
             'Duplicate'         = [System.Drawing.Color]::FromArgb(180, 35, 24)
@@ -160,10 +163,11 @@ function Build-FmMainTab {
         $s.Grid.SuspendLayout()
         try {
             foreach ($r in $rows) {
-                $i = $s.Grid.Rows.Add($false, $r.Status, $(if ($r.Kind -eq 'files') { $r.Name } else { $r.Name }), [FileManagerEngine.Util]::Size($r.Bytes), $r.Files.ToString('N0'),
+                $i = $s.Grid.Rows.Add($false, $r.Status, $(if ($r.IsPart) { '      ' + [char]0x21B3 + ' ' + $r.Name } else { $r.Name }), [FileManagerEngine.Util]::Size($r.Bytes), $r.Files.ToString('N0'),
                     $r.Folders.ToString('N0'), $(if ($r.Copies -gt 0) { $r.Copies } else { '' }), $(if ($r.Reward -gt 0) { [FileManagerEngine.Util]::Size($r.Reward) } else { '' }), $r.Oldest, $r.Note)
                 $s.Grid.Rows[$i].Tag = $r
                 if ($colors.ContainsKey($r.Status)) { $s.Grid.Rows[$i].Cells['cStatus'].Style.ForeColor = $colors[$r.Status] }
+                if ($r.IsPart) { $s.Grid.Rows[$i].DefaultCellStyle.BackColor = $s.App.Theme.Panel }
             }
         }
         finally { $s.Grid.ResumeLayout() }
@@ -231,6 +235,7 @@ function Build-FmMainTab {
     $cbo.Add_SelectedIndexChanged({ $s.Rel = ''; & $s.Fill }.GetNewClosure())
     $btnLoad.Add_Click({ & $s.LoadDrives }.GetNewClosure())
     $cboShow.Add_SelectedIndexChanged({ & $s.ApplyShow }.GetNewClosure())
+    $chkParts.Add_CheckedChanged({ & $s.Fill }.GetNewClosure())
     [void](Register-ListFilter -App $App -TextBox $txtFilter -OnFilter { param($Regex, $Text) $s.Regex = $Regex; & $s.ApplyShow }.GetNewClosure())
     $grid.Add_CurrentCellDirtyStateChanged({ if ($s.Grid.IsCurrentCellDirty) { $s.Grid.CommitEdit('CurrentCellChange') } }.GetNewClosure())
     $grid.Add_CellValueChanged({ param($sender, $e) if ($e.ColumnIndex -eq 0) { & $s.CountSel } }.GetNewClosure())

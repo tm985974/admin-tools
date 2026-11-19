@@ -228,6 +228,9 @@ try {
     Check (-not $st.ContainsKey('_Clean')) '_Clean itself is not listed'
     $inside = @($cat.GetView($d2, 'Mixed'))
     Check (@($inside | Where-Object { $_.Name -eq 'Docs2' -and $_.Status -eq 'Duplicate' }).Count -eq 1) 'inside Mixed: Docs2 is a duplicate'
+    $withParts = @($cat.GetView($d2, '', $true))
+    $part = @($withParts | Where-Object { $_.IsPart })
+    Check ($part.Count -eq 1 -and $part[0].Name -eq 'Docs2' -and $part[0].Status -eq 'Duplicate') "Partly row lists its part: Mixed > Docs2 (duplicate)"
     $ids = [long[]]@($view | Where-Object { $_.Kind -eq 'folder' } | ForEach-Object { $_.FolderId })
     $plan = $cat.BuildPlanFor($d2, $ids, $true)
     Write-Host $cat.MoveScript($plan.BatchId, $null) -ForegroundColor DarkGray

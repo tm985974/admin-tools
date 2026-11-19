@@ -47,6 +47,7 @@
         "Hash every file during a scan": "On: every file is read once, so every match is confirmed. Off: only files that might be duplicates are read (faster).",
         "Reset File Manager settings to defaults": "Put the File Manager settings back to: Ask, 2 hours, hash every file, list every folder, ignore nothing (Save to keep it).",
         "Refresh": "Read the data again and redraw this list.",
-        "Browse": "Pick a folder."
+        "Browse": "Pick a folder.",
+        "Show the parts of Partly folders": "On: under each Partly folder, the folders inside it that have copies are listed (indented), so you can see and tick them without opening the folder."
     }
 }
