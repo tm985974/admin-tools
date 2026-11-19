@@ -21,6 +21,7 @@ jobs:
           - projects\ADUserLookup
           - projects\CCMClientTS
           - projects\CommandLibrary
+          - projects\FileManager
           - projects\PDubPaste
           - projects\RadminLicense
           - projects\RSLinxDriverManager
@@ -31,3 +32,13 @@ jobs:
       - name: Build developer EXE (no Lite)
         shell: cmd
         run: call "${{ matrix.folder }}\Build-App.cmd" -NoLite -NoPause -Output "%RUNNER_TEMP%\App.exe"
+
+  filemanager-engine:
+    # The File Manager engine is C# compiled at run time (Add-Type), so the EXE build
+    # above does not compile it. This compiles it and runs it end to end on a test drive.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test the File Manager engine
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-FileManagerEngine.ps1

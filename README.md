@@ -11,6 +11,7 @@ projects/
   ADUserLookup/           AD user lookup and audit
   CCMClientTS/            CCM client troubleshooting
   CommandLibrary/         script / command library
+  FileManager/            duplicate folders across drives: catalog, _Clean / _Duplicates, undo, verified deletes
   PDubPaste/              password paste tool
   RadminLicense/          Radmin license management (Source/OldScript/ = the original scripts)
   RSLinxDriverManager/    RSLinx driver manager

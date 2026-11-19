@@ -1,0 +1,67 @@
+# CHANGELOG.txt -- project version history (newest first)
+# Each update package carries this file with its new section on top, plus the
+# bumped VERSION.txt, so Version History and the archived EXEs line up.
+
+v1.2.0 (2026-11-19)  Workflow tab; scan one folder; check a folder against the catalog
+  Added   : Workflow tab (second tab) - the recommended steps as a checklist, worked out from
+            the catalog: what is done, what is next (arrow), what is waiting, and a button to
+            each step.
+  Added   : Scan > One folder - scans one folder; only that part of its drive in the catalog is
+            replaced (the rest stays). A cut-off folder scan leaves the catalog unchanged.
+  Added   : Scan > Check only - reads every file of a folder (for example on a thumb drive) and
+            compares it with the catalog: each folder "Already have it" (identical folder, and
+            where), "All files found elsewhere", "Partly" or "New", plus the files not found.
+            Nothing is added or moved. Unhashed catalog files of the same size are read when
+            their drive is connected (and their hash is kept). Export CSV.
+  Added   : Actions > Only this folder - a plan for one folder: its duplicates, and the folder
+            itself to _Clean (keeping its path).
+  Changed : Moving to _Clean merges into a folder that is already in _Clean (only what is not
+            there yet moves) instead of skipping it.
+  Changed : Start fresh also clears the check results.
+
+v1.1.0 (2026-11-19)  Tick the moves to run; folders must be identical; Start fresh
+  Added   : Batch window - every step of a plan with a tick box (Select all / none, Not done
+            yet, Duplicates only, _Clean only, Tick highlighted, filter). Move selected,
+            Undo selected, Delete selected duplicates; unticked steps stay planned and can be
+            run later (Reports > Open batch, or double-click a batch). Ticking a folder for
+            _Clean also moves the duplicates inside it first; undoing a duplicate also moves
+            back the _Clean folder it came from first.
+  Changed : Actions > "Build plan" moves nothing: it opens the plan in the batch window.
+  Changed : Nothing is ignored by default any more (the ignore lists start empty; lists saved
+            by 1.0.x are dropped): folders only match when they are identical.
+  Changed : The origin note is written NEXT TO each copy ("<name> (n)_origin.txt"), not inside
+            it, so the copy stays identical to the kept folder.
+  Changed : Delete re-check compares the copy with the kept copy as they are now when anything
+            changed since the scan, so it also works after the ignore settings change.
+  Changed : A new plan replaces the steps older plans never ran.
+  Fixed   : A failed undo / delete step now shows its reason on the row (Note column), with a
+            hint when a file is open (Explorer, a program, antivirus).
+  Added   : Drives > Start fresh - empties the catalog (optionally keeping the batch history);
+            nothing on any drive changes.
+  Added   : Plan rows show the size and file count of folders going to _Clean.
+
+v1.0.1 (2026-11-19)  Fix: buttons that start a task failed with "null-valued expression"
+  Fixed   : Register drive, Start scan, Content check, Find duplicates, the Actions window,
+            Reports and Consolidate buttons failed with "You cannot call a method on a
+            null-valued expression": a callback made inside a button handler did not see
+            the tab's data (GetNewClosure only copies local variables).
+  Added   : Catalog.Close() (the engine test now removes its temporary folder).
+
+v1.0.0 (2026-11-19)  Created from AppTemplate v1.2.0
+  Added   : Catalog of every drive, folder and file in one SQLite file (winsqlite3.dll,
+            built into Windows 10 1607+ and 11). Drives are recognised by serial number.
+  Added   : Scan tab - quick scan (names, sizes, dates), content check (hashes only the
+            files in folders that might be duplicates; optional: every file whose size
+            matches another), Stop / carry on, ignore lists, long paths.
+  Added   : Duplicates tab - duplicate folder groups by content (names and dates ignored,
+            folder layout must match), top-down, biggest saving first; keeper = your pick,
+            else a copy already in _Clean, the oldest files, drive priority, shortest path.
+            Contained folders report.
+  Added   : Actions window - moves duplicates to X:\_Duplicates\<kept path>\<name>\<name> (n)
+            (numbered across drives, _origin.txt inside) and everything else to X:\_Clean,
+            each on its own drive; shown as PowerShell first; recorded for undo.
+  Added   : Reports tab - batches (continue, undo, delete duplicates after a full re-check
+            against the kept copy), scan history, CSV and HTML exports.
+  Added   : Consolidate tab - Robocopy (never overwrites), verify by hash, remove only the
+            source files that verified.
+  Added   : Drives tab - priority, register, health check (Get-PhysicalDisk), forget.

@@ -1,0 +1,5 @@
+{
+    "_note": "Greenfield projects: leave both empty. See _AppLauncher.ps1 (shared-scope loading) for porting a legacy tool.",
+    "Modules": [],
+    "Order": []
+}

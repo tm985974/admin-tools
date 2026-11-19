@@ -1,0 +1,14 @@
+{
+    "ActiveDefault": "Default",
+    "Environments": [
+        {
+            "Name": "Default",
+            "Label": "Default",
+            "SharedPath": "",
+            "IsDefault": true,
+            "FilterAsYouType": true,
+            "LogMaxKB": 5120,
+            "Notes": "File Manager keeps its catalog on this PC (%LOCALAPPDATA%\\FileManagerData\\Catalog). A Log & data path (UNC) only moves the logs and settings."
+        }
+    ]
+}
