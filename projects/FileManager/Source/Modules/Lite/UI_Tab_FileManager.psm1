@@ -68,6 +68,19 @@ function Build-FmMainTab {
     $sum = New-FmLabel -App $App -Height 24
     $sum.Font = New-AppFont -App $App -Style ([System.Drawing.FontStyle]::Bold)
 
+    # ---- the next step (worked out from the list; you still tick and move yourself) ----
+    $banner = New-Object System.Windows.Forms.Panel
+    $banner.Dock = 'Top'; $banner.Height = 76; $banner.BackColor = $App.Theme.Header
+    $bnTitle = New-Object System.Windows.Forms.Label
+    $bnTitle.Location = New-Object System.Drawing.Point(12, 8); $bnTitle.AutoSize = $true; $bnTitle.ForeColor = $App.Theme.Title
+    $bnTitle.Font = New-AppFont -App $App -Size ($App.Theme.FontSizePt + 3) -Style ([System.Drawing.FontStyle]::Bold)
+    $bnSteps = New-Object System.Windows.Forms.Label
+    $bnSteps.Location = New-Object System.Drawing.Point(14, 44); $bnSteps.AutoSize = $true; $bnSteps.ForeColor = $App.Theme.Text
+    $bnBtn = $App.Theme.MakeButton('Show and tick')
+    $bnBtn.Anchor = 'Top, Right'
+    $banner.Controls.AddRange(@($bnTitle, $bnSteps, $bnBtn))
+    $banner.Add_Resize({ $bnBtn.Location = New-Object System.Drawing.Point(($banner.ClientSize.Width - $bnBtn.Width - 14), 22) }.GetNewClosure())
+
     # ---- 2. the list ----
     $bar2 = New-FmBar -Height 38
     $btnUp = $App.Theme.MakeButton('Up one level')
@@ -76,8 +89,9 @@ function Build-FmMainTab {
     $lblShow = New-Object System.Windows.Forms.Label
     $lblShow.Text = 'Show:'; $lblShow.AutoSize = $true; $lblShow.Margin = New-Object System.Windows.Forms.Padding(0, 9, 4, 0)
     $cboShow = New-Object System.Windows.Forms.ComboBox
-    $cboShow.DropDownStyle = 'DropDownList'; $cboShow.Width = 170; $cboShow.Margin = New-Object System.Windows.Forms.Padding(0, 5, 12, 0)
-    [void]$cboShow.Items.AddRange([object[]]@('All', 'Duplicate', 'Older copy found', 'Keep (has copies)', 'Partly', 'Unique', 'Loose files'))
+    $cboShow.DropDownStyle = 'DropDownList'; $cboShow.Width = 200; $cboShow.Margin = New-Object System.Windows.Forms.Padding(0, 5, 12, 0)
+    [void]$cboShow.Items.AddRange([object[]]@('All', 'Step 1: exact copies', 'Step 2: older copies', 'Step 3: to _Clean', 'Waiting for step 1',
+        'Duplicate', 'Older copy found', 'Keep (has copies)', 'Partly', 'Unique', 'Loose files'))
     $cboShow.SelectedIndex = 0
     $lblFilter = New-Object System.Windows.Forms.Label
     $lblFilter.Text = 'Filter:'; $lblFilter.AutoSize = $true; $lblFilter.Margin = New-Object System.Windows.Forms.Padding(0, 9, 4, 0)
@@ -93,9 +107,9 @@ function Build-FmMainTab {
     $lblSel.AutoSize = $true; $lblSel.Margin = New-Object System.Windows.Forms.Padding(12, 9, 0, 0)
     $bar2.Controls.AddRange(@($btnUp, $lblWhere, $lblShow, $cboShow, $lblFilter, $txtFilter, $chkParts, $btnAll, $btnNone, $btnOpen, $lblSel))
 
-    $grid = New-FmGrid -App $App -Columns @('Status', 'Folder', 'Size', 'Files', 'Folders', 'Copies', 'Reward', 'Oldest file', 'Note') -Weights @(110, 330, 70, 70, 60, 50, 70, 75, 420) -Multi
+    $grid = New-FmGrid -App $App -Columns @('Status', 'Next step', 'Folder', 'Size', 'Files', 'Folders', 'Copies', 'Reward', 'Oldest file', 'Note') -Weights @(105, 135, 320, 70, 70, 60, 50, 70, 75, 380) -Multi
     $grid.ReadOnly = $false
-    $names = @('cStatus', 'cFolder', 'cSize', 'cFiles', 'cFolders', 'cCopies', 'cReward', 'cOldest', 'cNote')
+    $names = @('cStatus', 'cNext', 'cFolder', 'cSize', 'cFiles', 'cFolders', 'cCopies', 'cReward', 'cOldest', 'cNote')
     for ($i = 0; $i -lt $names.Count; $i++) { $grid.Columns[$i].Name = $names[$i]; $grid.Columns[$i].ReadOnly = $true; $grid.Columns[$i].SortMode = 'Automatic' }
     $chk = New-Object System.Windows.Forms.DataGridViewCheckBoxColumn
     $chk.Name = 'Pick'; $chk.HeaderText = ''; $chk.FillWeight = 22; $chk.ReadOnly = $false; $chk.SortMode = 'NotSortable'
@@ -120,7 +134,24 @@ function Build-FmMainTab {
     [void]$moreMenu.Items.Add('Consolidate...')
 
     $s = @{ Cat = $cat; App = $App; Combo = $cbo; Grid = $grid; Sum = $sum; Where = $lblWhere; Show = $cboShow; Sel = $lblSel; Prog = $prog
-            Job = $null; Stop = $btnStop; Busy = @($btnScan, $btnMove, $btnUndo, $btnDelete, $btnLoad); Rel = ''; Rows = @(); Regex = $null; Parts = $chkParts; More = $moreMenu; MoreBtn = $btnMore }
+            Job = $null; Stop = $btnStop; Busy = @($btnScan, $btnMove, $btnUndo, $btnDelete, $btnLoad); Rel = ''; Rows = @(); Regex = $null; Parts = $chkParts; More = $moreMenu; MoreBtn = $btnMore
+            BnTitle = $bnTitle; BnSteps = $bnSteps; BnBtn = $bnBtn; BnAction = ''; Scan = $btnScan; Delete = $btnDelete }
+
+    # Which recommended step a row belongs to: 1 exact copies, 2 older copies (your choice), 3 to _Clean, 0 waiting.
+    $stepOf = {
+        param($r)
+        switch ($r.Status) {
+            'Duplicate'         { 1 }
+            'Older copy found'  { 2 }
+            'Unique'            { 3 }
+            'Keep (has copies)' { 3 }
+            'Loose files'       { 3 }
+            'Partly'            { if ($r.Reward -gt 0) { 0 } else { 3 } }
+            default             { 0 }
+        }
+    }
+    $s.StepOf = $stepOf
+    $s.StepText = @{ 1 = '1  Move to _Duplicates'; 2 = '2  Swap? (you decide)'; 3 = '3  Move to _Clean'; 0 = 'After step 1' }
 
     # ---- helpers ----
     $driveId = { $v = $s.Combo.SelectedItem; if ($v -and $v.DriveId -gt 0) { [long]$v.DriveId } else { [long]0 } }.GetNewClosure()
@@ -138,12 +169,91 @@ function Build-FmMainTab {
         $s.Grid.CurrentCell = $null
         foreach ($row in $s.Grid.Rows) {
             $r = $row.Tag
-            $ok = ($want -eq 'All' -or $r.Status -eq $want)
+            $st = & $s.StepOf $r
+            $ok = switch -Wildcard ($want) {
+                'All'      { $true }
+                'Step 1*'  { $st -eq 1 }
+                'Step 2*'  { $st -eq 2 }
+                'Step 3*'  { $st -eq 3 }
+                'Waiting*' { $st -eq 0 }
+                default    { $r.Status -eq $want }
+            }
             if ($ok -and $s.Regex) { $ok = ($s.Regex.IsMatch([string]$r.Name) -or $s.Regex.IsMatch([string]$r.Note)) }
             $row.Visible = $ok
         }
     }.GetNewClosure()
     $s.ApplyShow = $applyShow
+
+    $s.BoldFont = New-AppFont -App $App -Style ([System.Drawing.FontStyle]::Bold)
+
+    $selectAll = {
+        $s.Grid.EndEdit()
+        $ask = ([string](Get-FmSetting -App $s.App -Key 'FmSwapOlder')) -eq 'Ask'
+        foreach ($row in $s.Grid.Rows) {
+            if (-not $row.Visible) { continue }
+            $row.Cells['Pick'].Value = -not ($ask -and $row.Tag.Status -eq 'Older copy found')
+        }
+        & $s.CountSel
+    }.GetNewClosure()
+    $s.SelectAll = $selectAll
+
+    $updateBanner = {
+        param([long]$d, $dr)
+        $ok = [string][char]0x2714
+        $size = { param([long]$b) [FileManagerEngine.Util]::Size($b) }
+        $title = ''; $btn = ''; $tip = ''; $action = ''
+        if ($d -le 0 -or -not $dr -or -not $dr.LastScan) {
+            $title = 'Next: scan this drive (pick it above).'
+            $btn = 'Scan'; $action = 'scan'; $tip = 'Read every folder and file of this drive into the hash database (read only).'
+            $s.BnSteps.Text = 'Steps after the scan:  1. move exact copies to _Duplicates   2. decide on older copies   3. move the rest to _Clean   4. check _Duplicates, then delete'
+        }
+        elseif ($dr.NeedsRescan) {
+            $title = 'Next: scan this drive again - it changed since the last scan.'
+            $btn = 'Scan'; $action = 'scan'; $tip = 'Read the drive again (files already hashed and unchanged are not read again).'
+            $s.BnSteps.Text = ''
+        }
+        else {
+            $all = @($s.Cat.GetView($d, '', $true))
+            $n = @{ 0 = 0; 1 = 0; 2 = 0; 3 = 0 }; $b = @{ 0 = [long]0; 1 = [long]0; 2 = [long]0; 3 = [long]0 }
+            foreach ($r in $all) { $k = [int](& $s.StepOf $r); $n[$k]++; $b[$k] += $r.Bytes }
+            $moved = $s.Cat.MovedDuplicates()
+            $reorg = $s.Cat.NeedsReorganize($d)
+            $mark = { param([int]$cnt, [string]$txt) if ($cnt -eq 0) { "$ok $txt" } else { $txt } }
+            $s.BnSteps.Text = ((& $mark $n[1] ('1. Exact copies: {0:N0} ({1})' -f $n[1], (& $size $b[1]))) + '      ' +
+                               (& $mark $n[2] ('2. Older copies: {0:N0}' -f $n[2])) + '      ' +
+                               (& $mark $n[3] ('3. To _Clean: {0:N0} ({1})' -f $n[3], (& $size $b[3]))) + '      ' +
+                               (& $mark $moved ('4. Waiting in _Duplicates: {0:N0} ({1}, all drives)' -f $moved, (& $size $s.Cat.MovedDuplicateBytes()))))
+            if ($reorg) {
+                $title = 'Next: Reorganize _Clean (one time) - it still has the layout of an earlier version.'
+                $btn = 'Reorganize'; $action = 'reorg'; $tip = 'Put what is already in _Clean into the new layout. You see every rename first.'
+            }
+            elseif ($n[1] -gt 0) {
+                $title = 'Next - step 1: move the {0:N0} exact copies ({1}) to _Duplicates. Everything inside each one goes with it.' -f $n[1], (& $size $b[1])
+                $btn = 'Show and tick'; $action = 'step1'; $tip = 'Show only the exact copies and tick them all. Then check the list and click Move selected.'
+            }
+            elseif ($n[2] -gt 0) {
+                $title = 'Next - step 2: {0:N0} folder(s) are older than the copy in _Clean. Tick the ones you want to swap (or skip them).' -f $n[2]
+                $btn = 'Show them'; $action = 'step2'; $tip = 'Show only the older copies. Tick the ones to swap, then Move selected.'
+            }
+            elseif ($n[3] -gt 0) {
+                $title = 'Next - step 3: move the {0:N0} remaining folder(s) ({1}) to _Clean.' -f $n[3], (& $size $b[3])
+                $btn = 'Show and tick'; $action = 'step3'; $tip = 'Show only what goes to _Clean and tick it all. Then check the list and click Move selected.'
+            }
+            elseif ($moved -gt 0) {
+                $title = 'Next - step 4: look through _Duplicates, then Delete duplicates ({0:N0}, {1}).' -f $moved, (& $size $s.Cat.MovedDuplicateBytes())
+                $btn = 'Delete duplicates'; $action = 'delete'; $tip = 'Each copy is read again and compared with its kept copy before it is deleted.'
+            }
+            else {
+                $title = "$ok This drive is sorted. Plug in the next drive, pick it above and Scan."
+                $action = ''
+            }
+        }
+        $s.BnTitle.Text = $title
+        $s.BnAction = $action
+        $s.BnBtn.Visible = [bool]$action
+        if ($action) { $s.BnBtn.Text = $btn; Set-AppToolTip -Control $s.BnBtn -Text $tip }
+    }.GetNewClosure()
+    $s.UpdateBanner = $updateBanner
 
     $fill = {
         $d = & $s.DriveId
@@ -151,6 +261,7 @@ function Build-FmMainTab {
         if ($d -le 0) {
             $s.Sum.Text = 'Pick a drive and click Scan. (A new drive is added to the catalog by its first scan.)'
             $s.Where.Text = ''
+            & $s.UpdateBanner 0 $null
             & $s.CountSel; return
         }
         $rows = @($s.Cat.GetView($d, $s.Rel, [bool]$s.Parts.Checked))
@@ -164,11 +275,12 @@ function Build-FmMainTab {
         $s.Grid.SuspendLayout()
         try {
             foreach ($r in $rows) {
-                $i = $s.Grid.Rows.Add($false, $r.Status, $(if ($r.IsPart) { '      ' + [char]0x21B3 + ' ' + $r.Name } else { $r.Name }), [FileManagerEngine.Util]::Size($r.Bytes), $r.Files.ToString('N0'),
+                $i = $s.Grid.Rows.Add($false, $r.Status, $s.StepText[[int](& $s.StepOf $r)], $(if ($r.IsPart) { '      ' + [char]0x21B3 + ' ' + $r.Name } else { $r.Name }), [FileManagerEngine.Util]::Size($r.Bytes), $r.Files.ToString('N0'),
                     $r.Folders.ToString('N0'), $(if ($r.Copies -gt 0) { $r.Copies } else { '' }), $(if ($r.Reward -gt 0) { [FileManagerEngine.Util]::Size($r.Reward) } else { '' }), $r.Oldest, $r.Note)
                 $s.Grid.Rows[$i].Tag = $r
                 if ($colors.ContainsKey($r.Status)) { $s.Grid.Rows[$i].Cells['cStatus'].Style.ForeColor = $colors[$r.Status] }
                 if ($r.IsPart) { $s.Grid.Rows[$i].DefaultCellStyle.BackColor = $s.App.Theme.Panel }
+                $s.Grid.Rows[$i].Cells['cNext'].Style.Font = $s.BoldFont
             }
         }
         finally { $s.Grid.ResumeLayout() }
@@ -180,6 +292,7 @@ function Build-FmMainTab {
         if ($dr -and $dr.NeedsRescan) { $info += '  -  SCAN AGAIN: the drive changed' }
         $s.Sum.Text = $info + '     ' + $s.Cat.ViewSummary($d)
         if ($s.Cat.NeedsReorganize($d)) { $s.Sum.Text += '     -  _Clean still has the old layout: More > Reorganize _Clean' }
+        & $s.UpdateBanner $d $dr
         & $s.CountSel
     }.GetNewClosure()
     $s.Fill = $fill
@@ -270,15 +383,7 @@ function Build-FmMainTab {
         & $s.Fill
     }.GetNewClosure())
 
-    $btnAll.Add_Click({
-        $s.Grid.EndEdit()
-        $ask = ([string](Get-FmSetting -App $s.App -Key 'FmSwapOlder')) -eq 'Ask'
-        foreach ($row in $s.Grid.Rows) {
-            if (-not $row.Visible) { continue }
-            $row.Cells['Pick'].Value = -not ($ask -and $row.Tag.Status -eq 'Older copy found')
-        }
-        & $s.CountSel
-    }.GetNewClosure())
+    $btnAll.Add_Click({ & $s.SelectAll }.GetNewClosure())
     $btnNone.Add_Click({ $s.Grid.EndEdit(); foreach ($row in $s.Grid.Rows) { $row.Cells['Pick'].Value = $false }; & $s.CountSel }.GetNewClosure())
 
     $btnOpen.Add_Click({
@@ -347,6 +452,40 @@ function Build-FmMainTab {
         & $s.Run (Invoke-FmSafe -App $App -What 'Delete duplicates' -Action { $s.Cat.StartDeleteAllDuplicates() }) 'Re-checking and deleting...' $null
     }.GetNewClosure())
 
+    $reorganize = {
+        $d = & $s.DriveId
+        $vol = $s.Combo.SelectedItem
+        if ($d -le 0) { $s.App.SetStatus('Pick a scanned drive first.', 'warn'); return }
+        $plan = Invoke-FmSafe -App $s.App -What 'Reorganize _Clean' -Action { $s.Cat.BuildReorganizePlan($d) }
+        if (-not $plan) { return }
+        if ($plan.BatchId -le 0) { $s.App.SetStatus("$($vol.Letter)\_Clean is already in the new layout.", 'ok'); return }
+        $summary = "Put the $($plan.CleanItems) item(s) at the top of $($vol.Letter)\_Clean into the new layout: _Clean\<Name>\<Name>_n, with a _sources.txt in each <Name> folder. " +
+                   'Renames on the same drive (instant); folders whose new name is the same as the old one go through a temporary name first. Undo puts everything back.'
+        if (-not (Confirm-AppCommand -App $s.App -Title 'Reorganize _Clean' -Kind Change -Always -Code $s.Cat.MoveScript($plan.BatchId, $null) -Summary $summary -RunLabel 'Reorganize')) {
+            $s.Cat.CancelBatch($plan.BatchId); return
+        }
+        $s.App.LogAction("Reorganize _Clean on $($vol.Letter): batch $($plan.BatchId), $($plan.CleanItems) item(s).")
+        & $s.Run (Invoke-FmSafe -App $s.App -What 'Reorganize _Clean' -Action { $s.Cat.StartApply($plan.BatchId) }) 'Reorganizing _Clean...' $null
+            }.GetNewClosure()
+    $s.Reorganize = $reorganize
+
+    # ---- the banner button ----
+    $bnBtn.Add_Click({
+        switch ($s.BnAction) {
+            'scan'   { $s.Scan.PerformClick() }
+            'delete' { $s.Delete.PerformClick() }
+            'reorg'  { & $s.Reorganize }
+            default {
+                $want = @{ step1 = 'Step 1: exact copies'; step2 = 'Step 2: older copies'; step3 = 'Step 3: to _Clean' }[$s.BnAction]
+                if (-not $want) { return }
+                if ($s.Rel -or -not $s.Parts.Checked) { $s.Rel = ''; $s.Parts.Checked = $true; & $s.Fill }
+                $s.Show.SelectedItem = $want
+                if ($s.BnAction -ne 'step2') { & $s.SelectAll }
+                $s.App.SetStatus('Ticked. Check the list, then click Move selected.', 'info')
+            }
+        }
+    }.GetNewClosure())
+
     # ---- More ----
     $btnMore.Add_Click({ $s.More.Show($s.MoreBtn, (New-Object System.Drawing.Point(0, $s.MoreBtn.Height))) }.GetNewClosure())
     $moreMenu.Add_ItemClicked({
@@ -357,21 +496,7 @@ function Build-FmMainTab {
             'Drives*'      { Show-FmPageWindow -App $s.App -Title 'Drives and priority' -Build ${function:Build-FmDrivesTab}; & $s.LoadDrives; & $s.Fill }
             'History*'     { Show-FmPageWindow -App $s.App -Title 'History' -Build ${function:Build-FmReportsTab}; & $s.Fill }
             'Consolidate*' { Show-FmPageWindow -App $s.App -Title 'Consolidate' -Build ${function:Build-FmConsolidateTab}; & $s.LoadDrives; & $s.Fill }
-            'Reorganize*' {
-                $d = & $s.DriveId
-                $vol = $s.Combo.SelectedItem
-                if ($d -le 0) { $s.App.SetStatus('Pick a scanned drive first.', 'warn'); return }
-                $plan = Invoke-FmSafe -App $s.App -What 'Reorganize _Clean' -Action { $s.Cat.BuildReorganizePlan($d) }
-                if (-not $plan) { return }
-                if ($plan.BatchId -le 0) { $s.App.SetStatus("$($vol.Letter)\_Clean is already in the new layout.", 'ok'); return }
-                $summary = "Put the $($plan.CleanItems) item(s) at the top of $($vol.Letter)\_Clean into the new layout: _Clean\<Name>\<Name>_n, with a _sources.txt in each <Name> folder. " +
-                           'Renames on the same drive (instant); folders whose new name is the same as the old one go through a temporary name first. Undo puts everything back.'
-                if (-not (Confirm-AppCommand -App $s.App -Title 'Reorganize _Clean' -Kind Change -Always -Code $s.Cat.MoveScript($plan.BatchId, $null) -Summary $summary -RunLabel 'Reorganize')) {
-                    $s.Cat.CancelBatch($plan.BatchId); return
-                }
-                $s.App.LogAction("Reorganize _Clean on $($vol.Letter): batch $($plan.BatchId), $($plan.CleanItems) item(s).")
-                & $s.Run (Invoke-FmSafe -App $s.App -What 'Reorganize _Clean' -Action { $s.Cat.StartApply($plan.BatchId) }) 'Reorganizing _Clean...' $null
-            }
+            'Reorganize*' { & $s.Reorganize }
             'Check*' {
                 $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
                 $dlg.Description = 'Pick a folder to compare with the catalog (for example on a thumb drive). Nothing is added or moved.'
@@ -393,6 +518,7 @@ function Build-FmMainTab {
     $Page.Controls.Add($prog.Log)
     $Page.Controls.Add($bar3)
     $Page.Controls.Add($bar2)
+    $Page.Controls.Add($banner)
     $Page.Controls.Add($sum)
     $Page.Controls.Add($prog.Panel)
     $Page.Controls.Add($bar1)

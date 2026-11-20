@@ -2,6 +2,17 @@
 # Each update package carries this file with its new section on top, plus the
 # bumped VERSION.txt, so Version History and the archived EXEs line up.
 
+v2.2.0 (2026-11-20)  The next step is shown above the list
+  Added   : A "Next" banner above the list says what to do now for the selected drive, with one
+            button that shows and ticks those rows (you still check them and click Move
+            selected), and a line with every step and its count (done steps get a check mark):
+              scan -> 1. move exact copies to _Duplicates -> 2. decide on older copies ->
+              3. move the rest to _Clean -> 4. check _Duplicates, then Delete duplicates.
+  Added   : "Next step" column on every row (1 Move to _Duplicates, 2 Swap? (you decide),
+            3 Move to _Clean, After step 1 = a Partly folder that still holds copies).
+  Added   : Show can filter by step (Step 1: exact copies, Step 2: older copies, Step 3: to
+            _Clean, Waiting for step 1) as well as by status.
+
 v2.1.0 (2026-11-19)  Flat layout: _Clean\<Name>\<Name>_n, with _sources.txt
   Changed : Every folder moved to _Clean goes to _Clean\<Name>\<Name>_<n>: folders with the same
             name are grouped side by side. Names are grouped ignoring capital letters and copy

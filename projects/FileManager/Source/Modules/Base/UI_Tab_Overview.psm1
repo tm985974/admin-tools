@@ -43,6 +43,7 @@ function New-OverviewTab {
     Add-Bullet 'Remembers every drive in one hash database, so you can scan one drive, unplug it, and plug in the next.'
 
     Add-Section 'How to use it (File Manager tab)'
+    Add-Bullet 'The blue Next banner above the list always says what to do now, with a button that shows and ticks those rows. You still check them and click Move selected yourself.'
     Add-Bullet '1. Pick a drive and click Scan. Every file is read once into the hash database (hours for a big drive; Stop is safe, it carries on).'
     Add-Bullet '2. The list shows the folders at the top of the drive, biggest reward (space you get back) first. Click a column to sort by size, files or folders.'
     Add-Bullet '3. Tick the rows you want, then Move selected. You see the exact moves first. Every move stays on its drive and can be undone (Undo last).'
